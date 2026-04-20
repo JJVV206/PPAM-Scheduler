@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 68% 8%;
+    --foreground: 216 38% 93%;
+    --card: 217 44% 13%;
+    --card-foreground: 216 40% 96%;
+    --popover: 220 48% 11%;
+    --popover-foreground: 216 40% 96%;
+    --primary: 220 100% 73%;
+    --primary-foreground: 221 72% 12%;
+    --secondary: 217 35% 20%;
+    --secondary-foreground: 217 38% 94%;
+    --muted: 218 31% 18%;
+    --muted-foreground: 217 18% 68%;
+    --accent: 214 90% 61%;
+    --accent-foreground: 216 40% 96%;
+    --danger: 4 86% 63%;
+    --danger-foreground: 0 0% 100%;
+    --warning: 29 94% 63%;
+    --warning-foreground: 222 45% 10%;
+    --success: 148 58% 49%;
+    --success-foreground: 216 45% 8%;
+    --border: 217 33% 23%;
+    --input: 217 33% 23%;
+    --ring: 220 100% 73%;
+    --surface: 217 44% 13%;
+    --surface-elevated: 217 38% 16%;
+    --surface-brand: 220 73% 61%;
+    --radius: 1.1rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply min-h-screen bg-background font-sans text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at top, rgba(107, 151, 255, 0.12), transparent 34%),
+      radial-gradient(circle at bottom right, rgba(24, 84, 214, 0.12), transparent 28%),
+      linear-gradient(180deg, rgba(3, 17, 41, 0.98), rgba(4, 18, 42, 1));
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .surface-panel {
+    @apply rounded-3xl border border-border/80 bg-surface/90 shadow-soft backdrop-blur;
+  }
+
+  .surface-elevated {
+    @apply rounded-3xl border border-white/5 bg-surface-elevated/95 shadow-glow;
+  }
+}
