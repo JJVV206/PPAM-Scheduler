@@ -8,12 +8,14 @@ import { getVolunteers } from "@/services/volunteer.service";
 import { db } from "@/lib/db/prisma";
 
 export default async function AdminSchedulePage() {
-  const [schedule, preachingPoints, volunteers, currentWeek] = await Promise.all([
-    getWeeklySchedule(),
+  const schedule = await getWeeklySchedule();
+  const [preachingPoints, volunteers, currentWeek] = await Promise.all([
     getPreachingPoints(),
     getVolunteers(),
     db.scheduleWeek.findFirst({
-      orderBy: { startDate: "desc" }
+      where: {
+        startDate: schedule.startDate
+      }
     })
   ]);
 
@@ -27,6 +29,7 @@ export default async function AdminSchedulePage() {
         {currentWeek ? (
           <AssignmentForm
             scheduleWeekId={currentWeek.id}
+            weekStartDate={schedule.startDate.toISOString()}
             preachingPoints={preachingPoints.map((point) => ({
               id: point.id,
               name: point.name,

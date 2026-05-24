@@ -165,6 +165,7 @@ model Assignment {
   dayOfWeek        DayOfWeek
   timeSlot         TimeSlot
   preachingPointId String
+  pairNumber       Int                  @default(1)
   status           AssignmentStatus     @default(SCHEDULED)
   notes            String?
   completedAt      DateTime?
@@ -178,8 +179,9 @@ model Assignment {
   notifications    NotificationLog[]
   activities       AssignmentActivity[]
 
-  @@unique([date, timeSlot, preachingPointId])
+  @@unique([date, timeSlot, preachingPointId, pairNumber])
   @@index([date, timeSlot, status])
+  @@index([date, timeSlot, preachingPointId])
   @@index([scheduleWeekId])
 }
 

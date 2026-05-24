@@ -51,6 +51,16 @@ type AppSidebarProps = {
   role: UserRole;
 };
 
+function isActiveRoute(pathname: string, href: string) {
+  const isSectionRoot = href === "/admin" || href === "/volunteer";
+
+  if (isSectionRoot) {
+    return pathname === href;
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function AppSidebar({ role }: AppSidebarProps) {
   const pathname = usePathname();
   const items = role === "ADMIN" ? adminItems : volunteerItems;
@@ -72,8 +82,7 @@ export function AppSidebar({ role }: AppSidebarProps) {
 
         <nav className="space-y-2">
           {items.map((item) => {
-            const active =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const active = isActiveRoute(pathname, item.href);
             const Icon = item.icon;
 
             return (

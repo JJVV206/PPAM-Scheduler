@@ -3,24 +3,16 @@ import { Clock3, MapPin, Users2 } from "lucide-react";
 import { StatusBadge } from "@/components/assignments/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
-import type { AssignmentDetailDto, WeeklyScheduleCell } from "@/types/domain";
+import type { AssignmentDetailDto } from "@/types/domain";
 
 type AssignmentCardProps = {
-  assignment: WeeklyScheduleCell | AssignmentDetailDto;
+  assignment: AssignmentDetailDto;
   action?: React.ReactNode;
 };
 
 export function AssignmentCard({ assignment, action }: AssignmentCardProps) {
-  const volunteerNames =
-    "volunteerNames" in assignment
-      ? assignment.volunteerNames
-      : assignment.volunteers.map((item) => item.volunteer.name);
-  const point = "preachingPoint" in assignment
-    ? assignment.preachingPoint
-    : {
-        name: assignment.preachingPointName,
-        area: assignment.area
-      };
+  const volunteerNames = assignment.volunteers.map((item) => item.volunteer.name);
+  const point = assignment.preachingPoint;
 
   return (
     <Card className="h-full border border-white/5 bg-white/[0.03]">
@@ -31,6 +23,9 @@ export function AssignmentCard({ assignment, action }: AssignmentCardProps) {
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <MapPin className="h-4 w-4" />
               {point.area}
+            </p>
+            <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              Couple {assignment.pairNumber}
             </p>
           </div>
           <StatusBadge status={assignment.status} />

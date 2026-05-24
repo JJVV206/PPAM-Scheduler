@@ -16,9 +16,23 @@ Production-ready MVP for managing weekly public preaching assignments with role-
 
 1. Copy `.env.example` to `.env`.
 2. Install dependencies with `npm install`.
-3. Run Prisma migrations or `prisma db push`.
-4. Seed the database with `npm run db:seed`.
-5. Start the app with `npm run dev`.
+3. Start PostgreSQL with `npm run db:start`.
+4. Sync the schema with `npm run db:push`.
+5. Seed the database with `npm run db:seed`.
+6. Start the app with `npm run dev`.
+
+## Local Database
+
+This repo includes a local PostgreSQL service in `compose.yaml`.
+
+- Start DB: `npm run db:start`
+- Check DB status: `npm run db:status`
+- Stop DB: `npm run db:stop`
+- First-time setup: `npm run db:prepare`
+
+If `docker compose` cannot connect, Docker Desktop is not running yet. Start Docker Desktop first, then rerun `npm run db:start`.
+
+If you see `Can't reach database server at localhost:5432`, the app is up but PostgreSQL is not running.
 
 ## Demo Users
 

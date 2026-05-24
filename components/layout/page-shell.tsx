@@ -13,7 +13,7 @@ type PageShellProps = {
 export function PageShell({ role, userName, children }: PageShellProps) {
   return (
     <div className="min-h-screen px-4 py-4">
-      <div className="mx-auto flex max-w-[1600px] gap-4">
+      <div className="mx-auto flex max-w-[1760px] gap-4">
         <AppSidebar role={role} />
         <main className="min-w-0 flex-1 space-y-4">
           <TopNavbar role={role} userName={userName} />

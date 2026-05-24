@@ -39,7 +39,12 @@ export default async function AdminAssignmentsPage() {
               <TableCell>{TIME_SLOT_DEFINITIONS[assignment.timeSlot].label}</TableCell>
               <TableCell>{assignment.preachingPoint.name}</TableCell>
               <TableCell>
-                {assignment.volunteers.map((item) => item.volunteer.name).join(" & ")}
+                <div className="space-y-1">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                    Couple {assignment.pairNumber}
+                  </p>
+                  <p>{assignment.volunteers.map((item) => item.volunteer.name).join(" & ")}</p>
+                </div>
               </TableCell>
               <TableCell>
                 <StatusBadge status={assignment.status} />

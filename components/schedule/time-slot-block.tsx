@@ -1,11 +1,10 @@
 import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
-import type { TimeSlot, WeeklyScheduleCell } from "@/types/domain";
-
-import { AssignmentCard } from "@/components/assignments/assignment-card";
+import type { TimeSlot, WeeklySchedulePointCell } from "@/types/domain";
+import { SchedulePointGroup } from "@/components/schedule/schedule-point-group";
 
 type TimeSlotBlockProps = {
   timeSlot: TimeSlot;
-  assignments: WeeklyScheduleCell[];
+  assignments: WeeklySchedulePointCell[];
   emptyState?: React.ReactNode;
 };
 
@@ -23,7 +22,10 @@ export function TimeSlotBlock({
       <div className="space-y-3">
         {assignments.length ? (
           assignments.map((assignment) => (
-            <AssignmentCard key={assignment.id} assignment={assignment} />
+            <SchedulePointGroup
+              key={`${assignment.preachingPointId}-${assignment.timeSlot}`}
+              group={assignment}
+            />
           ))
         ) : (
           emptyState ?? (

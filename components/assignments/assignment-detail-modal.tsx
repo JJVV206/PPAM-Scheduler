@@ -35,6 +35,7 @@ export function AssignmentDetailModal({
         <DialogHeader>
           <DialogTitle>{assignment.preachingPoint.name}</DialogTitle>
           <DialogDescription>
+            Couple {assignment.pairNumber} •{" "}
             {formatDisplayDate(assignment.date, "EEEE, MMM d")} •{" "}
             {TIME_SLOT_DEFINITIONS[assignment.timeSlot].label}
           </DialogDescription>

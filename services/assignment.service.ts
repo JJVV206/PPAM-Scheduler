@@ -1,4 +1,4 @@
-import { addDays, differenceInCalendarDays, endOfWeek, startOfWeek } from "date-fns";
+import { addDays, differenceInCalendarDays, endOfWeek, isSameDay, startOfWeek } from "date-fns";
 import {
   AssignmentStatus,
   DayOfWeek,
@@ -9,14 +9,19 @@ import {
 } from "@prisma/client";
 
 import { db } from "@/lib/db/prisma";
-import { DAY_LABELS, TIME_SLOT_DEFINITIONS, TIME_SLOTS } from "@/lib/constants/domain";
+import {
+  DAYS_OF_WEEK,
+  DAY_LABELS,
+  TIME_SLOT_DEFINITIONS,
+  TIME_SLOTS
+} from "@/lib/constants/domain";
 import type {
   AdminDashboardStats,
   AssignmentDetailDto,
   AssignmentVolunteerDto,
   OpenSlotDto,
   VolunteerSummary,
-  WeeklyScheduleCell,
+  WeeklySchedulePointCell,
   WeeklyScheduleMatrix
 } from "@/types/domain";
 import { AppError } from "@/services/errors";
@@ -126,6 +131,7 @@ function mapAssignmentDetail(assignment: Prisma.AssignmentGetPayload<{ include: 
     date: assignment.date,
     dayOfWeek: assignment.dayOfWeek,
     timeSlot: assignment.timeSlot,
+    pairNumber: assignment.pairNumber,
     status: assignment.status,
     notes: assignment.notes,
     preachingPoint: {
@@ -223,6 +229,26 @@ async function syncResponses(input: {
   }
 }
 
+async function getNextPairNumber(input: {
+  tx: Prisma.TransactionClient;
+  date: Date;
+  timeSlot: TimeSlot;
+  preachingPointId: string;
+}) {
+  const result = await input.tx.assignment.aggregate({
+    where: {
+      date: input.date,
+      timeSlot: input.timeSlot,
+      preachingPointId: input.preachingPointId
+    },
+    _max: {
+      pairNumber: true
+    }
+  });
+
+  return (result._max.pairNumber ?? 0) + 1;
+}
+
 export async function recalculateAssignmentStatus(
   assignmentId: string,
   tx?: Prisma.TransactionClient
@@ -266,6 +292,7 @@ export async function createWeeklyAssignment(input: {
   dayOfWeek: DayOfWeek;
   timeSlot: TimeSlot;
   preachingPointId: string;
+  pairNumber?: number;
   notes?: string;
   volunteers: Array<{ volunteerId: string; position: VolunteerPosition }>;
   actorUserId: string;
@@ -278,6 +305,15 @@ export async function createWeeklyAssignment(input: {
   });
 
   const assignment = await db.$transaction(async (tx) => {
+    const pairNumber =
+      input.pairNumber ??
+      (await getNextPairNumber({
+        tx,
+        date: input.date,
+        timeSlot: input.timeSlot,
+        preachingPointId: input.preachingPointId
+      }));
+
     const created = await tx.assignment.create({
       data: {
         scheduleWeekId: input.scheduleWeekId,
@@ -285,6 +321,7 @@ export async function createWeeklyAssignment(input: {
         dayOfWeek: input.dayOfWeek,
         timeSlot: input.timeSlot,
         preachingPointId: input.preachingPointId,
+        pairNumber,
         notes: input.notes,
         status: "SCHEDULED"
       }
@@ -348,7 +385,12 @@ export async function updateAssignment(
 
   const nextDate = input.date ?? current.date;
   const nextTimeSlot = input.timeSlot ?? current.timeSlot;
+  const nextPreachingPointId = input.preachingPointId ?? current.preachingPointId;
   const volunteerIds = input.volunteers?.map((item) => item.volunteerId) ?? current.volunteers.map((item) => item.volunteerId);
+  const movedToNewSlot =
+    !isSameDay(nextDate, current.date) ||
+    nextTimeSlot !== current.timeSlot ||
+    nextPreachingPointId !== current.preachingPointId;
 
   await assertNoVolunteerConflicts({
     assignmentId,
@@ -358,6 +400,15 @@ export async function updateAssignment(
   });
 
   const assignment = await db.$transaction(async (tx) => {
+    const pairNumber = movedToNewSlot
+      ? await getNextPairNumber({
+          tx,
+          date: nextDate,
+          timeSlot: nextTimeSlot,
+          preachingPointId: nextPreachingPointId
+        })
+      : current.pairNumber;
+
     const updated = await tx.assignment.update({
       where: { id: assignmentId },
       data: {
@@ -365,6 +416,7 @@ export async function updateAssignment(
         dayOfWeek: input.dayOfWeek,
         timeSlot: input.timeSlot,
         preachingPointId: input.preachingPointId,
+        pairNumber,
         notes: input.notes,
         status: input.status
       }
@@ -457,18 +509,23 @@ export async function getWeeklySchedule(input?: {
       },
       responses: true
     },
-    orderBy: [{ date: "asc" }, { timeSlot: "asc" }]
+    orderBy: [
+      { date: "asc" },
+      { timeSlot: "asc" },
+      { preachingPoint: { name: "asc" } },
+      { pairNumber: "asc" }
+    ]
   });
 
   const days = Array.from({ length: 7 }).map((_, index) => {
     const date = addDays(weekStart, index);
-    const dayOfWeek = Object.keys(DAY_LABELS)[index] as DayOfWeek;
+    const dayOfWeek = DAYS_OF_WEEK[index];
     const items = TIME_SLOTS.reduce(
       (accumulator, timeSlot) => {
         accumulator[timeSlot] = [];
         return accumulator;
       },
-      {} as Record<TimeSlot, WeeklyScheduleCell[]>
+      {} as Record<TimeSlot, WeeklySchedulePointCell[]>
     );
 
     return {
@@ -482,14 +539,14 @@ export async function getWeeklySchedule(input?: {
     const day = days.find((item) => item.dayOfWeek === assignment.dayOfWeek);
     if (!day) continue;
 
-    day.items[assignment.timeSlot].push({
+    const groups = day.items[assignment.timeSlot];
+    const existingGroup = groups.find(
+      (group) => group.preachingPointId === assignment.preachingPointId
+    );
+
+    const pair = {
       id: assignment.id,
-      date: assignment.date,
-      dayOfWeek: assignment.dayOfWeek,
-      timeSlot: assignment.timeSlot,
-      preachingPointId: assignment.preachingPointId,
-      preachingPointName: assignment.preachingPoint.name,
-      area: assignment.preachingPoint.area,
+      pairNumber: assignment.pairNumber,
       status: assignment.status,
       volunteerNames: assignment.volunteers.map((slot) => slot.volunteer.user.name),
       warnings: calculateWarnings({
@@ -497,7 +554,24 @@ export async function getWeeklySchedule(input?: {
         hasDecline: assignment.responses.some(
           (response) => response.responseStatus === "DECLINED"
         )
-      })
+      }),
+      notes: assignment.notes
+    };
+
+    if (existingGroup) {
+      existingGroup.pairs.push(pair);
+      existingGroup.pairs.sort((left, right) => left.pairNumber - right.pairNumber);
+      continue;
+    }
+
+    groups.push({
+      date: assignment.date,
+      dayOfWeek: assignment.dayOfWeek,
+      timeSlot: assignment.timeSlot,
+      preachingPointId: assignment.preachingPointId,
+      preachingPointName: assignment.preachingPoint.name,
+      area: assignment.preachingPoint.area,
+      pairs: [pair]
     });
   }
 
@@ -543,6 +617,7 @@ export async function duplicateScheduleWeek(input: {
       dayOfWeek: assignment.dayOfWeek,
       timeSlot: assignment.timeSlot,
       preachingPointId: assignment.preachingPointId,
+      pairNumber: assignment.pairNumber,
       notes: assignment.notes ?? undefined,
       volunteers: assignment.volunteers.map((volunteer) => ({
         volunteerId: volunteer.volunteerId,
@@ -915,9 +990,6 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
 
   const details = assignments.map(mapAssignmentDetail);
   const today = new Date();
-  const todaysAssignments = schedule.days.find(
-    (day) => day.date.toDateString() === today.toDateString()
-  );
 
   return {
     weekLabel: schedule.weekLabel,
@@ -930,7 +1002,9 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
       declinedAssignments: assignments.filter((item) => item.status === "DECLINED").length,
       openSlots: openSlots.length
     },
-    todaysAssignments: todaysAssignments ? Object.values(todaysAssignments.items).flat() : [],
+    todaysAssignments: details.filter(
+      (assignment) => assignment.date.toDateString() === today.toDateString()
+    ),
     pendingConfirmations: details.filter(
       (assignment) => assignment.status === "PENDING_CONFIRMATION"
     ),
@@ -948,7 +1022,7 @@ export async function getVolunteerHistory(volunteerProfileId: string) {
       }
     },
     include: assignmentInclude,
-    orderBy: { date: "desc" }
+    orderBy: [{ date: "desc" }, { pairNumber: "asc" }]
   });
 
   return assignments.map(mapAssignmentDetail);
@@ -1087,7 +1161,7 @@ export async function getAssignments(input?: {
         : undefined
     },
     include: assignmentInclude,
-    orderBy: [{ date: "asc" }, { timeSlot: "asc" }]
+    orderBy: [{ date: "asc" }, { timeSlot: "asc" }, { pairNumber: "asc" }]
   });
 
   return assignments.map(mapAssignmentDetail);

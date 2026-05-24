@@ -85,6 +85,7 @@ export type AssignmentDetailDto = {
   date: Date;
   dayOfWeek: DayOfWeek;
   timeSlot: TimeSlot;
+  pairNumber: number;
   status: AssignmentStatus;
   notes?: string | null;
   preachingPoint: PreachingPointSummary;
@@ -93,17 +94,23 @@ export type AssignmentDetailDto = {
   warnings: string[];
 };
 
-export type WeeklyScheduleCell = {
+export type WeeklySchedulePair = {
   id: string;
+  pairNumber: number;
+  status: AssignmentStatus;
+  volunteerNames: string[];
+  warnings: string[];
+  notes?: string | null;
+};
+
+export type WeeklySchedulePointCell = {
   date: Date;
   dayOfWeek: DayOfWeek;
   timeSlot: TimeSlot;
   preachingPointName: string;
   preachingPointId: string;
   area: string;
-  status: AssignmentStatus;
-  volunteerNames: string[];
-  warnings: string[];
+  pairs: WeeklySchedulePair[];
 };
 
 export type WeeklyScheduleMatrix = {
@@ -113,7 +120,7 @@ export type WeeklyScheduleMatrix = {
   days: Array<{
     date: Date;
     dayOfWeek: DayOfWeek;
-    items: Record<TimeSlot, WeeklyScheduleCell[]>;
+    items: Record<TimeSlot, WeeklySchedulePointCell[]>;
   }>;
 };
 
@@ -132,7 +139,7 @@ export type AdminDashboardStats = {
     declinedAssignments: number;
     openSlots: number;
   };
-  todaysAssignments: WeeklyScheduleCell[];
+  todaysAssignments: AssignmentDetailDto[];
   pendingConfirmations: AssignmentDetailDto[];
   urgentReplacements: OpenSlotDto[];
 };
