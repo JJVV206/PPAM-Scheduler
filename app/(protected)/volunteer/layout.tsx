@@ -1,0 +1,28 @@
+import { redirect } from "next/navigation";
+
+import { PageShell } from "@/components/layout/page-shell";
+import { getServerAuthSession } from "@/lib/auth/auth";
+
+export const dynamic = "force-dynamic";
+
+export default async function VolunteerLayout({
+  children
+}: {
+  children: React.ReactNode;
+}) {
+  const session = await getServerAuthSession();
+
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  if (session.user.role !== "VOLUNTEER") {
+    redirect("/admin");
+  }
+
+  return (
+    <PageShell role="VOLUNTEER" userName={session.user.name ?? "Volunteer"}>
+      {children}
+    </PageShell>
+  );
+}

@@ -1,0 +1,55 @@
+import { Clock3, MapPin, Users2 } from "lucide-react";
+
+import { StatusBadge } from "@/components/assignments/status-badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
+import type { AssignmentDetailDto } from "@/types/domain";
+
+type AssignmentCardProps = {
+  assignment: AssignmentDetailDto;
+  action?: React.ReactNode;
+};
+
+export function AssignmentCard({ assignment, action }: AssignmentCardProps) {
+  const volunteerNames = assignment.volunteers.map((item) => item.volunteer.name);
+  const point = assignment.preachingPoint;
+
+  return (
+    <Card className="h-full border border-white/5 bg-white/[0.03]">
+      <CardContent className="space-y-4 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <p className="font-semibold">{point.name}</p>
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <MapPin className="h-4 w-4" />
+              {point.area}
+            </p>
+            <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              Couple {assignment.pairNumber}
+            </p>
+          </div>
+          <StatusBadge status={assignment.status} />
+        </div>
+
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <Clock3 className="h-4 w-4" />
+            {TIME_SLOT_DEFINITIONS[assignment.timeSlot].label}
+          </div>
+          <div className="flex items-center gap-2">
+            <Users2 className="h-4 w-4" />
+            {volunteerNames.length ? volunteerNames.join(" & ") : "Awaiting pair"}
+          </div>
+        </div>
+
+        {"warnings" in assignment && assignment.warnings.length ? (
+          <div className="rounded-2xl border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
+            {assignment.warnings.join(" • ")}
+          </div>
+        ) : null}
+
+        {action}
+      </CardContent>
+    </Card>
+  );
+}

@@ -1,0 +1,322 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  VOLUNTEER
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum TimeSlot {
+  SLOT_07_09
+  SLOT_09_11
+  SLOT_11_13
+  SLOT_13_15
+  SLOT_15_17
+}
+
+enum AssignmentStatus {
+  SCHEDULED
+  PENDING_CONFIRMATION
+  CONFIRMED
+  DECLINED
+  NEEDS_REPLACEMENT
+  REASSIGNED
+  COMPLETED
+  CANCELLED
+}
+
+enum ResponseStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+}
+
+enum VolunteerPosition {
+  FIRST
+  SECOND
+}
+
+enum NotificationType {
+  CONFIRMATION_REQUEST
+  REMINDER
+  REPLACEMENT_OPPORTUNITY
+  FINAL_REMINDER
+  RESET_PASSWORD
+  ASSIGNMENT_UPDATE
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum AssignmentActivityType {
+  ASSIGNED
+  REMINDER_SENT
+  RESPONSE_RECEIVED
+  REPLACEMENT_ASSIGNED
+  STATUS_OVERRIDDEN
+  COMPLETED
+  CANCELLED
+  NOTES_UPDATED
+}
+
+model User {
+  id               String              @id @default(cuid())
+  name             String
+  email            String              @unique
+  passwordHash     String
+  role             UserRole
+  phone            String?
+  active           Boolean             @default(true)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  volunteerProfile VolunteerProfile?
+  accounts         Account[]
+  sessions         Session[]
+  notifications    NotificationLog[]
+  activities       AssignmentActivity[]
+  createdWeeks     ScheduleWeek[]
+  passwordResets   PasswordResetToken[]
+}
+
+model VolunteerProfile {
+  id                   String                 @id @default(cuid())
+  userId               String                 @unique
+  notes                String?
+  transportationNotes  String?
+  preferredAreas       String[]
+  reliabilityScore     Float                  @default(100)
+  confirmationCount    Int                    @default(0)
+  declineCount         Int                    @default(0)
+  noResponseCount      Int                    @default(0)
+  active               Boolean                @default(true)
+  temporaryUnavailable Boolean                @default(false)
+  user                 User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignments          AssignmentVolunteer[]
+  responses            AssignmentResponse[]
+  availability         VolunteerAvailability[]
+  availabilityBlocks   AvailabilityException[]
+}
+
+model PreachingPoint {
+  id          String                    @id @default(cuid())
+  name        String
+  area        String
+  notes       String?
+  active      Boolean                   @default(true)
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  activeSlots PreachingPointActiveSlot[]
+  assignments Assignment[]
+}
+
+model PreachingPointActiveSlot {
+  id               String         @id @default(cuid())
+  preachingPointId String
+  dayOfWeek        DayOfWeek
+  timeSlot         TimeSlot
+  preachingPoint   PreachingPoint @relation(fields: [preachingPointId], references: [id], onDelete: Cascade)
+
+  @@unique([preachingPointId, dayOfWeek, timeSlot])
+}
+
+model ScheduleWeek {
+  id          String       @id @default(cuid())
+  startDate   DateTime
+  endDate     DateTime
+  label       String
+  createdById String
+  createdAt   DateTime     @default(now())
+  createdBy   User         @relation(fields: [createdById], references: [id])
+  assignments Assignment[]
+
+  @@unique([startDate, endDate])
+}
+
+model Assignment {
+  id               String               @id @default(cuid())
+  scheduleWeekId   String
+  date             DateTime
+  dayOfWeek        DayOfWeek
+  timeSlot         TimeSlot
+  preachingPointId String
+  pairNumber       Int                  @default(1)
+  status           AssignmentStatus     @default(SCHEDULED)
+  notes            String?
+  completedAt      DateTime?
+  cancelledAt      DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  scheduleWeek     ScheduleWeek         @relation(fields: [scheduleWeekId], references: [id], onDelete: Cascade)
+  preachingPoint   PreachingPoint       @relation(fields: [preachingPointId], references: [id])
+  volunteers       AssignmentVolunteer[]
+  responses        AssignmentResponse[]
+  notifications    NotificationLog[]
+  activities       AssignmentActivity[]
+
+  @@unique([date, timeSlot, preachingPointId, pairNumber])
+  @@index([date, timeSlot, status])
+  @@index([date, timeSlot, preachingPointId])
+  @@index([scheduleWeekId])
+}
+
+model AssignmentVolunteer {
+  id            String            @id @default(cuid())
+  assignmentId  String
+  volunteerId   String
+  position      VolunteerPosition
+  isReplacement Boolean           @default(false)
+  assignment    Assignment        @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  volunteer     VolunteerProfile  @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, position])
+  @@unique([assignmentId, volunteerId])
+  @@index([volunteerId])
+}
+
+model AssignmentResponse {
+  id             String          @id @default(cuid())
+  assignmentId   String
+  volunteerId    String
+  responseStatus ResponseStatus  @default(PENDING)
+  note           String?
+  respondedAt    DateTime?
+  assignment     Assignment      @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  volunteer      VolunteerProfile @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, volunteerId])
+  @@index([volunteerId, responseStatus])
+}
+
+model VolunteerAvailability {
+  id            String           @id @default(cuid())
+  volunteerId    String
+  dayOfWeek      DayOfWeek
+  timeSlot       TimeSlot
+  areaPreference String?
+  available      Boolean         @default(true)
+  recurring      Boolean         @default(true)
+  volunteer      VolunteerProfile @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+
+  @@unique([volunteerId, dayOfWeek, timeSlot])
+}
+
+model AvailabilityException {
+  id          String           @id @default(cuid())
+  volunteerId String
+  startDate   DateTime
+  endDate     DateTime
+  reason      String?
+  volunteer   VolunteerProfile @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+
+  @@index([volunteerId, startDate, endDate])
+}
+
+model NotificationLog {
+  id           String             @id @default(cuid())
+  userId       String
+  assignmentId String?
+  type         NotificationType
+  channel      NotificationChannel
+  status       NotificationStatus
+  sentAt       DateTime?
+  errorMessage String?
+  metadata     Json?
+  createdAt    DateTime           @default(now())
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignment   Assignment?        @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+
+  @@index([userId, sentAt])
+}
+
+model AssignmentActivity {
+  id          String                 @id @default(cuid())
+  assignmentId String
+  actorUserId String?
+  actionType  AssignmentActivityType
+  metadata    Json?
+  createdAt   DateTime               @default(now())
+  assignment  Assignment             @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  actorUser   User?                  @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([assignmentId, createdAt])
+}
+
+model AppSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
