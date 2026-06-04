@@ -40,7 +40,7 @@ const DialogContent = React.forwardRef<
       {children}
       <DialogPrimitive.Close className="absolute right-6 top-6 rounded-full p-2 text-muted-foreground transition hover:bg-white/5 hover:text-foreground">
         <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
+        <span className="sr-only">Cerrar</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>
@@ -58,7 +58,10 @@ const DialogFooter = ({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)} {...props} />
+  <div
+    className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)}
+    {...props}
+  />
 );
 
 const DialogTitle = React.forwardRef<

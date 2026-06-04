@@ -37,7 +37,7 @@ export function LoginForm({
 
   async function onSubmit(values: LoginValues) {
     if (!authReady) {
-      setError(environmentMessage ?? "Server configuration is incomplete.");
+      setError(environmentMessage ?? "La configuración del servidor está incompleta.");
       return;
     }
 
@@ -52,8 +52,8 @@ export function LoginForm({
     if (result?.error) {
       setError(
         result.error === "CredentialsSignin"
-          ? "Invalid credentials."
-          : "Unable to sign in. Check the server configuration and database connection."
+          ? "Credenciales inválidas."
+          : "No fue posible iniciar sesión. Revisa la configuración del servidor y la conexión a la base de datos."
       );
       return;
     }
@@ -65,9 +65,9 @@ export function LoginForm({
   return (
     <Card className="surface-elevated w-full max-w-[30rem]">
       <CardHeader className="space-y-2">
-        <CardTitle className="text-3xl">Welcome back</CardTitle>
+        <CardTitle className="text-3xl">Bienvenido de nuevo</CardTitle>
         <CardDescription>
-          Sign in to manage schedules, confirmations, and replacements.
+          Inicia sesión para gestionar horarios, confirmaciones y reemplazos.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -96,9 +96,9 @@ export function LoginForm({
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>Contraseña</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="Enter your password" {...field} />
+                    <Input type="password" placeholder="Ingresa tu contraseña" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -106,14 +106,14 @@ export function LoginForm({
             />
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             <Button className="w-full" type="submit" disabled={!authReady}>
-              Sign in
+              Entrar
             </Button>
           </form>
         </Form>
         <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-          <span>Need to reset access?</span>
+          <span>¿Necesitas restablecer el acceso?</span>
           <Link href="/forgot-password" className="text-primary">
-            Forgot password
+            Olvidé mi contraseña
           </Link>
         </div>
       </CardContent>

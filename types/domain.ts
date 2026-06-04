@@ -63,6 +63,7 @@ export type PreachingPointSummary = {
 export type AssignmentVolunteerDto = {
   volunteerId: string;
   assignmentVolunteerId: string;
+  responseId?: string | null;
   position: VolunteerPosition;
   isReplacement: boolean;
   responseStatus: ResponseStatus;

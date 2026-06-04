@@ -23,7 +23,7 @@ export default async function AdminVolunteerProfilePage({
       <div className="grid gap-6 xl:grid-cols-[0.9fr,1.4fr]">
         <VolunteerProfileCard volunteer={volunteer} />
         <div className="space-y-4">
-          <h1 className="font-heading text-3xl font-semibold">Assignment History</h1>
+          <h1 className="font-heading text-3xl font-semibold">Historial de asignaciones</h1>
           {history.map((assignment) => (
             <AssignmentCard key={assignment.id} assignment={assignment} />
           ))}

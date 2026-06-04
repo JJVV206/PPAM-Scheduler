@@ -1,0 +1,296 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  DAY_LABELS,
+  TIME_SLOTS,
+  TIME_SLOT_DEFINITIONS
+} from "@/lib/constants/domain";
+import type {
+  AssignmentDetailDto,
+  DayOfWeek,
+  PreachingPointSummary,
+  TimeSlot,
+  VolunteerSummary
+} from "@/types/domain";
+
+type AssignmentAdminActionsProps = {
+  assignment: AssignmentDetailDto;
+  preachingPoints: PreachingPointSummary[];
+  volunteers: VolunteerSummary[];
+};
+
+function getDayOfWeekFromDate(value: string): DayOfWeek {
+  const date = new Date(`${value}T12:00:00`);
+  const sundayFirstOrder: DayOfWeek[] = [
+    "SUNDAY",
+    "MONDAY",
+    "TUESDAY",
+    "WEDNESDAY",
+    "THURSDAY",
+    "FRIDAY",
+    "SATURDAY"
+  ];
+  return sundayFirstOrder[date.getDay()];
+}
+
+function toAssignmentIsoDate(value: string) {
+  return new Date(`${value}T12:00:00`).toISOString();
+}
+
+export function AssignmentAdminActions({
+  assignment,
+  preachingPoints,
+  volunteers
+}: AssignmentAdminActionsProps) {
+  const router = useRouter();
+  const [assignmentDate, setAssignmentDate] = useState(
+    assignment.date.toISOString().slice(0, 10)
+  );
+  const [timeSlot, setTimeSlot] = useState<TimeSlot>(assignment.timeSlot);
+  const [preachingPointId, setPreachingPointId] = useState(
+    assignment.preachingPoint.id
+  );
+  const [volunteerOneId, setVolunteerOneId] = useState(
+    assignment.volunteers.find((item) => item.position === "FIRST")
+      ?.volunteerId ?? ""
+  );
+  const [volunteerTwoId, setVolunteerTwoId] = useState(
+    assignment.volunteers.find((item) => item.position === "SECOND")
+      ?.volunteerId ?? ""
+  );
+  const [notes, setNotes] = useState(assignment.notes ?? "");
+  const [loading, setLoading] = useState<"save" | "delete" | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const selectedDayOfWeek = useMemo(
+    () => getDayOfWeekFromDate(assignmentDate),
+    [assignmentDate]
+  );
+
+  const compatiblePoints = useMemo(
+    () =>
+      preachingPoints.filter(
+        (point) =>
+          point.activeSlots.length === 0 ||
+          point.activeSlots.some(
+            (slot) =>
+              slot.dayOfWeek === selectedDayOfWeek && slot.timeSlot === timeSlot
+          )
+      ),
+    [preachingPoints, selectedDayOfWeek, timeSlot]
+  );
+
+  useEffect(() => {
+    if (
+      compatiblePoints.length &&
+      !compatiblePoints.some((point) => point.id === preachingPointId)
+    ) {
+      setPreachingPointId(compatiblePoints[0].id);
+    }
+  }, [compatiblePoints, preachingPointId]);
+
+  async function handleSave() {
+    setLoading("save");
+    setMessage(null);
+
+    const response = await fetch(`/api/assignments/${assignment.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        date: toAssignmentIsoDate(assignmentDate),
+        dayOfWeek: selectedDayOfWeek,
+        timeSlot,
+        preachingPointId,
+        notes: notes.trim() ? notes : null,
+        volunteers: [
+          volunteerOneId
+            ? { volunteerId: volunteerOneId, position: "FIRST" as const }
+            : null,
+          volunteerTwoId
+            ? { volunteerId: volunteerTwoId, position: "SECOND" as const }
+            : null
+        ].filter(Boolean)
+      })
+    });
+    const result = await response.json();
+
+    setLoading(null);
+    setMessage(response.ok ? "Asignación actualizada." : result.error);
+
+    if (response.ok) {
+      router.refresh();
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm("Se eliminará esta asignación. ¿Deseas continuar?")) {
+      return;
+    }
+
+    setLoading("delete");
+    setMessage(null);
+
+    const response = await fetch(`/api/assignments/${assignment.id}`, {
+      method: "DELETE"
+    });
+    const result = await response.json();
+
+    setLoading(null);
+    setMessage(response.ok ? "Asignación eliminada." : result.error);
+
+    if (response.ok) {
+      router.refresh();
+    }
+  }
+
+  return (
+    <div className="space-y-4 border-t border-border/60 pt-4">
+      <div>
+        <p className="font-semibold">Editar asignación</p>
+        <p className="text-sm text-muted-foreground">
+          Ajusta fecha, horario, punto o pareja sin salir del seguimiento.
+        </p>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-2">
+          <label className="text-sm font-medium">Fecha</label>
+          <Input
+            type="date"
+            value={assignmentDate}
+            onChange={(event) => setAssignmentDate(event.target.value)}
+          />
+        </div>
+        <div className="grid gap-2">
+          <label className="text-sm font-medium">Día detectado</label>
+          <div className="rounded-2xl border border-border/70 bg-background/35 px-4 py-3 text-sm text-muted-foreground">
+            {DAY_LABELS[selectedDayOfWeek]}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3">
+        <label className="text-sm font-medium">Horario</label>
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          {TIME_SLOTS.map((slot) => (
+            <button
+              key={slot}
+              type="button"
+              onClick={() => setTimeSlot(slot)}
+              className={`rounded-2xl border px-4 py-3 text-left transition-colors ${
+                timeSlot === slot
+                  ? "border-primary bg-primary/15 text-foreground"
+                  : "border-border/70 bg-background/35 text-muted-foreground"
+              }`}
+            >
+              <p className="text-sm font-semibold text-inherit">
+                {TIME_SLOT_DEFINITIONS[slot].shortLabel}
+              </p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-2 md:col-span-3">
+          <label className="text-sm font-medium">Punto de predicación</label>
+          <Select value={preachingPointId} onValueChange={setPreachingPointId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecciona un punto" />
+            </SelectTrigger>
+            <SelectContent>
+              {compatiblePoints.map((point) => (
+                <SelectItem key={point.id} value={point.id}>
+                  {point.name} • {point.area}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-2">
+          <label className="text-sm font-medium">Voluntario 1</label>
+          <Select value={volunteerOneId} onValueChange={setVolunteerOneId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Primer puesto" />
+            </SelectTrigger>
+            <SelectContent>
+              {volunteers.map((volunteer) => (
+                <SelectItem key={volunteer.id} value={volunteer.id}>
+                  {volunteer.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-2">
+          <label className="text-sm font-medium">Voluntario 2</label>
+          <Select value={volunteerTwoId} onValueChange={setVolunteerTwoId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Segundo puesto" />
+            </SelectTrigger>
+            <SelectContent>
+              {volunteers.map((volunteer) => (
+                <SelectItem key={volunteer.id} value={volunteer.id}>
+                  {volunteer.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid gap-2">
+        <label className="text-sm font-medium">Notas</label>
+        <Textarea
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+          placeholder="Indicaciones operativas"
+        />
+      </div>
+
+      {message ? (
+        <p className="text-sm text-muted-foreground">{message}</p>
+      ) : null}
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+        <Button
+          type="button"
+          variant="danger"
+          onClick={handleDelete}
+          disabled={loading !== null}
+        >
+          {loading === "delete" ? "Eliminando..." : "Eliminar asignación"}
+        </Button>
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={
+            loading !== null ||
+            !assignmentDate ||
+            !preachingPointId ||
+            (volunteerOneId !== "" && volunteerOneId === volunteerTwoId)
+          }
+        >
+          {loading === "save" ? "Guardando..." : "Guardar cambios"}
+        </Button>
+      </div>
+    </div>
+  );
+}

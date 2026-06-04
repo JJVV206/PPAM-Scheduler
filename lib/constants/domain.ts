@@ -60,43 +60,86 @@ export const TIME_SLOT_DEFINITIONS: Record<
   }
 > = {
   SLOT_07_09: {
-    label: "7:00 AM - 9:00 AM",
-    shortLabel: "7-9 AM",
+    label: "07:00 - 09:00",
+    shortLabel: "07:00-09:00",
     start: "07:00",
     end: "09:00"
   },
   SLOT_09_11: {
-    label: "9:00 AM - 11:00 AM",
-    shortLabel: "9-11 AM",
+    label: "09:00 - 11:00",
+    shortLabel: "09:00-11:00",
     start: "09:00",
     end: "11:00"
   },
   SLOT_11_13: {
-    label: "11:00 AM - 1:00 PM",
-    shortLabel: "11-1 PM",
+    label: "11:00 - 13:00",
+    shortLabel: "11:00-13:00",
     start: "11:00",
     end: "13:00"
   },
   SLOT_13_15: {
-    label: "1:00 PM - 3:00 PM",
-    shortLabel: "1-3 PM",
+    label: "13:00 - 15:00",
+    shortLabel: "13:00-15:00",
     start: "13:00",
     end: "15:00"
   },
   SLOT_15_17: {
-    label: "3:00 PM - 5:00 PM",
-    shortLabel: "3-5 PM",
+    label: "15:00 - 17:00",
+    shortLabel: "15:00-17:00",
     start: "15:00",
     end: "17:00"
   }
 };
 
 export const DAY_LABELS = {
-  MONDAY: "Monday",
-  TUESDAY: "Tuesday",
-  WEDNESDAY: "Wednesday",
-  THURSDAY: "Thursday",
-  FRIDAY: "Friday",
-  SATURDAY: "Saturday",
-  SUNDAY: "Sunday"
+  MONDAY: "Lunes",
+  TUESDAY: "Martes",
+  WEDNESDAY: "Miércoles",
+  THURSDAY: "Jueves",
+  FRIDAY: "Viernes",
+  SATURDAY: "Sábado",
+  SUNDAY: "Domingo"
+} as const;
+
+export const ROLE_LABELS = {
+  ADMIN: "Administrador",
+  VOLUNTEER: "Voluntario"
+} as const;
+
+export const VOLUNTEER_POSITION_LABELS = {
+  FIRST: "Puesto 1",
+  SECOND: "Puesto 2"
+} as const;
+
+export const NOTIFICATION_TYPE_LABELS = {
+  CONFIRMATION_REQUEST: "Solicitud de confirmación",
+  REMINDER: "Recordatorio",
+  REPLACEMENT_OPPORTUNITY: "Oportunidad de reemplazo",
+  FINAL_REMINDER: "Recordatorio final",
+  RESET_PASSWORD: "Restablecimiento de contraseña",
+  ASSIGNMENT_UPDATE: "Actualización de asignación"
+} as const;
+
+export const NOTIFICATION_CHANNEL_LABELS = {
+  EMAIL: "Correo",
+  SMS: "SMS",
+  WHATSAPP: "WhatsApp",
+  IN_APP: "En la app"
+} as const;
+
+export const NOTIFICATION_STATUS_LABELS = {
+  PENDING: "Pendiente",
+  SENT: "Enviado",
+  FAILED: "Fallido"
+} as const;
+
+export const ASSIGNMENT_ACTIVITY_LABELS = {
+  ASSIGNED: "Asignado",
+  REMINDER_SENT: "Recordatorio enviado",
+  RESPONSE_RECEIVED: "Respuesta recibida",
+  REPLACEMENT_ASSIGNED: "Reemplazo asignado",
+  STATUS_OVERRIDDEN: "Estado ajustado",
+  COMPLETED: "Completado",
+  CANCELLED: "Cancelado",
+  NOTES_UPDATED: "Notas actualizadas"
 } as const;

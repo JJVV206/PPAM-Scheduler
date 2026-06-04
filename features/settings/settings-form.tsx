@@ -32,7 +32,7 @@ export function SettingsForm({ initialValues }: SettingsFormProps) {
       body: JSON.stringify(values)
     });
     const result = await response.json();
-    setMessage(response.ok ? "Settings updated." : result.error);
+    setMessage(response.ok ? "Configuración actualizada." : result.error);
   }
 
   return (
@@ -45,7 +45,7 @@ export function SettingsForm({ initialValues }: SettingsFormProps) {
               name="confirmationLeadDays"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Confirmation lead days</FormLabel>
+                  <FormLabel>Días de anticipación para confirmar</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -62,7 +62,7 @@ export function SettingsForm({ initialValues }: SettingsFormProps) {
               name="reminderTimingDays"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Reminder timings</FormLabel>
+                  <FormLabel>Días para recordatorios</FormLabel>
                   <FormControl>
                     <Input
                       value={field.value.join(", ")}
@@ -80,7 +80,7 @@ export function SettingsForm({ initialValues }: SettingsFormProps) {
                 </FormItem>
               )}
             />
-            <Button type="submit">Save settings</Button>
+            <Button type="submit">Guardar configuración</Button>
           </form>
         </Form>
         {message ? <p className="mt-3 text-sm text-muted-foreground">{message}</p> : null}

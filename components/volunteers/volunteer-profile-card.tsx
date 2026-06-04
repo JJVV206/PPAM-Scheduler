@@ -27,19 +27,19 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
           </p>
           <p className="flex items-center gap-2">
             <Phone className="h-4 w-4" />
-            {volunteer.phone ?? "No phone"}
+            {volunteer.phone ?? "Sin teléfono"}
           </p>
           <p className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4" />
-            Reliability {Math.round(volunteer.reliabilityScore)}%
+            Confiabilidad {Math.round(volunteer.reliabilityScore)}%
           </p>
           <p className="flex items-center gap-2">
             <CarFront className="h-4 w-4" />
-            {volunteer.transportationNotes ?? "No transportation notes"}
+            {volunteer.transportationNotes ?? "Sin notas de transporte"}
           </p>
         </div>
         <div className="rounded-2xl bg-white/[0.03] p-4 text-sm text-muted-foreground">
-          Preferred areas: {volunteer.preferredAreas.join(", ") || "None"}
+          Áreas preferidas: {volunteer.preferredAreas.join(", ") || "Ninguna"}
         </div>
       </CardContent>
     </Card>

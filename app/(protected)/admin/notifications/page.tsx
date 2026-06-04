@@ -7,8 +7,8 @@ export default async function AdminNotificationsPage() {
 
   return (
     <DataTable
-      title="Notifications"
-      description="Track sent reminders, confirmation requests, and failed deliveries."
+      title="Notificaciones"
+      description="Da seguimiento a recordatorios enviados, solicitudes de confirmación y entregas fallidas. En local, el registro en NotificationLog sirve como trazabilidad mínima."
     >
       <NotificationTable notifications={notifications} />
     </DataTable>

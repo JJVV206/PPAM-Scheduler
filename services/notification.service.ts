@@ -70,7 +70,7 @@ export async function sendEmailNotification(payload: NotificationPayload) {
       type: payload.type,
       channel: payload.channel ?? "EMAIL",
       status: "FAILED",
-      errorMessage: "Recipient email not found",
+      errorMessage: "No se encontró un correo para el destinatario",
       metadata: payload.metadata
     });
     return;
@@ -109,7 +109,10 @@ export async function sendEmailNotification(payload: NotificationPayload) {
       type: payload.type,
       channel: payload.channel ?? "EMAIL",
       status: "FAILED",
-      errorMessage: error instanceof Error ? error.message : "Unknown notification error",
+      errorMessage:
+        error instanceof Error
+          ? error.message
+          : "Error desconocido al enviar la notificación",
       metadata: payload.metadata
     });
   }
@@ -122,15 +125,17 @@ export async function resendConfirmationReminder(input: {
   pointName: string;
   dateLabel: string;
   timeSlotLabel: string;
+  confirmationLink?: string | null;
 }) {
   return sendEmailNotification({
     userId: input.volunteerUserId,
     assignmentId: input.assignmentId,
     type: "REMINDER",
-    subject: "Reminder: confirm your PPAM assignment",
-    html: `<p>Hello ${input.volunteerName},</p><p>Please confirm your PPAM assignment for ${input.dateLabel} at ${input.timeSlotLabel} in ${input.pointName}.</p>`,
+    subject: "Recordatorio: confirma tu asignación de PPAM",
+    html: `<p>Hola ${input.volunteerName},</p><p>Confirma tu asignación de PPAM para ${input.dateLabel} a las ${input.timeSlotLabel} en ${input.pointName}.</p>${input.confirmationLink ? `<p><a href="${input.confirmationLink}">Abrir confirmación directa</a></p>` : ""}`,
     metadata: {
-      pointName: input.pointName
+      pointName: input.pointName,
+      confirmationLink: input.confirmationLink
     }
   });
 }

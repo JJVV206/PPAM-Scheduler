@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>PPAM Scheduler - Arquitectura Tecnica</title>
+    <link rel="stylesheet" href="./ppam-scheduler-arquitectura.css" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">PPAM Scheduler</p>
+          <p class="topbar-title">Arquitectura tecnica y flujos del sistema</p>
+        </div>
+        <nav class="topbar-links">
+          <a href="./ppam-scheduler-presentacion.html">Presentacion general</a>
+          <a href="./ppam-scheduler-mvp.html">MVP visual previo</a>
+        </nav>
+      </header>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Stack actual</p>
+          <h1>Aplicacion full stack con flujo transaccional para planeacion, respuesta y reemplazo.</h1>
+          <p class="hero-text">
+            La base actual combina Next.js App Router, React con TypeScript,
+            Prisma y PostgreSQL, con autenticacion por credenciales y una capa
+            de servicios que encapsula reglas de negocio, estados y notificaciones.
+          </p>
+          <div class="chip-row">
+            <span>Next.js App Router</span>
+            <span>React + TypeScript</span>
+            <span>Prisma + PostgreSQL</span>
+            <span>NextAuth Credentials</span>
+            <span>TanStack Query</span>
+            <span>Zod + React Hook Form</span>
+          </div>
+        </div>
+
+        <aside class="hero-panel">
+          <p class="panel-label">Criterio tecnico central</p>
+          <p class="hero-statement">
+            La arquitectura esta organizada para proteger tres cosas: integridad
+            de asignaciones, control de estados y trazabilidad de lo que hace
+            cada usuario durante la semana.
+          </p>
+          <ul class="summary-list">
+            <li>Sin doble asignacion en la misma fecha y franja</li>
+            <li>Estados recalculados segun respuestas y ventana de confirmacion</li>
+            <li>Actividad, notificaciones y disponibilidad persistidas</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Capas</p>
+          <h2>Arquitectura actual del sistema</h2>
+        </div>
+
+        <div class="layer-stack">
+          <article class="layer-card accent">
+            <p class="layer-tag">1. Experiencias</p>
+            <h3>UI Admin y UI Volunteer</h3>
+            <p>Dashboards, planner semanal, asignaciones, vacantes, disponibilidad, notificaciones y perfil.</p>
+          </article>
+          <article class="layer-card">
+            <p class="layer-tag">2. Aplicacion Next.js</p>
+            <h3>Pages y Route Handlers</h3>
+            <p>Rutas protegidas por rol y endpoints bajo <code>/api</code> para asignaciones, disponibilidad, puntos, dashboard y ajustes.</p>
+          </article>
+          <article class="layer-card">
+            <p class="layer-tag">3. Capa de negocio</p>
+            <h3>Services</h3>
+            <p><code>assignment.service</code>, <code>availability.service</code>, <code>notification.service</code>, <code>setting.service</code> y servicios de dashboard/reportes.</p>
+          </article>
+          <article class="layer-card">
+            <p class="layer-tag">4. Reglas de entrada</p>
+            <h3>Auth, Guards y Validacion</h3>
+            <p>NextAuth credentials, <code>requireRole</code>, <code>requireSession</code> y esquemas Zod para proteger el contrato de entrada.</p>
+          </article>
+          <article class="layer-card">
+            <p class="layer-tag">5. Persistencia</p>
+            <h3>Prisma ORM</h3>
+            <p>Transacciones para crear respuestas, registrar actividad, reasignar voluntarios y recalcular estado sin inconsistencias.</p>
+          </article>
+          <article class="layer-card accent">
+            <p class="layer-tag">6. Infra y salida</p>
+            <h3>PostgreSQL + SMTP</h3>
+            <p>Base relacional para dominio operativo y salida de correos via Nodemailer con log de envio o fallo.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Dominio</p>
+          <h2>Modelo de datos que sostiene la operacion</h2>
+        </div>
+
+        <div class="domain-grid">
+          <article class="domain-card">
+            <h3>Usuarios y perfiles</h3>
+            <ul class="plain-list">
+              <li><code>User</code> define identidad, credenciales y rol</li>
+              <li><code>VolunteerProfile</code> guarda confiabilidad, preferencias y contadores</li>
+              <li><code>VolunteerAvailability</code> y <code>AvailabilityException</code> modelan recurrencia y bloqueos</li>
+            </ul>
+          </article>
+
+          <article class="domain-card">
+            <h3>Planeacion</h3>
+            <ul class="plain-list">
+              <li><code>PreachingPoint</code> y <code>PreachingPointActiveSlot</code> representan puntos y franjas activas</li>
+              <li><code>ScheduleWeek</code> agrupa el marco semanal</li>
+              <li><code>Assignment</code> y <code>AssignmentVolunteer</code> unen punto, horario, pareja y posicion</li>
+            </ul>
+          </article>
+
+          <article class="domain-card">
+            <h3>Ejecucion</h3>
+            <ul class="plain-list">
+              <li><code>AssignmentResponse</code> guarda confirmacion o rechazo</li>
+              <li><code>NotificationLog</code> deja rastro de solicitudes y recordatorios</li>
+              <li><code>AssignmentActivity</code> actua como timeline operativo</li>
+            </ul>
+          </article>
+
+          <article class="domain-card">
+            <h3>Configuracion</h3>
+            <ul class="plain-list">
+              <li><code>AppSetting</code> define anticipacion de confirmacion</li>
+              <li>Tambien define cadencia de recordatorios y canales habilitados</li>
+              <li>Permite modificar comportamiento sin tocar codigo</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Flujos tecnicos</p>
+          <h2>Como viajan las acciones por el sistema</h2>
+        </div>
+
+        <div class="flow-grid">
+          <article class="flow-card">
+            <p class="panel-label">Flujo 1</p>
+            <h3>Crear o editar asignacion</h3>
+            <ol class="flow-list">
+              <li>Admin usa planner o formulario de asignacion.</li>
+              <li>La UI envia la peticion al endpoint de <code>/api/assignments</code>.</li>
+              <li>Zod valida fecha, franja, punto y voluntarios.</li>
+              <li><code>assignment.service</code> revisa conflictos con <code>assertNoVolunteerConflicts</code>.</li>
+              <li>Prisma crea o actualiza <code>Assignment</code>, posiciones y respuestas pendientes.</li>
+              <li>El motor <code>determineAssignmentStatus</code> define si queda programada, pendiente o necesita reemplazo.</li>
+            </ol>
+          </article>
+
+          <article class="flow-card">
+            <p class="panel-label">Flujo 2</p>
+            <h3>Confirmar o rechazar</h3>
+            <ol class="flow-list">
+              <li>Voluntario entra al portal o responde desde su flujo de confirmacion.</li>
+              <li>La solicitud pega a <code>/api/assignments/[id]/confirm</code> o <code>/decline</code>.</li>
+              <li>Los guards verifican sesion y rol <code>VOLUNTEER</code>.</li>
+              <li>La respuesta se guarda en <code>AssignmentResponse</code>.</li>
+              <li>Se registra <code>AssignmentActivity</code> con la accion recibida.</li>
+              <li>Si confirma, se recalcula el estado; si rechaza, pasa a <code>NEEDS_REPLACEMENT</code>.</li>
+            </ol>
+          </article>
+
+          <article class="flow-card">
+            <p class="panel-label">Flujo 3</p>
+            <h3>Resolver vacantes y reemplazos</h3>
+            <ol class="flow-list">
+              <li>Las vacantes salen de asignaciones incompletas o rechazadas.</li>
+              <li><code>getOpenSlots</code> identifica posiciones faltantes y urgencia.</li>
+              <li><code>getAvailableVolunteersForSlot</code> filtra por disponibilidad, conflictos y bloqueos temporales.</li>
+              <li>El admin reasigna via <code>/api/assignments/[id]/replace</code>.</li>
+              <li>La transaccion reemplaza posicion, recrea respuesta pendiente y registra actividad.</li>
+              <li>El estado vuelve a evaluarse con la nueva composicion de la pareja.</li>
+            </ol>
+          </article>
+
+          <article class="flow-card">
+            <p class="panel-label">Flujo 4</p>
+            <h3>Actualizar disponibilidad</h3>
+            <ol class="flow-list">
+              <li>El voluntario modifica su disponibilidad recurrente.</li>
+              <li>La UI envia <code>PUT /api/availability</code>.</li>
+              <li>La validacion acepta items recurrentes, bandera temporal y excepciones.</li>
+              <li><code>availability.service</code> reemplaza disponibilidad y bloqueos dentro de una transaccion.</li>
+              <li>El perfil conserva una vista consistente para futuras sugerencias y chequeos.</li>
+            </ol>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Estado y reglas</p>
+          <h2>Motor de decisiones de la asignacion</h2>
+        </div>
+
+        <div class="state-grid">
+          <article class="state-card">
+            <h3>Entrada del motor</h3>
+            <ul class="plain-list">
+              <li>Fecha de la asignacion</li>
+              <li>Cantidad de voluntarios en la pareja</li>
+              <li>Respuestas actuales de cada voluntario</li>
+              <li>Dias de anticipacion configurados para confirmar</li>
+            </ul>
+          </article>
+
+          <article class="state-card highlight">
+            <h3>Salida del motor</h3>
+            <ul class="plain-list">
+              <li><code>NEEDS_REPLACEMENT</code> si falta alguien o hay rechazo</li>
+              <li><code>CONFIRMED</code> si ambos confirman</li>
+              <li><code>PENDING_CONFIRMATION</code> si entro a ventana de confirmacion</li>
+              <li><code>SCHEDULED</code> si aun no corresponde pedir respuesta</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Objetivo tecnico</p>
+          <h2>Arquitectura objetivo para la version terminada</h2>
+        </div>
+
+        <div class="target-grid">
+          <article class="target-card">
+            <p class="panel-label">Fortalecer lo actual</p>
+            <ul class="plain-list">
+              <li>Agregar UI dedicada para duplicar semana y administrar slots activos</li>
+              <li>Completar experiencia de excepciones temporales del voluntario</li>
+              <li>Integrar reportes a la navegacion principal</li>
+            </ul>
+          </article>
+
+          <article class="target-card">
+            <p class="panel-label">Automatizacion</p>
+            <ul class="plain-list">
+              <li>Procesos programados para recordatorios y seguimiento</li>
+              <li>Links de confirmacion directos y tokenizados desde email</li>
+              <li>Mas canales de entrega cuando el producto los necesite</li>
+            </ul>
+          </article>
+
+          <article class="target-card">
+            <p class="panel-label">Observabilidad y producto</p>
+            <ul class="plain-list">
+              <li>Metricas operativas mas completas y reportes visibles</li>
+              <li>Scoring de confiabilidad mas automatico y explicable</li>
+              <li>Trazabilidad mas rica para auditoria y mejora continua</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

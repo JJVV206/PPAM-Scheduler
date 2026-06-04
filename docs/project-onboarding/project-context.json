@@ -1,0 +1,810 @@
+{
+  "metadata": {
+    "generatedAt": "2026-06-04T20:30:19Z",
+    "generator": "project-onboarding-docs/scripts/build_context.js",
+    "lang": "es",
+    "repoRoot": "/Users/josejaredvillatorovargas/Code/clients/jw/PPAM/PPAM_Scheduler",
+    "scannedFileCount": 163,
+    "maxDepth": 5,
+    "maxFiles": 1200
+  },
+  "project": {
+    "name": "PPAM Scheduler",
+    "description": "Production-ready MVP for managing weekly public preaching assignments with role-based admin and volunteer experiences.",
+    "descriptionSource": "README.md",
+    "tagline": "Coordina semanas reales de predicacion publica, confirmaciones y reemplazos desde una sola interfaz.",
+    "repoType": "fullstack",
+    "repoTypeLabel": "Aplicacion full-stack",
+    "documentationStatus": "Borrador basado en evidencia"
+  },
+  "businessView": {
+    "audienceSummary": "Resumen progresivo para coordinadores, stakeholders y nuevos desarrolladores que necesitan entender el producto sin empezar por el codigo.",
+    "elevatorPitch": "PPAM Scheduler centraliza la planeacion semanal de predicacion publica: permite preparar semanas, asignar parejas por punto y franja, solicitar confirmaciones, monitorear respuestas y cubrir vacantes desde un mismo sistema.",
+    "primaryUsers": [
+      "Coordinadores o administradores que preparan la semana, administran puntos, disparan confirmaciones y resuelven vacantes.",
+      "Voluntarios que revisan asignaciones, confirman o rechazan su participacion y mantienen su disponibilidad real.",
+      "Desarrolladores o stakeholders que necesitan visibilidad del flujo operativo y del alcance actual del MVP."
+    ],
+    "businessOutcomes": [
+      "Reduce la coordinacion manual para operar una semana completa de asignaciones sin depender de base de datos ni llamadas manuales a API.",
+      "Disminuye conflictos de agenda y doble asignacion al validar disponibilidad, respuestas y reemplazos sobre una sola fuente de verdad.",
+      "Deja trazabilidad minima en actividad y NotificationLog para confirmar que solicitudes y recordatorios fueron procesados."
+    ],
+    "coreFlows": [
+      {
+        "title": "Preparar semana",
+        "description": "El coordinador crea o duplica una semana, navega el planner y agrega parejas por punto y horario."
+      },
+      {
+        "title": "Solicitar confirmaciones",
+        "description": "Desde el detalle de una asignacion el admin puede enviar la solicitud inicial o reenviar recordatorios a respuestas pendientes."
+      },
+      {
+        "title": "Responder asignacion",
+        "description": "El voluntario confirma o rechaza desde el portal o desde el enlace directo incluido en el correo."
+      },
+      {
+        "title": "Cubrir vacantes",
+        "description": "Si una pareja queda incompleta o alguien rechaza, la vacante muestra posiciones faltantes, urgencia y sugerencias elegibles para reasignar."
+      }
+    ],
+    "modules": [
+      {
+        "name": "Workspace admin",
+        "summary": "Reune dashboard, horario semanal, asignaciones, voluntarios, puntos, vacantes, notificaciones y configuracion."
+      },
+      {
+        "name": "Portal del voluntario",
+        "summary": "Expone inicio, mis asignaciones, vacantes compatibles, disponibilidad, notificaciones y perfil."
+      },
+      {
+        "name": "Motor operativo de asignaciones",
+        "summary": "Concentra reglas de estados, confirmaciones, doble booking, reemplazos y duplicacion de semanas."
+      },
+      {
+        "name": "Persistencia, notificaciones y setup local",
+        "summary": "Usa Prisma sobre PostgreSQL, logs de notificacion y scripts locales para levantar datos demo de forma reproducible."
+      }
+    ],
+    "glossary": [
+      {
+        "term": "Punto de predicacion",
+        "meaning": "Lugar donde se agenda una o mas parejas en dias y franjas concretas."
+      },
+      {
+        "term": "Asignacion",
+        "meaning": "Registro que combina fecha, horario, punto, numero de pareja, voluntarios y estado operativo."
+      },
+      {
+        "term": "Vacante",
+        "meaning": "Asignacion incompleta o afectada por un rechazo que requiere reemplazo."
+      },
+      {
+        "term": "Disponibilidad temporal",
+        "meaning": "Bloque excepcional de fechas donde un voluntario no debe aparecer como sugerencia."
+      },
+      {
+        "term": "NotificationLog",
+        "meaning": "Bitacora donde queda registrado si una solicitud o recordatorio fue enviado o fallo."
+      }
+    ],
+    "studyGuide": {
+      "whatIsIt": "PPAM Scheduler es una aplicacion full-stack en Next.js para coordinar asignaciones semanales de predicacion publica con experiencias separadas para administradores y voluntarios.",
+      "whatIsItFor": "Sirve para operar una semana real de punta a punta: preparar el calendario, asignar parejas, pedir confirmaciones, seguir respuestas y reaccionar a vacantes o rechazos desde la UI.",
+      "originAndContext": "La mejor evidencia del contexto funcional sale del README, del schema Prisma y de las rutas protegidas en `app/(protected)/admin` y `app/(protected)/volunteer`. El dominio de predicacion publica y coordinacion semanal se desprende de nombres de modelos, paginas y datos seed.",
+      "evolution": "El repo muestra senales de haber pasado de un esqueleto MVP a un flujo operativo mas cerrado: hoy existen duplicacion de semana, enlaces directos de confirmacion, excepciones temporales de disponibilidad, active slots por punto y scripts mas robustos para la base local.",
+      "highLevelHowItWorks": "Un admin entra al workspace, crea o duplica una semana, arma asignaciones y las sigue desde planner, tablas y modales. Los voluntarios reciben solicitudes, responden desde portal o correo y el sistema recalcula estados, genera vacantes y ofrece candidatos de reemplazo segun disponibilidad y conflictos.",
+      "enterpriseUse": "Dentro de una organizacion, esta herramienta encaja como sistema operativo semanal para un equipo pequeno que coordina turnos, coberturas y confirmaciones con trazabilidad minima.",
+      "companySpecificUse": "Por el lenguaje del dominio, el uso visible parece estar enfocado en coordinadores y voluntarios de predicacion publica. Eso esta fuertemente sugerido por el repo, aunque la politica exacta de uso por congregacion o region no esta documentada.",
+      "problemsSolved": [
+        "Evita preparar semanas por fuera del sistema o depender de llamadas manuales a endpoints para completar flujos criticos.",
+        "Reduce perdida de visibilidad sobre quien ya confirmo, quien rechazo y donde faltan posiciones por cubrir.",
+        "Ayuda a proponer reemplazos compatibles usando disponibilidad recurrente, excepciones temporales y ausencia de conflicto horario.",
+        "Disminuye errores operativos al concentrar estado, actividad y notificaciones en una sola base de datos."
+      ],
+      "benefits": [
+        "Permite operar una semana completa desde la interfaz principal del admin.",
+        "Ofrece una experiencia clara para voluntarios con detalle, respuesta y disponibilidad actualizable.",
+        "Deja evidencia minima util para QA, demos y handoff mediante timeline de actividad y NotificationLog."
+      ],
+      "peopleAndTeams": [
+        "Coordinadores o admins responsables del horario semanal.",
+        "Voluntarios que participan en las asignaciones y reemplazos.",
+        "Desarrolladores que mantienen UI, reglas de negocio, autenticacion, datos y notificaciones."
+      ],
+      "administration": [
+        "El admin administra semanas, puntos, vacantes y confirmaciones desde pantallas protegidas por rol.",
+        "El entorno local se levanta con PostgreSQL en Docker, Prisma para schema y seed, y `next dev` para la app.",
+        "Las variables `DATABASE_URL`, `NEXTAUTH_SECRET` y la configuracion SMTP controlan persistencia, sesion y envio de correos."
+      ],
+      "relatedConcepts": [
+        "App Router con areas protegidas por rol.",
+        "State machine simple de asignaciones segun voluntarios y respuestas.",
+        "Prisma como capa de persistencia y esquema de dominio.",
+        "NotificationLog como trazabilidad operacional.",
+        "Docker Compose como base del entorno local."
+      ],
+      "simpleExamples": [
+        {
+          "title": "Ejemplo 1: rechazo y vacante",
+          "explanation": "Si un voluntario rechaza, la asignacion cambia a `NEEDS_REPLACEMENT`, aparece en vacantes y el admin puede escoger un reemplazo sugerido.",
+          "analogy": "Como una guardia medica donde el turno sigue existiendo aunque cambie la persona asignada."
+        },
+        {
+          "title": "Ejemplo 2: preparar una nueva semana",
+          "explanation": "El coordinador puede clonar una semana anterior, navegar al nuevo rango y seguir ajustando parejas o puntos sin rehacer todo desde cero.",
+          "analogy": "Como duplicar un calendario semanal y solo corregir los cambios de esta semana."
+        }
+      ],
+      "commonMisconceptions": [
+        "No es solo un frontend: el mismo repo contiene handlers, servicios y Prisma como backend integrado.",
+        "Una semana visible en el planner no equivale automaticamente a un `ScheduleWeek`; primero debe existir el registro de semana para poder asignar.",
+        "El enlace directo de correo hoy usa `responseId` y resuelve el MVP, pero no sustituye automaticamente una estrategia de hardening para produccion."
+      ],
+      "juniorStarterGuide": [
+        "Empieza por README, luego `prisma/schema.prisma`, `services/assignment.service.ts` y las paginas de admin y volunteer.",
+        "Entiende primero los modelos de dominio: semana, asignacion, voluntario, respuesta, punto y notificacion.",
+        "Sigue un flujo real de negocio antes de cambiar codigo: crear semana, crear asignacion, confirmar, rechazar y cubrir vacante.",
+        "Verifica siempre si una regla vive en UI o en `services/`; la logica importante esta mayormente del lado de servicio.",
+        "Levanta la base con `npm run db:start`, `db:push` y `db:seed` antes de sacar conclusiones sobre rutas o datos vacios."
+      ],
+      "readingOrder": [
+        {
+          "file": "README.md",
+          "reason": "Da el mejor contexto funcional disponible para una lectura inicial."
+        },
+        {
+          "file": "prisma/schema.prisma",
+          "reason": "Expone el lenguaje de dominio real y las relaciones entre semanas, asignaciones, respuestas, vacantes y notificaciones."
+        },
+        {
+          "file": "services/assignment.service.ts",
+          "reason": "Concentra duplicacion de semana, estados, confirmaciones, reemplazos y dashboard."
+        },
+        {
+          "file": "app/(protected)/admin/schedule/page.tsx",
+          "reason": "Muestra la superficie principal para preparar semanas y conectar planner con asignaciones."
+        },
+        {
+          "file": "app/(protected)/admin/assignments/page.tsx",
+          "reason": "Revela el detalle operativo donde hoy se editan, notifican y eliminan asignaciones."
+        },
+        {
+          "file": "app/(protected)/volunteer/availability/page.tsx",
+          "reason": "Enseña como el voluntario mantiene disponibilidad recurrente y excepciones temporales."
+        },
+        {
+          "file": "components/assignments/confirmation-card.tsx",
+          "reason": "Aterriza la experiencia directa de respuesta desde portal o correo."
+        }
+      ],
+      "visualPrompts": [
+        {
+          "title": "Vista general del proyecto",
+          "prompt": "Crea una ilustracion dark mode tipo operations dashboard para PPAM Scheduler mostrando cuatro bloques: workspace admin, portal del voluntario, motor operativo de asignaciones y persistencia/notificaciones. Debe verse profesional, moderna y apta para presentar a stakeholders no tecnicos."
+        },
+        {
+          "title": "Como funciona de extremo a extremo",
+          "prompt": "Genera un diagrama dark mode limpio que muestre el flujo end-to-end de PPAM Scheduler: crear o duplicar semana, asignar pareja, enviar confirmacion, recibir respuesta, detectar vacante, sugerir reemplazo y registrar NotificationLog. Usa iconografia simple y rotulos en espanol."
+        },
+        {
+          "title": "Uso dentro de una empresa",
+          "prompt": "Crea una imagen dark mode estilo mapa organizacional mostrando como coordinadores, voluntarios, desarrolladores y servicios de soporte (PostgreSQL y SMTP) interactuan con PPAM Scheduler. Debe sentirse clara, operativa y util para onboarding."
+        },
+        {
+          "title": "Historia y evolucion",
+          "prompt": "Disena una timeline dark mode que explique la evolucion visible de PPAM Scheduler desde un MVP inicial hasta un flujo mas cerrado con duplicacion de semana, active slots, excepciones temporales, respuesta directa por correo, logs de notificacion y setup local idempotente. Estilo sobrio, tecnologico y facil de presentar."
+        }
+      ]
+    },
+    "openQuestions": [
+      "Confirma si el flujo directo desde correo basado en `responseId` es suficiente para piloto interno o si debe migrarse a links firmados antes de un entorno mas expuesto.",
+      "Valida si reportes, scoring automatico y canales extra como SMS o WhatsApp quedan fuera de navegacion principal o forman parte de una siguiente fase.",
+      "Confirma si existe algun proceso externo de aprobacion, monitoreo o soporte que no este documentado en el repo."
+    ]
+  },
+  "technicalView": {
+    "architecture": {
+      "style": "Aplicacion full-stack con Next.js App Router",
+      "summary": "El repo combina UI, handlers y logica de negocio en una sola base. `app/` contiene superficies web, `app/api` expone endpoints protegidos por rol, `services/` concentra reglas de dominio y Prisma persiste el estado operativo en PostgreSQL.",
+      "dataFlow": "Admin y volunteer entran por areas protegidas distintas. La UI envia formularios a route handlers que validan con Zod, revisan sesion/rol y delegan en servicios como `assignment.service.ts`, donde se recalculan estados, se sincronizan respuestas y se registran actividades o notificaciones.",
+      "deployment": "El entorno local visible usa Next.js en `localhost:3000`, PostgreSQL por Docker Compose en `localhost:5432` y SMTP opcional via Nodemailer. No se observan aun pipelines CI/CD ni manifiestos de despliegue productivo."
+    },
+    "stack": {
+      "runtime": [
+        "Node.js"
+      ],
+      "frameworks": [
+        "Next.js",
+        "React"
+      ],
+      "ui": [
+        "Componentized UI",
+        "HTML templates",
+        "Lucide Icons",
+        "Radix UI",
+        "Tailwind CSS"
+      ],
+      "tooling": [
+        "ESLint",
+        "Markdown",
+        "PostCSS",
+        "Prettier",
+        "TypeScript",
+        "YAML"
+      ],
+      "testing": [
+        "Vitest"
+      ],
+      "data": [
+        "Prisma",
+        "Prisma Client"
+      ],
+      "infrastructure": [
+        "Docker Compose",
+        "PostgreSQL",
+        "SMTP / Nodemailer"
+      ]
+    },
+    "structure": [
+      {
+        "path": "app",
+        "purpose": "App Router con login, reset de password y workspaces protegidos para admin y volunteer.",
+        "source": "app"
+      },
+      {
+        "path": "app/api",
+        "purpose": "Route handlers para asignaciones, availability, open-slots, puntos, auth, schedule y dashboards.",
+        "source": "app/api"
+      },
+      {
+        "path": "components",
+        "purpose": "Componentes de UI y dominio como assignment cards, planner semanal, tablas, modales y formularios.",
+        "source": "components"
+      },
+      {
+        "path": "services",
+        "purpose": "Capa principal de negocio para asignaciones, disponibilidad, voluntarios, settings y notificaciones.",
+        "source": "services"
+      },
+      {
+        "path": "lib",
+        "purpose": "Auth, constantes, utilidades, validaciones y acceso base a Prisma.",
+        "source": "lib"
+      },
+      {
+        "path": "prisma",
+        "purpose": "Schema de dominio, seed y configuracion del cliente de base de datos.",
+        "source": "prisma"
+      },
+      {
+        "path": "tests",
+        "purpose": "Pruebas automatizadas, hoy enfocadas en el motor de estados de asignacion.",
+        "source": "tests"
+      },
+      {
+        "path": "scripts",
+        "purpose": "Scripts de soporte para levantar, detener y diagnosticar la base local.",
+        "source": "scripts"
+      }
+    ],
+    "entryPoints": [
+      {
+        "path": "app/layout.tsx",
+        "purpose": "Layout raiz y shell global de la aplicacion.",
+        "source": "app/layout.tsx"
+      },
+      {
+        "path": "app/page.tsx",
+        "purpose": "Resuelve el punto de entrada segun sesion y rol del usuario.",
+        "source": "app/page.tsx"
+      },
+      {
+        "path": "app/api/auth/[...nextauth]/route.ts",
+        "purpose": "Bootstrap de autenticacion por credenciales y sesion.",
+        "source": "app/api/auth/[...nextauth]/route.ts"
+      },
+      {
+        "path": "app/(protected)/admin/schedule/page.tsx",
+        "purpose": "Surface principal para preparar semanas, navegar el planner y abrir la creacion de asignaciones.",
+        "source": "app/(protected)/admin/schedule/page.tsx"
+      },
+      {
+        "path": "app/api/assignments/route.ts",
+        "purpose": "Endpoint central para listar y crear asignaciones desde el workspace admin.",
+        "source": "app/api/assignments/route.ts"
+      }
+    ],
+    "commands": [
+      {
+        "name": "dev",
+        "command": "next dev",
+        "purpose": "Inicia el entorno local de desarrollo.",
+        "source": "package.json"
+      },
+      {
+        "name": "build",
+        "command": "next build",
+        "purpose": "Genera el artefacto de build.",
+        "source": "package.json"
+      },
+      {
+        "name": "start",
+        "command": "next start",
+        "purpose": "Inicia la aplicacion o servicio.",
+        "source": "package.json"
+      },
+      {
+        "name": "lint",
+        "command": "next lint",
+        "purpose": "Aplica validaciones de lint.",
+        "source": "package.json"
+      },
+      {
+        "name": "typecheck",
+        "command": "tsc --noEmit",
+        "purpose": "Verifica tipos.",
+        "source": "package.json"
+      },
+      {
+        "name": "test",
+        "command": "vitest run",
+        "purpose": "Ejecuta la suite de pruebas.",
+        "source": "package.json"
+      },
+      {
+        "name": "test:watch",
+        "command": "vitest",
+        "purpose": "Script observado en el manifest.",
+        "source": "package.json"
+      },
+      {
+        "name": "db:start",
+        "command": "bash scripts/db-start.sh",
+        "purpose": "Inicia la aplicacion o servicio.",
+        "source": "package.json"
+      },
+      {
+        "name": "db:stop",
+        "command": "bash scripts/db-stop.sh",
+        "purpose": "Script observado en el manifest.",
+        "source": "package.json"
+      },
+      {
+        "name": "db:status",
+        "command": "bash scripts/db-status.sh",
+        "purpose": "Script observado en el manifest.",
+        "source": "package.json"
+      },
+      {
+        "name": "db:prepare",
+        "command": "npm run db:start && npm run db:push && npm run db:seed",
+        "purpose": "Script observado en el manifest.",
+        "source": "package.json"
+      },
+      {
+        "name": "db:generate",
+        "command": "prisma generate",
+        "purpose": "Script observado en el manifest.",
+        "source": "package.json"
+      },
+      {
+        "name": "db:push",
+        "command": "prisma db push",
+        "purpose": "Script observado en el manifest.",
+        "source": "package.json"
+      },
+      {
+        "name": "db:migrate",
+        "command": "prisma migrate dev",
+        "purpose": "Script observado en el manifest.",
+        "source": "package.json"
+      },
+      {
+        "name": "db:seed",
+        "command": "tsx prisma/seed.ts",
+        "purpose": "Script observado en el manifest.",
+        "source": "package.json"
+      },
+      {
+        "name": "postinstall",
+        "command": "prisma generate",
+        "purpose": "Script observado en el manifest.",
+        "source": "package.json"
+      }
+    ],
+    "envFiles": [
+      {
+        "path": ".env",
+        "source": ".env"
+      },
+      {
+        "path": ".env.example",
+        "source": ".env.example"
+      },
+      {
+        "path": ".env.local",
+        "source": ".env.local"
+      }
+    ],
+    "ci": [],
+    "deploymentFiles": [],
+    "dependencies": [
+      {
+        "name": "@hookform/resolvers",
+        "version": "^3.9.0",
+        "scope": "dependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@next-auth/prisma-adapter",
+        "version": "^1.0.7",
+        "scope": "dependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@prisma/client",
+        "version": "^5.22.0",
+        "scope": "dependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@radix-ui/react-avatar",
+        "version": "^1.1.1",
+        "scope": "dependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@radix-ui/react-checkbox",
+        "version": "^1.1.2",
+        "scope": "dependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@radix-ui/react-dialog",
+        "version": "^1.1.4",
+        "scope": "dependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@radix-ui/react-dropdown-menu",
+        "version": "^2.1.4",
+        "scope": "dependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@radix-ui/react-label",
+        "version": "^2.1.1",
+        "scope": "dependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@radix-ui/react-scroll-area",
+        "version": "^1.2.2",
+        "scope": "dependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@radix-ui/react-select",
+        "version": "^2.1.4",
+        "scope": "dependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@radix-ui/react-separator",
+        "version": "^1.1.1",
+        "scope": "dependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@radix-ui/react-slot",
+        "version": "^1.1.1",
+        "scope": "dependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@radix-ui/react-switch",
+        "version": "^1.1.2",
+        "scope": "dependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@tanstack/react-query",
+        "version": "^5.59.20",
+        "scope": "dependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@tanstack/react-query-devtools",
+        "version": "^5.59.20",
+        "scope": "dependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@types/bcryptjs",
+        "version": "^2.4.6",
+        "scope": "devDependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@types/node",
+        "version": "^22.9.0",
+        "scope": "devDependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@types/nodemailer",
+        "version": "^6.4.17",
+        "scope": "devDependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@types/react",
+        "version": "^19.0.2",
+        "scope": "devDependencies",
+        "source": "package.json"
+      },
+      {
+        "name": "@types/react-dom",
+        "version": "^19.0.2",
+        "scope": "devDependencies",
+        "source": "package.json"
+      }
+    ],
+    "testing": {
+      "frameworks": [
+        "Vitest"
+      ],
+      "locations": [
+        "tests"
+      ],
+      "testFileCount": 1,
+      "notes": "Hoy la cobertura automatizada visible es baja y se concentra en `determineAssignmentStatus`. El repo necesita seguir apoyandose en smoke tests manuales de admin y volunteer para cambios funcionales grandes."
+    },
+    "integrations": [
+      {
+        "name": "PostgreSQL local",
+        "evidence": "La persistencia local usa PostgreSQL por Docker Compose y Prisma.",
+        "source": "compose.yaml"
+      },
+      {
+        "name": "NextAuth credentials",
+        "evidence": "La autenticacion se resuelve dentro del repo con NextAuth y adaptador Prisma.",
+        "source": "app/api/auth/[...nextauth]/route.ts"
+      },
+      {
+        "name": "SMTP / Nodemailer",
+        "evidence": "Las solicitudes y recordatorios de confirmacion se envian por correo y quedan registradas en NotificationLog.",
+        "source": "services/notification.service.ts"
+      }
+    ],
+    "studyGuide": {
+      "technicalExplanation": "La forma correcta de leer este sistema es verlo como monolito web de Next.js: rutas y pantallas en `app/`, backend HTTP en `app/api`, reglas del dominio en `services/` y persistencia en Prisma. El archivo mas importante para comportamiento real es `services/assignment.service.ts`.",
+      "operationalModel": "Localmente el flujo visible es: levantar PostgreSQL con `npm run db:start`, sincronizar schema con `db:push`, cargar demo users con `db:seed` y arrancar la app con `npm run dev`. El script de DB ya es idempotente cuando el contenedor `ppam-scheduler-postgres` existe de una sesion anterior.",
+      "companySpecificUse": "El uso especifico visible es coordinacion semanal de predicacion publica con dos superficies de trabajo: admins que operan la semana y volunteers que responden asignaciones. Eso esta mucho mas claro en las rutas protegidas que en el README corto.",
+      "relatedTechnicalConcepts": [
+        "Next.js App Router y route handlers en el mismo repo.",
+        "NextAuth con guards por rol y sesiones enriquecidas.",
+        "Prisma como modelo de dominio y repositorio efectivo.",
+        "State transitions de asignacion segun ventana de confirmacion y respuestas.",
+        "Sincronizacion de notificaciones, responses y assignment activities."
+      ],
+      "juniorChecklist": [
+        "Antes de tocar UI, reproduce un flujo real con datos seed: crear semana, crear asignacion, confirmar y cubrir vacante.",
+        "Lee `prisma/schema.prisma` antes de cambiar servicios o validaciones; ahi vive el contrato de dominio.",
+        "Busca reglas en `services/` antes de asumir que una pantalla controla el comportamiento.",
+        "Verifica siempre el rol requerido en `lib/auth/guards.ts` cuando abras o agregues endpoints.",
+        "No des por hecho cobertura automatica amplia; valida typecheck, test y smoke manual."
+      ],
+      "commonPitfalls": [
+        "Confundir `app/api` con logica de negocio; los handlers son delgados y el comportamiento importante vive en servicios.",
+        "Asumir que un punto sin active slots esta deshabilitado; en este repo se interpreta como unrestricted temporalmente.",
+        "Olvidar que confirmacion, rechazo y reemplazo deben mantener consistencia entre estado, responses, actividades y NotificationLog."
+      ],
+      "readingOrder": [
+        {
+          "file": "README.md",
+          "reason": "Da el mejor contexto funcional disponible para una lectura inicial."
+        },
+        {
+          "file": "prisma/schema.prisma",
+          "reason": "Define el vocabulario del dominio y muestra que el repo no es solo frontend."
+        },
+        {
+          "file": "services/assignment.service.ts",
+          "reason": "Resume casi todo el comportamiento operativo importante."
+        },
+        {
+          "file": "app/(protected)/admin/schedule/page.tsx",
+          "reason": "Aterriza el planner y la preparacion de semanas desde la UI."
+        },
+        {
+          "file": "app/(protected)/admin/assignments/page.tsx",
+          "reason": "Muestra la superficie de seguimiento detallado y acciones de notificacion."
+        },
+        {
+          "file": "components/availability/availability-selector.tsx",
+          "reason": "Aclara como disponibilidad recurrente y excepciones temporales llegan al flujo real."
+        },
+        {
+          "file": "services/notification.service.ts",
+          "reason": "Explica el envio real de correos y su trazabilidad en NotificationLog."
+        }
+      ],
+      "sourceHighlights": [
+        {
+          "file": "README.md",
+          "takeaway": "Fuente primaria para descripcion, objetivo y posicionamiento del proyecto."
+        },
+        {
+          "file": "prisma/schema.prisma",
+          "takeaway": "De aqui salen los conceptos mas fuertes del negocio: scheduleWeek, assignment, response, activeSlot y notificationLog."
+        },
+        {
+          "file": "services/assignment.service.ts",
+          "takeaway": "Es la columna vertebral del dominio: duplicacion de semanas, confirmaciones, vacantes, reemplazos y dashboard."
+        },
+        {
+          "file": "app/(protected)/admin/schedule/page.tsx",
+          "takeaway": "Revela que preparar la semana ya es un flujo visible de UI y no solo capacidad de backend."
+        },
+        {
+          "file": "app/(protected)/volunteer/confirm/[responseId]/page.tsx",
+          "takeaway": "Muestra el acceso directo desde correo para confirmar o rechazar sin navegar por todo el portal."
+        },
+        {
+          "file": "scripts/db-start.sh",
+          "takeaway": "Documenta una decision operativa clave: reutilizar el contenedor existente para que el setup local sea recuperable."
+        }
+      ]
+    },
+    "risks": [
+      "La cobertura automatizada visible sigue siendo baja para un flujo tan operativo; hoy solo hay un test unitario en el motor de estados.",
+      "No se observan CI, despliegue, monitoreo ni politicas de rollback; el camino a produccion no queda demostrado por el repo.",
+      "El acceso directo de confirmacion via `responseId` cumple el MVP, pero conviene revisar endurecimiento antes de un entorno mas expuesto.",
+      "La configuracion SMTP y secretos de sesion pueden romper el piloto silenciosamente si no se validan al levantar el entorno."
+    ],
+    "openQuestions": [
+      "Existe algun pipeline externo, checklist de release o despliegue manual que no este versionado aqui?",
+      "Se espera hardening adicional para los links directos de confirmacion antes de salir de piloto interno?",
+      "Los reportes visibles en sidebar son parte del alcance estable o siguen siendo una capacidad secundaria no critica?"
+    ]
+  },
+  "evidence": {
+    "draftNote": "Borrador generado a partir de evidencia del repositorio. Completa los campos narrativos antes de compartirlo fuera del equipo.",
+    "keyFiles": [
+      ".env",
+      ".env.example",
+      ".env.local",
+      "app/layout.tsx",
+      "app/page.tsx",
+      "package.json",
+      "README.md",
+      "tsconfig.json"
+    ],
+    "sourceHighlights": [
+      {
+        "file": "README.md",
+        "takeaway": "Fuente primaria para descripcion, objetivo y posicionamiento del proyecto."
+      },
+      {
+        "file": "package.json",
+        "takeaway": "Fuente confiable para runtime, scripts y dependencias."
+      },
+      {
+        "file": "app/layout.tsx",
+        "takeaway": "Punto de entrada observado para entender el flujo real."
+      },
+      {
+        "file": "app/page.tsx",
+        "takeaway": "Punto de entrada observado para entender el flujo real."
+      },
+      {
+        "file": "app/(auth)/forgot-password/page.tsx",
+        "takeaway": "Aqui aparecen rutas o pantallas que revelan el flujo funcional real."
+      },
+      {
+        "file": "app/(protected)/admin/assignments/page.tsx",
+        "takeaway": "Aqui aparecen rutas o pantallas que revelan el flujo funcional real."
+      }
+    ],
+    "readingOrder": [
+      {
+        "file": "README.md",
+        "reason": "Da el mejor contexto funcional disponible para una lectura inicial."
+      },
+      {
+        "file": "package.json",
+        "reason": "Resume scripts, dependencias y el runtime principal."
+      },
+      {
+        "file": "app/layout.tsx",
+        "reason": "Muestra donde arranca el sistema o como se orquesta el flujo principal."
+      },
+      {
+        "file": "app/page.tsx",
+        "reason": "Muestra donde arranca el sistema o como se orquesta el flujo principal."
+      },
+      {
+        "file": ".env",
+        "reason": "Aterriza variables de entorno e integraciones externas."
+      },
+      {
+        "file": ".env.example",
+        "reason": "Aterriza variables de entorno e integraciones externas."
+      },
+      {
+        "file": "tests",
+        "reason": "Permite ver que comportamientos importantes intenta cubrir el equipo."
+      }
+    ],
+    "observedFacts": [
+      {
+        "label": "Manifest",
+        "value": "package.json",
+        "source": "package.json",
+        "type": "observed"
+      },
+      {
+        "label": "Descripcion",
+        "value": "Production-ready MVP for managing weekly public preaching assignments with role-based admin and volunteer experiences.",
+        "source": "README.md",
+        "type": "observed"
+      },
+      {
+        "label": "Frameworks",
+        "value": "Next.js, React",
+        "source": "package.json",
+        "type": "observed"
+      },
+      {
+        "label": "UI",
+        "value": "Componentized UI, HTML templates, Lucide Icons, Radix UI, Tailwind CSS",
+        "source": "package.json",
+        "type": "observed"
+      },
+      {
+        "label": "Entrypoints",
+        "value": "app/layout.tsx, app/page.tsx",
+        "source": "app/layout.tsx",
+        "type": "observed"
+      },
+      {
+        "label": "Superficies visibles",
+        "value": "(auth) y (protected)",
+        "source": "app/(auth)/forgot-password/page.tsx",
+        "type": "observed"
+      },
+      {
+        "label": "Archivos de entorno",
+        "value": ".env, .env.example, .env.local",
+        "source": ".env",
+        "type": "observed"
+      },
+      {
+        "label": "Pruebas",
+        "value": "1 archivos de prueba detectados",
+        "source": "tests",
+        "type": "observed"
+      }
+    ],
+    "inferredFacts": [
+      {
+        "label": "Tipo de repositorio",
+        "value": "Aplicacion frontend",
+        "rationale": "Inferido por frameworks, manifiestos y estructura del arbol.",
+        "confidence": "medium",
+        "source": "package.json",
+        "type": "inferred"
+      },
+      {
+        "label": "Resumen de arquitectura",
+        "value": "El repositorio apunta a una aplicacion frontend centrada en React, Next.js, TypeScript, Tailwind CSS.",
+        "rationale": "Inferido a partir del stack detectado.",
+        "confidence": "medium",
+        "source": "package.json",
+        "type": "inferred"
+      }
+    ]
+  }
+}

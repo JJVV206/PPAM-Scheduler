@@ -44,7 +44,7 @@ export function CreateVolunteerForm() {
       body: JSON.stringify(values)
     });
     const result = await response.json();
-    setMessage(response.ok ? "Volunteer created." : result.error);
+    setMessage(response.ok ? "Voluntario creado." : result.error);
     if (response.ok) {
       setOpen(false);
       form.reset();
@@ -54,11 +54,11 @@ export function CreateVolunteerForm() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Add Volunteer</Button>
+        <Button>Agregar voluntario</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Volunteer</DialogTitle>
+          <DialogTitle>Agregar voluntario</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -67,7 +67,7 @@ export function CreateVolunteerForm() {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name</FormLabel>
+                  <FormLabel>Nombre</FormLabel>
                   <FormControl>
                     <Input {...field} />
                   </FormControl>
@@ -93,7 +93,7 @@ export function CreateVolunteerForm() {
               name="phone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Phone</FormLabel>
+                  <FormLabel>Teléfono</FormLabel>
                   <FormControl>
                     <Input {...field} value={field.value ?? ""} />
                   </FormControl>
@@ -106,7 +106,7 @@ export function CreateVolunteerForm() {
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel>Notas</FormLabel>
                   <FormControl>
                     <Textarea {...field} value={field.value ?? ""} />
                   </FormControl>
@@ -115,7 +115,7 @@ export function CreateVolunteerForm() {
             />
             {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
             <Button type="submit" className="w-full">
-              Save Volunteer
+              Guardar voluntario
             </Button>
           </form>
         </Form>

@@ -25,7 +25,7 @@ export function AssignmentCard({ assignment, action }: AssignmentCardProps) {
               {point.area}
             </p>
             <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-              Couple {assignment.pairNumber}
+              Pareja {assignment.pairNumber}
             </p>
           </div>
           <StatusBadge status={assignment.status} />
@@ -38,7 +38,7 @@ export function AssignmentCard({ assignment, action }: AssignmentCardProps) {
           </div>
           <div className="flex items-center gap-2">
             <Users2 className="h-4 w-4" />
-            {volunteerNames.length ? volunteerNames.join(" & ") : "Awaiting pair"}
+            {volunteerNames.length ? volunteerNames.join(" y ") : "Esperando pareja"}
           </div>
         </div>
 

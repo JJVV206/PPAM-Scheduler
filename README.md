@@ -32,6 +32,8 @@ This repo includes a local PostgreSQL service in `compose.yaml`.
 
 If `docker compose` cannot connect, Docker Desktop is not running yet. Start Docker Desktop first, then rerun `npm run db:start`.
 
+If `db:start` reports that `ppam-scheduler-postgres` already exists, the script now reuses that container instead of trying to recreate it. This makes the local flow idempotent when the database was created in an earlier session.
+
 If you see `Can't reach database server at localhost:5432`, the app is up but PostgreSQL is not running.
 
 ## Demo Users

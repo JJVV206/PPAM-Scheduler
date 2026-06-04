@@ -18,7 +18,7 @@ export async function getAuthRuntimeStatus(): Promise<AuthRuntimeStatus> {
     return {
       ready: false,
       missingEnv,
-      message: `Missing environment variables: ${missingEnv.join(", ")}. Create .env.local or .env, then restart the dev server.`
+      message: `Faltan variables de entorno: ${missingEnv.join(", ")}. Crea .env.local o .env y reinicia el servidor de desarrollo.`
     };
   }
 
@@ -34,8 +34,8 @@ export async function getAuthRuntimeStatus(): Promise<AuthRuntimeStatus> {
       missingEnv: [],
       message:
         error instanceof Error
-          ? `Database connection failed: ${error.message}`
-          : "Database connection failed. Check DATABASE_URL and that PostgreSQL is running."
+          ? `Falló la conexión con la base de datos: ${error.message}`
+          : "Falló la conexión con la base de datos. Revisa DATABASE_URL y confirma que PostgreSQL esté en ejecución."
     };
   }
 }

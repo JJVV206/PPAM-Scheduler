@@ -29,7 +29,7 @@ export default async function VolunteerConfirmPage({
 
   return (
     <ConfirmationCard
-      assignmentId={response.assignmentId}
+      responseId={response.id}
       pointName={response.assignment.preachingPoint.name}
       date={response.assignment.date}
       timeSlot={response.assignment.timeSlot}

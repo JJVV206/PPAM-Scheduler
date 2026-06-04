@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 import { SchedulePointGroup } from "@/components/schedule/schedule-point-group";
 import type { WeeklyScheduleMatrix } from "@/types/domain";
@@ -20,9 +21,11 @@ export function WeeklyScheduleGrid({ schedule }: WeeklyScheduleGridProps) {
             className="bg-surface-elevated px-3 py-4 text-center"
           >
             <p className="font-heading text-base font-semibold text-foreground xl:text-lg">
-              {format(day.date, "EEE")}
+              {format(day.date, "EEE", { locale: es })}
             </p>
-            <p className="text-sm text-muted-foreground">{format(day.date, "MMM d")}</p>
+            <p className="text-sm text-muted-foreground">
+              {format(day.date, "d 'de' MMM", { locale: es })}
+            </p>
           </div>
         ))}
 
@@ -56,7 +59,7 @@ export function WeeklyScheduleGrid({ schedule }: WeeklyScheduleGridProps) {
                       ))
                     ) : (
                       <div className="flex min-h-20 items-center justify-center rounded-2xl border border-dashed border-border/70 bg-background/30 px-3 py-4 text-center text-sm text-muted-foreground">
-                        No couples assigned
+                        Sin parejas asignadas
                       </div>
                     )}
                   </div>

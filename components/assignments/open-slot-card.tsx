@@ -1,12 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { MapPin, TriangleAlert, Users2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import {
+  TIME_SLOT_DEFINITIONS,
+  VOLUNTEER_POSITION_LABELS
+} from "@/lib/constants/domain";
 import { formatDisplayDate } from "@/lib/utils";
 import type { OpenSlotDto } from "@/types/domain";
 
@@ -21,11 +31,20 @@ export function OpenSlotCard({
   mode,
   currentVolunteerId
 }: OpenSlotCardProps) {
+  const router = useRouter();
   const [selectedVolunteerId, setSelectedVolunteerId] = useState(
     currentVolunteerId ?? openSlot.suggestedVolunteers[0]?.id ?? ""
   );
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const selectedVolunteer = useMemo(
+    () =>
+      openSlot.suggestedVolunteers.find(
+        (volunteer) => volunteer.id === selectedVolunteerId
+      ),
+    [openSlot.suggestedVolunteers, selectedVolunteerId]
+  );
 
   async function handleAssign() {
     setSubmitting(true);
@@ -41,8 +60,12 @@ export function OpenSlotCard({
       })
     });
     const result = await response.json();
-    setMessage(response.ok ? "Slot covered. Refresh to see updates." : result.error);
+    setMessage(response.ok ? "Vacante cubierta." : result.error);
     setSubmitting(false);
+
+    if (response.ok) {
+      router.refresh();
+    }
   }
 
   return (
@@ -63,21 +86,29 @@ export function OpenSlotCard({
           </div>
         </div>
         <div className="grid gap-3 text-sm text-muted-foreground">
-          <p>{formatDisplayDate(openSlot.date, "EEEE, MMM d")}</p>
+          <p>{formatDisplayDate(openSlot.date, "EEEE d 'de' MMM")}</p>
           <p>{TIME_SLOT_DEFINITIONS[openSlot.timeSlot].label}</p>
           <p className="flex items-center gap-2">
             <Users2 className="h-4 w-4" />
-            Missing {openSlot.missingPositions.join(" & ")}
+            Faltan{" "}
+            {openSlot.missingPositions
+              .map((position) => VOLUNTEER_POSITION_LABELS[position])
+              .join(" y ")}
           </p>
           {openSlot.notes ? (
-            <p className="rounded-2xl bg-white/[0.03] p-3 text-foreground">{openSlot.notes}</p>
+            <p className="rounded-2xl bg-white/[0.03] p-3 text-foreground">
+              {openSlot.notes}
+            </p>
           ) : null}
         </div>
         {mode === "admin" ? (
           <div className="space-y-3">
-            <Select value={selectedVolunteerId} onValueChange={setSelectedVolunteerId}>
+            <Select
+              value={selectedVolunteerId}
+              onValueChange={setSelectedVolunteerId}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Assign volunteer" />
+                <SelectValue placeholder="Asignar voluntario" />
               </SelectTrigger>
               <SelectContent>
                 {openSlot.suggestedVolunteers.map((volunteer) => (
@@ -92,8 +123,17 @@ export function OpenSlotCard({
               onClick={handleAssign}
               disabled={!selectedVolunteerId || submitting}
             >
-              {submitting ? "Assigning..." : "Assign Replacement"}
+              {submitting ? "Asignando..." : "Asignar reemplazo"}
             </Button>
+            {selectedVolunteer ? (
+              <div className="rounded-2xl bg-background/40 px-3 py-2 text-xs text-muted-foreground">
+                {selectedVolunteer.preferredAreas.includes(openSlot.area)
+                  ? "Elegible por preferencia de zona y disponibilidad."
+                  : "Elegible por disponibilidad en esta franja y sin conflicto activo."}{" "}
+                Confiabilidad: {Math.round(selectedVolunteer.reliabilityScore)}
+                %.
+              </div>
+            ) : null}
           </div>
         ) : (
           <Button
@@ -101,7 +141,7 @@ export function OpenSlotCard({
             onClick={handleAssign}
             disabled={!selectedVolunteerId || submitting}
           >
-            {submitting ? "Accepting..." : "Accept Assignment"}
+            {submitting ? "Aceptando..." : "Aceptar asignación"}
           </Button>
         )}
         {message ? (

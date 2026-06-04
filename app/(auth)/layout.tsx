@@ -12,27 +12,27 @@ export default function AuthLayout({
         <div className="hidden max-w-xl space-y-6 lg:block">
           <div className="space-y-3">
             <p className="text-xs uppercase tracking-[0.32em] text-primary/80">
-              PPAM Scheduler
+              PPAM Planificador
             </p>
             <h1 className="font-heading text-5xl font-semibold leading-tight text-balance">
-              Weekly scheduling, confirmations, and replacements in one control center.
+              Horarios semanales, confirmaciones y reemplazos en un solo centro de control.
             </h1>
             <p className="max-w-lg text-lg leading-8 text-muted-foreground">
-              Coordinate preaching points, detect open slots early, and keep volunteers moving through a cleaner confirmation flow.
+              Coordina puntos de predicación, detecta vacantes a tiempo y mantén a los voluntarios avanzando con un flujo de confirmación más claro.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-3xl border border-white/8 bg-white/[0.04] p-5">
               <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
-                Admin
+                Administración
               </p>
-              <p className="mt-3 font-heading text-2xl font-semibold">Operational schedule control</p>
+              <p className="mt-3 font-heading text-2xl font-semibold">Control operativo del horario</p>
             </div>
             <div className="rounded-3xl border border-white/8 bg-white/[0.04] p-5">
               <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
-                Volunteer
+                Voluntariado
               </p>
-              <p className="mt-3 font-heading text-2xl font-semibold">Fast mobile confirmation flow</p>
+              <p className="mt-3 font-heading text-2xl font-semibold">Confirmación móvil ágil</p>
             </div>
           </div>
         </div>

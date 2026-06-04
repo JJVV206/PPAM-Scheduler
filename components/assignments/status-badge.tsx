@@ -12,15 +12,15 @@ const statusMap: Record<
     variant: "default" | "secondary" | "success" | "warning" | "danger" | "outline";
   }
 > = {
-  SCHEDULED: { label: "Scheduled", variant: "secondary" },
-  PENDING_CONFIRMATION: { label: "Pending", variant: "warning" },
-  CONFIRMED: { label: "Confirmed", variant: "success" },
-  DECLINED: { label: "Declined", variant: "danger" },
-  NEEDS_REPLACEMENT: { label: "Needs Replacement", variant: "danger" },
-  REASSIGNED: { label: "Reassigned", variant: "default" },
-  COMPLETED: { label: "Completed", variant: "success" },
-  CANCELLED: { label: "Cancelled", variant: "outline" },
-  PENDING: { label: "Pending", variant: "warning" }
+  SCHEDULED: { label: "Programada", variant: "secondary" },
+  PENDING_CONFIRMATION: { label: "Pendiente", variant: "warning" },
+  CONFIRMED: { label: "Confirmada", variant: "success" },
+  DECLINED: { label: "Rechazada", variant: "danger" },
+  NEEDS_REPLACEMENT: { label: "Requiere reemplazo", variant: "danger" },
+  REASSIGNED: { label: "Reasignada", variant: "default" },
+  COMPLETED: { label: "Completada", variant: "success" },
+  CANCELLED: { label: "Cancelada", variant: "outline" },
+  PENDING: { label: "Pendiente", variant: "warning" }
 };
 
 export function StatusBadge({ status }: StatusBadgeProps) {

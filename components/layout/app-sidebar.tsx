@@ -28,23 +28,23 @@ type NavItem = {
 };
 
 const adminItems: NavItem[] = [
-  { href: "/admin", label: "Dashboard", icon: Home },
-  { href: "/admin/schedule", label: "Weekly Schedule", icon: CalendarDays },
-  { href: "/admin/assignments", label: "Assignments", icon: ClipboardList },
-  { href: "/admin/volunteers", label: "Volunteers", icon: Users },
-  { href: "/admin/points", label: "Preaching Points", icon: MapPin },
-  { href: "/admin/open-slots", label: "Open Slots", icon: Sparkles },
-  { href: "/admin/notifications", label: "Notifications", icon: Bell },
-  { href: "/admin/settings", label: "Settings", icon: Settings }
+  { href: "/admin", label: "Inicio", icon: Home },
+  { href: "/admin/schedule", label: "Horario semanal", icon: CalendarDays },
+  { href: "/admin/assignments", label: "Asignaciones", icon: ClipboardList },
+  { href: "/admin/volunteers", label: "Voluntarios", icon: Users },
+  { href: "/admin/points", label: "Puntos de predicación", icon: MapPin },
+  { href: "/admin/open-slots", label: "Vacantes", icon: Sparkles },
+  { href: "/admin/notifications", label: "Notificaciones", icon: Bell },
+  { href: "/admin/settings", label: "Configuración", icon: Settings }
 ];
 
 const volunteerItems: NavItem[] = [
-  { href: "/volunteer", label: "Dashboard", icon: Home },
-  { href: "/volunteer/assignments", label: "My Assignments", icon: CalendarDays },
-  { href: "/volunteer/open-slots", label: "Open Slots", icon: Sparkles },
-  { href: "/volunteer/availability", label: "Availability", icon: UserCircle2 },
-  { href: "/volunteer/notifications", label: "Notifications", icon: Bell },
-  { href: "/volunteer/profile", label: "Profile", icon: Settings }
+  { href: "/volunteer", label: "Inicio", icon: Home },
+  { href: "/volunteer/assignments", label: "Mis asignaciones", icon: CalendarDays },
+  { href: "/volunteer/open-slots", label: "Vacantes", icon: Sparkles },
+  { href: "/volunteer/availability", label: "Disponibilidad", icon: UserCircle2 },
+  { href: "/volunteer/notifications", label: "Notificaciones", icon: Bell },
+  { href: "/volunteer/profile", label: "Perfil", icon: Settings }
 ];
 
 type AppSidebarProps = {
@@ -75,7 +75,7 @@ export function AppSidebar({ role }: AppSidebarProps) {
           <div>
             <p className="font-heading text-xl font-semibold">PPAM</p>
             <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">
-              Scheduler
+              Planificador
             </p>
           </div>
         </div>
@@ -106,7 +106,7 @@ export function AppSidebar({ role }: AppSidebarProps) {
       <div className="space-y-3 border-t border-border/60 pt-5">
         <button className="flex items-center gap-3 px-4 py-2 text-sm text-muted-foreground transition hover:text-foreground">
           <LifeBuoy className="h-4 w-4" />
-          Support
+          Soporte
         </button>
         <Button
           variant="ghost"
@@ -114,7 +114,7 @@ export function AppSidebar({ role }: AppSidebarProps) {
           onClick={() => signOut({ callbackUrl: "/login" })}
         >
           <LogOut className="h-4 w-4" />
-          Logout
+          Cerrar sesión
         </Button>
       </div>
     </aside>

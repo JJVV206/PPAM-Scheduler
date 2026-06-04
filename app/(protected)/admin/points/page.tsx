@@ -8,8 +8,8 @@ export default async function AdminPointsPage() {
 
   return (
     <DataTable
-      title="Preaching Points"
-      description="Manage locations, active windows, and territory coverage."
+      title="Puntos de predicación"
+      description="Gestiona ubicaciones, horarios activos y cobertura del territorio."
       actions={<CreatePointForm />}
     >
       <PreachingPointTable

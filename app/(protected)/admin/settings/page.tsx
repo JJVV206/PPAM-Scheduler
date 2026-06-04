@@ -7,9 +7,9 @@ export default async function AdminSettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-4xl font-semibold">Settings</h1>
+        <h1 className="font-heading text-4xl font-semibold">Configuración</h1>
         <p className="text-sm text-muted-foreground">
-          Configure confirmation lead time, reminder cadence, and delivery channels.
+          Configura la anticipación de confirmación, la cadencia de recordatorios y los canales de entrega.
         </p>
       </div>
       <SettingsForm initialValues={settings} />

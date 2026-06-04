@@ -31,19 +31,19 @@ export function ForgotPasswordForm() {
       body: JSON.stringify(values)
     });
     if (response.ok) {
-      setMessage("If the email exists, a reset link has been sent.");
+      setMessage("Si el correo existe, ya enviamos un enlace para restablecer la contraseña.");
     } else {
       const result = await response.json();
-      setMessage(result.error ?? "Unable to send reset instructions.");
+      setMessage(result.error ?? "No fue posible enviar las instrucciones de restablecimiento.");
     }
   }
 
   return (
     <Card className="surface-elevated w-full max-w-md">
       <CardHeader className="space-y-2">
-        <CardTitle className="text-3xl">Reset password</CardTitle>
+        <CardTitle className="text-3xl">Restablecer contraseña</CardTitle>
         <CardDescription>
-          Enter your email and we will send a reset link.
+          Ingresa tu correo y te enviaremos un enlace de restablecimiento.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -63,13 +63,13 @@ export function ForgotPasswordForm() {
               )}
             />
             <Button type="submit" className="w-full">
-              Send reset link
+              Enviar enlace
             </Button>
           </form>
         </Form>
         {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
         <Link href="/login" className="block text-sm text-primary">
-          Back to login
+          Volver al acceso
         </Link>
       </CardContent>
     </Card>

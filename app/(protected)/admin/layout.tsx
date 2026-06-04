@@ -21,7 +21,7 @@ export default async function AdminLayout({
   }
 
   return (
-    <PageShell role="ADMIN" userName={session.user.name ?? "Admin"}>
+    <PageShell role="ADMIN" userName={session.user.name ?? "Administrador"}>
       {children}
     </PageShell>
   );

@@ -30,7 +30,7 @@ export function TimeSlotBlock({
         ) : (
           emptyState ?? (
             <div className="rounded-2xl border border-dashed border-border/80 bg-white/[0.02] p-4 text-sm text-muted-foreground">
-              No assignments
+              Sin asignaciones
             </div>
           )
         )}

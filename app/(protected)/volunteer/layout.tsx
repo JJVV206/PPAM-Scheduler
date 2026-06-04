@@ -21,7 +21,7 @@ export default async function VolunteerLayout({
   }
 
   return (
-    <PageShell role="VOLUNTEER" userName={session.user.name ?? "Volunteer"}>
+    <PageShell role="VOLUNTEER" userName={session.user.name ?? "Voluntario"}>
       {children}
     </PageShell>
   );

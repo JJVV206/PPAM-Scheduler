@@ -35,15 +35,17 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
       body: JSON.stringify(values)
     });
     const result = await response.json();
-    setMessage(response.ok ? "Password updated. You can sign in now." : result.error);
+    setMessage(
+      response.ok ? "Contraseña actualizada. Ya puedes iniciar sesión." : result.error
+    );
   }
 
   return (
     <Card className="surface-elevated w-full max-w-md">
       <CardHeader className="space-y-2">
-        <CardTitle className="text-3xl">Create a new password</CardTitle>
+        <CardTitle className="text-3xl">Crear nueva contraseña</CardTitle>
         <CardDescription>
-          Use a strong password with uppercase, lowercase, and numbers.
+          Usa una contraseña segura con mayúsculas, minúsculas y números.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -54,7 +56,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>New password</FormLabel>
+                  <FormLabel>Nueva contraseña</FormLabel>
                   <FormControl>
                     <Input type="password" {...field} />
                   </FormControl>
@@ -63,7 +65,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
               )}
             />
             <Button type="submit" className="w-full">
-              Update password
+              Actualizar contraseña
             </Button>
           </form>
         </Form>
