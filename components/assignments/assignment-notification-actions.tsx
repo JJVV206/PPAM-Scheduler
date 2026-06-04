@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button";
 type AssignmentNotificationActionsProps = {
   assignmentId: string;
   disabled?: boolean;
+  compact?: boolean;
 };
 
 export function AssignmentNotificationActions({
   assignmentId,
-  disabled
+  disabled,
+  compact = false
 }: AssignmentNotificationActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState<"request" | "reminder" | null>(null);
@@ -45,10 +47,11 @@ export function AssignmentNotificationActions({
   }
 
   return (
-    <div className="space-y-3">
+    <div className={compact ? "space-y-2.5" : "space-y-3"}>
       <div className="grid gap-3 sm:grid-cols-2">
         <Button
           type="button"
+          size={compact ? "sm" : "default"}
           onClick={() => trigger("request")}
           disabled={disabled || loading !== null}
         >
@@ -57,13 +60,18 @@ export function AssignmentNotificationActions({
         <Button
           type="button"
           variant="secondary"
+          size={compact ? "sm" : "default"}
           onClick={() => trigger("reminder")}
           disabled={disabled || loading !== null}
         >
           {loading === "reminder" ? "Reenviando..." : "Reenviar recordatorio"}
         </Button>
       </div>
-      {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+      {message ? (
+        <p className={compact ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>
+          {message}
+        </p>
+      ) : null}
     </div>
   );
 }

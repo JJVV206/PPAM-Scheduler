@@ -42,8 +42,8 @@ export default async function AdminSchedulePage({
     ]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden">
+      <div className="shrink-0 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="font-heading text-4xl font-semibold">
             Horario semanal
@@ -79,7 +79,7 @@ export default async function AdminSchedulePage({
           volunteers={volunteers}
         />
       ) : (
-        <Card className="surface-panel">
+        <Card className="surface-panel shrink-0">
           <CardContent className="p-6 text-sm text-muted-foreground">
             Esta semana todavía no existe como registro operativo. Usa "Crear o
             duplicar semana" para habilitar asignaciones y seguimiento.
@@ -87,11 +87,11 @@ export default async function AdminSchedulePage({
         </Card>
       )}
 
-      <Card className="surface-panel">
-        <CardHeader>
+      <Card className="surface-panel min-h-0 flex-1 overflow-hidden">
+        <CardHeader className="shrink-0 p-4 pb-3 xl:px-5 xl:pt-5">
           <CardTitle>Planeador</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pb-2 pt-0 xl:px-5">
           {schedule.days.some((day) =>
             Object.values(day.items).some((items) => items.length > 0)
           ) ? (

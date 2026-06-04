@@ -34,9 +34,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   DAY_LABELS,
-  TIME_SLOTS,
-  TIME_SLOT_DEFINITIONS
+  TIME_SLOTS
 } from "@/lib/constants/domain";
+import { TimeSlotOptionButton } from "@/components/assignments/time-slot-option-button";
 import { cn } from "@/lib/utils";
 import type {
   DayOfWeek,
@@ -160,6 +160,8 @@ export function AssignmentForm({
 
     return matches.length ? matches : preachingPoints;
   }, [preachingPoints, selectedDayOfWeek, selectedTimeSlot]);
+
+  const hasSinglePoint = preachingPoints.length <= 1;
 
   useEffect(() => {
     const currentPointId = form.getValues("preachingPointId");
@@ -290,24 +292,12 @@ export function AssignmentForm({
                           const isActive = field.value === timeSlot;
 
                           return (
-                            <button
+                            <TimeSlotOptionButton
                               key={timeSlot}
-                              type="button"
+                              slot={timeSlot}
+                              selected={isActive}
                               onClick={() => field.onChange(timeSlot)}
-                              className={cn(
-                                "rounded-2xl border px-4 py-3 text-left transition-colors",
-                                isActive
-                                  ? "border-primary bg-primary/15 text-foreground shadow-[0_8px_24px_rgba(102,145,255,0.18)]"
-                                  : "border-border/70 bg-background/35 text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                              )}
-                            >
-                              <p className="text-sm font-semibold text-inherit">
-                                {TIME_SLOT_DEFINITIONS[timeSlot].shortLabel}
-                              </p>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {TIME_SLOT_DEFINITIONS[timeSlot].label}
-                              </p>
-                            </button>
+                            />
                           );
                         })}
                       </div>
@@ -335,32 +325,34 @@ export function AssignmentForm({
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="preachingPointId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Punto de predicación</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona un punto" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {compatiblePoints.map((point) => (
-                          <SelectItem key={point.id} value={point.id}>
-                            {point.name} • {point.area}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            {!hasSinglePoint ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="preachingPointId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Punto de predicación</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona un punto" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {compatiblePoints.map((point) => (
+                            <SelectItem key={point.id} value={point.id}>
+                              {point.name} • {point.area}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            ) : null}
 
             <div className="grid gap-4 md:grid-cols-2">
               <FormField

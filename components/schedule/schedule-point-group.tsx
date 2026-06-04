@@ -1,54 +1,81 @@
-import { MapPin, Users2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 
-import { StatusBadge } from "@/components/assignments/status-badge";
-import type { WeeklySchedulePointCell } from "@/types/domain";
+import { cn } from "@/lib/utils";
+import type { AssignmentStatus, WeeklySchedulePointCell } from "@/types/domain";
 
 type SchedulePointGroupProps = {
   group: WeeklySchedulePointCell;
 };
 
+const compactStatusMap: Record<
+  AssignmentStatus,
+  { label: string; className: string }
+> = {
+  SCHEDULED: {
+    label: "Programada",
+    className: "border-white/10 bg-secondary text-secondary-foreground"
+  },
+  PENDING_CONFIRMATION: {
+    label: "Pendiente",
+    className: "border-warning/25 bg-warning/15 text-warning"
+  },
+  CONFIRMED: {
+    label: "Confirmada",
+    className: "border-success/25 bg-success/15 text-success"
+  },
+  DECLINED: {
+    label: "Rechazada",
+    className: "border-danger/25 bg-danger/15 text-danger"
+  },
+  NEEDS_REPLACEMENT: {
+    label: "Reemplazo",
+    className: "border-danger/25 bg-danger/15 text-danger"
+  },
+  REASSIGNED: {
+    label: "Reasignada",
+    className: "border-primary/40 bg-primary/15 text-primary"
+  },
+  COMPLETED: {
+    label: "Completada",
+    className: "border-success/25 bg-success/15 text-success"
+  },
+  CANCELLED: {
+    label: "Cancelada",
+    className: "border-border bg-transparent text-foreground"
+  }
+};
+
 export function SchedulePointGroup({ group }: SchedulePointGroupProps) {
   return (
-    <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-2.5 xl:p-3">
-      <div className="mb-2.5 flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <p className="text-sm font-semibold leading-tight text-foreground">
-            {group.preachingPointName}
-          </p>
-          <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground xl:text-xs">
-            <MapPin className="h-3.5 w-3.5" />
-            {group.area}
-          </p>
-        </div>
-        <div className="rounded-full bg-primary/12 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
-          {group.pairs.length} pareja{group.pairs.length > 1 ? "s" : ""}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        {group.pairs.map((pair) => (
-          <div
-            key={pair.id}
-            className="rounded-2xl border border-border/70 bg-background/40 p-2.5"
-          >
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Pareja {pair.pairNumber}
-              </p>
-              <StatusBadge status={pair.status} />
-            </div>
-            <p className="flex items-start gap-2 text-sm leading-snug text-foreground">
-              <Users2 className="mt-0.5 h-4 w-4 text-muted-foreground" />
-              {pair.volunteerNames.length ? pair.volunteerNames.join(" y ") : "Esperando pareja"}
+    <div className="space-y-1.5">
+      {group.pairs.map((pair) => (
+        <Link
+          key={pair.id}
+          href={`/admin/assignments/${pair.id}`}
+          className="group flex min-h-16 items-center justify-between gap-2 rounded-[18px] border border-white/8 bg-white/[0.04] px-2.5 py-2 transition hover:border-primary/30 hover:bg-white/[0.06]"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="overflow-hidden text-[12px] font-semibold leading-tight text-foreground">
+              {group.preachingPointName}
             </p>
-            {pair.warnings.length ? (
-              <p className="mt-2 text-xs text-warning">
-                {pair.warnings.join(" • ")}
-              </p>
-            ) : null}
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Pareja {pair.pairNumber}
+              </span>
+              <span
+                className={cn(
+                  "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none",
+                  compactStatusMap[pair.status].className
+                )}
+              >
+                {compactStatusMap[pair.status].label}
+              </span>
+            </div>
           </div>
-        ))}
-      </div>
+          <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition group-hover:text-foreground" />
+        </Link>
+      ))}
     </div>
   );
 }

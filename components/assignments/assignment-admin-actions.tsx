@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { TimeSlotOptionButton } from "@/components/assignments/time-slot-option-button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -15,9 +16,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   DAY_LABELS,
-  TIME_SLOTS,
-  TIME_SLOT_DEFINITIONS
+  TIME_SLOTS
 } from "@/lib/constants/domain";
+import { cn } from "@/lib/utils";
 import type {
   AssignmentDetailDto,
   DayOfWeek,
@@ -30,6 +31,9 @@ type AssignmentAdminActionsProps = {
   assignment: AssignmentDetailDto;
   preachingPoints: PreachingPointSummary[];
   volunteers: VolunteerSummary[];
+  compact?: boolean;
+  showDivider?: boolean;
+  showHeading?: boolean;
 };
 
 function getDayOfWeekFromDate(value: string): DayOfWeek {
@@ -53,7 +57,10 @@ function toAssignmentIsoDate(value: string) {
 export function AssignmentAdminActions({
   assignment,
   preachingPoints,
-  volunteers
+  volunteers,
+  compact = false,
+  showDivider = true,
+  showHeading = true
 }: AssignmentAdminActionsProps) {
   const router = useRouter();
   const [assignmentDate, setAssignmentDate] = useState(
@@ -92,6 +99,8 @@ export function AssignmentAdminActions({
       ),
     [preachingPoints, selectedDayOfWeek, timeSlot]
   );
+
+  const hasSinglePoint = preachingPoints.length <= 1;
 
   useEffect(() => {
     if (
@@ -159,26 +168,42 @@ export function AssignmentAdminActions({
   }
 
   return (
-    <div className="space-y-4 border-t border-border/60 pt-4">
-      <div>
-        <p className="font-semibold">Editar asignación</p>
-        <p className="text-sm text-muted-foreground">
-          Ajusta fecha, horario, punto o pareja sin salir del seguimiento.
-        </p>
-      </div>
+    <div
+      className={cn(
+        compact ? "space-y-3" : "space-y-4",
+        showDivider && "border-t border-border/60",
+        showDivider && (compact ? "pt-3" : "pt-4")
+      )}
+    >
+      {showHeading ? (
+        <div>
+          <p className="font-semibold">Editar asignación</p>
+          <p className={compact ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>
+            Ajusta fecha, horario
+            {hasSinglePoint ? "" : ", punto"}
+            {" o pareja sin salir del seguimiento."}
+          </p>
+        </div>
+      ) : null}
 
       <div className="grid gap-3 md:grid-cols-2">
         <div className="grid gap-2">
           <label className="text-sm font-medium">Fecha</label>
           <Input
             type="date"
+            className={compact ? "h-10" : undefined}
             value={assignmentDate}
             onChange={(event) => setAssignmentDate(event.target.value)}
           />
         </div>
         <div className="grid gap-2">
           <label className="text-sm font-medium">Día detectado</label>
-          <div className="rounded-2xl border border-border/70 bg-background/35 px-4 py-3 text-sm text-muted-foreground">
+          <div
+            className={cn(
+              "rounded-2xl border border-border/70 bg-background/35 text-muted-foreground",
+              compact ? "px-4 py-2.5 text-sm" : "px-4 py-3 text-sm"
+            )}
+          >
             {DAY_LABELS[selectedDayOfWeek]}
           </div>
         </div>
@@ -186,47 +211,42 @@ export function AssignmentAdminActions({
 
       <div className="grid gap-3">
         <label className="text-sm font-medium">Horario</label>
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        <div className={cn("grid gap-2", compact ? "grid-cols-2 md:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-5")}>
           {TIME_SLOTS.map((slot) => (
-            <button
+            <TimeSlotOptionButton
               key={slot}
-              type="button"
+              slot={slot}
+              selected={timeSlot === slot}
               onClick={() => setTimeSlot(slot)}
-              className={`rounded-2xl border px-4 py-3 text-left transition-colors ${
-                timeSlot === slot
-                  ? "border-primary bg-primary/15 text-foreground"
-                  : "border-border/70 bg-background/35 text-muted-foreground"
-              }`}
-            >
-              <p className="text-sm font-semibold text-inherit">
-                {TIME_SLOT_DEFINITIONS[slot].shortLabel}
-              </p>
-            </button>
+              className={compact ? "px-2.5 py-2" : undefined}
+            />
           ))}
         </div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <div className="grid gap-2 md:col-span-3">
-          <label className="text-sm font-medium">Punto de predicación</label>
-          <Select value={preachingPointId} onValueChange={setPreachingPointId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un punto" />
-            </SelectTrigger>
-            <SelectContent>
-              {compatiblePoints.map((point) => (
-                <SelectItem key={point.id} value={point.id}>
-                  {point.name} • {point.area}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {!hasSinglePoint ? (
+          <div className="grid gap-2 md:col-span-3">
+            <label className="text-sm font-medium">Punto de predicación</label>
+            <Select value={preachingPointId} onValueChange={setPreachingPointId}>
+              <SelectTrigger className={compact ? "h-10" : undefined}>
+                <SelectValue placeholder="Selecciona un punto" />
+              </SelectTrigger>
+              <SelectContent>
+                {compatiblePoints.map((point) => (
+                  <SelectItem key={point.id} value={point.id}>
+                    {point.name} • {point.area}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
 
         <div className="grid gap-2">
           <label className="text-sm font-medium">Voluntario 1</label>
           <Select value={volunteerOneId} onValueChange={setVolunteerOneId}>
-            <SelectTrigger>
+            <SelectTrigger className={compact ? "h-10" : undefined}>
               <SelectValue placeholder="Primer puesto" />
             </SelectTrigger>
             <SelectContent>
@@ -242,7 +262,7 @@ export function AssignmentAdminActions({
         <div className="grid gap-2">
           <label className="text-sm font-medium">Voluntario 2</label>
           <Select value={volunteerTwoId} onValueChange={setVolunteerTwoId}>
-            <SelectTrigger>
+            <SelectTrigger className={compact ? "h-10" : undefined}>
               <SelectValue placeholder="Segundo puesto" />
             </SelectTrigger>
             <SelectContent>
@@ -259,6 +279,8 @@ export function AssignmentAdminActions({
       <div className="grid gap-2">
         <label className="text-sm font-medium">Notas</label>
         <Textarea
+          rows={compact ? 3 : 5}
+          className={compact ? "min-h-[88px]" : undefined}
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
           placeholder="Indicaciones operativas"
@@ -266,13 +288,16 @@ export function AssignmentAdminActions({
       </div>
 
       {message ? (
-        <p className="text-sm text-muted-foreground">{message}</p>
+        <p className={compact ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>
+          {message}
+        </p>
       ) : null}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
         <Button
           type="button"
           variant="danger"
+          size={compact ? "sm" : "default"}
           onClick={handleDelete}
           disabled={loading !== null}
         >
@@ -280,6 +305,7 @@ export function AssignmentAdminActions({
         </Button>
         <Button
           type="button"
+          size={compact ? "sm" : "default"}
           onClick={handleSave}
           disabled={
             loading !== null ||

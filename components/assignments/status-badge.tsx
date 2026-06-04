@@ -1,8 +1,10 @@
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import type { AssignmentStatus, ResponseStatus } from "@/types/domain";
 
 type StatusBadgeProps = {
   status: AssignmentStatus | ResponseStatus;
+  className?: string;
 };
 
 const statusMap: Record<
@@ -23,7 +25,14 @@ const statusMap: Record<
   PENDING: { label: "Pendiente", variant: "warning" }
 };
 
-export function StatusBadge({ status }: StatusBadgeProps) {
+export function StatusBadge({ status, className }: StatusBadgeProps) {
   const config = statusMap[status];
-  return <Badge variant={config.variant}>{config.label}</Badge>;
+  return (
+    <Badge
+      variant={config.variant}
+      className={cn("max-w-full text-center leading-tight", className)}
+    >
+      {config.label}
+    </Badge>
+  );
 }

@@ -8,7 +8,6 @@ import {
   Home,
   LifeBuoy,
   LogOut,
-  MapPin,
   Settings,
   UserCircle2,
   Users,
@@ -32,7 +31,6 @@ const adminItems: NavItem[] = [
   { href: "/admin/schedule", label: "Horario semanal", icon: CalendarDays },
   { href: "/admin/assignments", label: "Asignaciones", icon: ClipboardList },
   { href: "/admin/volunteers", label: "Voluntarios", icon: Users },
-  { href: "/admin/points", label: "Puntos de predicación", icon: MapPin },
   { href: "/admin/open-slots", label: "Vacantes", icon: Sparkles },
   { href: "/admin/notifications", label: "Notificaciones", icon: Bell },
   { href: "/admin/settings", label: "Configuración", icon: Settings }
@@ -66,7 +64,7 @@ export function AppSidebar({ role }: AppSidebarProps) {
   const items = role === "ADMIN" ? adminItems : volunteerItems;
 
   return (
-    <aside className="surface-panel hidden h-[calc(100vh-2rem)] min-w-72 flex-col justify-between p-5 lg:flex">
+    <aside className="surface-panel hidden h-full min-w-72 shrink-0 flex-col justify-between p-5 lg:flex">
       <div className="space-y-8">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-glow">
