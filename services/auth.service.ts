@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 
 import { db } from "@/lib/db/prisma";
 import { hashPassword } from "@/lib/auth/password";
+import { getAppBaseUrl } from "@/lib/env/config";
 import { AppError } from "@/services/errors";
 import { sendEmailNotification } from "@/services/notification.service";
 
@@ -16,6 +17,7 @@ export async function requestPasswordReset(email: string) {
   }
 
   const token = randomBytes(32).toString("hex");
+  const resetUrl = `${getAppBaseUrl()}/reset-password/${token}`;
 
   await db.passwordResetToken.create({
     data: {
@@ -29,7 +31,7 @@ export async function requestPasswordReset(email: string) {
     userId: user.id,
     type: "RESET_PASSWORD",
     subject: "Restablece tu contraseña de PPAM Planificador",
-    html: `<p>Hola ${user.name},</p><p>Usa este enlace para restablecer tu contraseña:</p><p><a href="${process.env.NEXTAUTH_URL}/reset-password/${token}">${process.env.NEXTAUTH_URL}/reset-password/${token}</a></p>`,
+    html: `<p>Hola ${user.name},</p><p>Usa este enlace para restablecer tu contraseña:</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
     metadata: {
       token
     }

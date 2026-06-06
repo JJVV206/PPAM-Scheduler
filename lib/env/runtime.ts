@@ -1,9 +1,8 @@
 import { ensureServerEnvLoaded } from "@/lib/env/load-env";
+import { getMissingRequiredAppEnv, getSmtpConfig, isProductionRuntime } from "@/lib/env/config";
 import { db } from "@/lib/db/prisma";
 
 ensureServerEnvLoaded();
-
-const REQUIRED_AUTH_ENV = ["DATABASE_URL"] as const;
 
 export type AuthRuntimeStatus = {
   ready: boolean;
@@ -12,18 +11,34 @@ export type AuthRuntimeStatus = {
 };
 
 export async function getAuthRuntimeStatus(): Promise<AuthRuntimeStatus> {
-  const missingEnv = REQUIRED_AUTH_ENV.filter((key) => !process.env[key]);
+  const missingEnv = getMissingRequiredAppEnv();
 
   if (missingEnv.length > 0) {
     return {
       ready: false,
       missingEnv,
-      message: `Faltan variables de entorno: ${missingEnv.join(", ")}. Crea .env.local o .env y reinicia el servidor de desarrollo.`
+      message: `Faltan variables de entorno: ${missingEnv.join(", ")}. Configúralas y reinicia el servidor.`
     };
   }
 
   try {
     await db.$queryRaw`SELECT 1`;
+
+    if (isProductionRuntime()) {
+      try {
+        getSmtpConfig();
+      } catch (error) {
+        return {
+          ready: false,
+          missingEnv: [],
+          message:
+            error instanceof Error
+              ? error.message
+              : "La configuración SMTP no es válida."
+        };
+      }
+    }
+
     return {
       ready: true,
       missingEnv: []

@@ -81,8 +81,11 @@ export default async function AdminSchedulePage({
       ) : (
         <Card className="surface-panel shrink-0">
           <CardContent className="p-6 text-sm text-muted-foreground">
-            Esta semana todavía no existe como registro operativo. Usa "Crear o
-            duplicar semana" para habilitar asignaciones y seguimiento.
+            Esta semana todavía no existe como registro operativo. Usa{" "}
+            <span className="font-medium text-foreground">
+              Crear o duplicar semana
+            </span>{" "}
+            para habilitar asignaciones y seguimiento.
           </CardContent>
         </Card>
       )}

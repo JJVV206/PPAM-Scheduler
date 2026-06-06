@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger
@@ -230,16 +231,15 @@ export function AssignmentForm({
       <DialogTrigger asChild>
         <Button size="lg">Agregar pareja</Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="max-w-[1080px] overflow-hidden p-5 sm:p-6">
+        <DialogHeader className="space-y-1 pr-8">
           <DialogTitle>Agregar pareja al horario</DialogTitle>
+          <DialogDescription>
+            Cada guardado crea una pareja nueva para ese mismo horario.
+          </DialogDescription>
         </DialogHeader>
-        <div className="bg-primary/8 rounded-2xl border border-primary/15 px-4 py-3 text-sm text-muted-foreground">
-          Cada guardado crea una pareja asignada. Para agregar más parejas al
-          mismo punto y horario, vuelve a guardar con otra pareja.
-        </div>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="assignmentDate"
@@ -247,7 +247,7 @@ export function AssignmentForm({
                 <FormItem>
                   <FormLabel>Día de la semana</FormLabel>
                   <FormControl>
-                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                       {weekDateOptions.map((option) => {
                         const isActive = field.value === option.value;
 
@@ -257,7 +257,7 @@ export function AssignmentForm({
                             type="button"
                             onClick={() => field.onChange(option.value)}
                             className={cn(
-                              "rounded-2xl border px-4 py-3 text-left transition-colors",
+                              "rounded-2xl border px-4 py-2.5 text-left transition-colors",
                               isActive
                                 ? "border-primary bg-primary/15 text-foreground shadow-[0_8px_24px_rgba(102,145,255,0.18)]"
                                 : "border-border/70 bg-background/35 text-muted-foreground hover:border-primary/40 hover:text-foreground"
@@ -266,7 +266,7 @@ export function AssignmentForm({
                             <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                               {option.shortLabel}
                             </p>
-                            <p className="mt-1 text-sm font-semibold text-inherit">
+                            <p className="mt-1 text-[13px] font-semibold leading-snug text-inherit lg:text-sm">
                               {option.label}
                             </p>
                           </button>
@@ -287,7 +287,7 @@ export function AssignmentForm({
                   <FormItem>
                     <FormLabel>Horario</FormLabel>
                     <FormControl>
-                      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                      <div className="grid gap-2 sm:grid-cols-5">
                         {TIME_SLOTS.map((timeSlot) => {
                           const isActive = field.value === timeSlot;
 
@@ -297,6 +297,7 @@ export function AssignmentForm({
                               slot={timeSlot}
                               selected={isActive}
                               onClick={() => field.onChange(timeSlot)}
+                              dense
                             />
                           );
                         })}
@@ -316,11 +317,11 @@ export function AssignmentForm({
                 <p className="mt-1 text-xs text-muted-foreground">
                   {compatiblePoints.length} punto
                   {compatiblePoints.length === 1 ? "" : "s"} compatible
-                  {compatiblePoints.length === 1 ? "" : "s"} para este horario
+                  {compatiblePoints.length === 1 ? "" : "s"} en este horario.
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Los puntos sin slots activos quedan temporalmente disponibles
-                  en cualquier franja.
+                  Los puntos sin slots activos siguen disponibles en cualquier
+                  franja.
                 </p>
               </div>
             </div>
@@ -335,7 +336,7 @@ export function AssignmentForm({
                       <FormLabel>Punto de predicación</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="h-10">
                             <SelectValue placeholder="Selecciona un punto" />
                           </SelectTrigger>
                         </FormControl>
@@ -363,7 +364,7 @@ export function AssignmentForm({
                     <FormLabel>Voluntario 1</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-10">
                           <SelectValue placeholder="Asignar primer voluntario" />
                         </SelectTrigger>
                       </FormControl>
@@ -387,7 +388,7 @@ export function AssignmentForm({
                     <FormLabel>Voluntario 2</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-10">
                           <SelectValue placeholder="Asignar segundo voluntario" />
                         </SelectTrigger>
                       </FormControl>
@@ -415,6 +416,7 @@ export function AssignmentForm({
                     <Textarea
                       {...field}
                       value={field.value ?? ""}
+                      className="min-h-[96px]"
                       placeholder="Indicaciones opcionales para esta pareja"
                     />
                   </FormControl>
@@ -430,12 +432,13 @@ export function AssignmentForm({
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button
                 type="button"
+                size="sm"
                 variant="secondary"
                 onClick={() => setOpen(false)}
               >
                 Cerrar
               </Button>
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" size="sm" disabled={submitting}>
                 {submitting ? "Guardando..." : "Guardar pareja"}
               </Button>
             </div>

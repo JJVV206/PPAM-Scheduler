@@ -3,20 +3,15 @@ import { getServerSession, type NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
 import { db } from "@/lib/db/prisma";
+import { getSessionSecret } from "@/lib/env/config";
 import { ensureServerEnvLoaded } from "@/lib/env/load-env";
 import { loginSchema } from "@/lib/validations/auth";
 import { verifyPassword } from "@/lib/auth/password";
 
 ensureServerEnvLoaded();
 
-const devSecret =
-  process.env.NEXTAUTH_SECRET ??
-  (process.env.NODE_ENV !== "production"
-    ? "ppam-scheduler-local-dev-secret"
-    : undefined);
-
 export const authOptions: NextAuthOptions = {
-  secret: devSecret,
+  secret: getSessionSecret(),
   adapter: PrismaAdapter(db),
   session: {
     strategy: "jwt"

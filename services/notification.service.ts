@@ -7,6 +7,8 @@ import {
 } from "@prisma/client";
 
 import { db } from "@/lib/db/prisma";
+import { getSmtpConfig } from "@/lib/env/config";
+import { AppError } from "@/services/errors";
 
 type NotificationPayload = {
   userId: string;
@@ -19,21 +21,17 @@ type NotificationPayload = {
 };
 
 function createTransport() {
-  if (!process.env.SMTP_HOST) {
+  const smtpConfig = getSmtpConfig();
+
+  if (!smtpConfig) {
     return null;
   }
 
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT ?? 1025),
-    secure: false,
-    auth:
-      process.env.SMTP_USER && process.env.SMTP_PASS
-        ? {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS
-          }
-        : undefined
+    host: smtpConfig.host,
+    port: smtpConfig.port,
+    secure: smtpConfig.secure,
+    auth: smtpConfig.auth
   });
 }
 
@@ -76,18 +74,32 @@ export async function sendEmailNotification(payload: NotificationPayload) {
     return;
   }
 
-  const transport = createTransport();
-
   try {
-    if (!transport || process.env.NODE_ENV === "development") {
+    const smtpConfig = getSmtpConfig();
+    const transport = smtpConfig ? createTransport() : null;
+
+    if (!transport) {
       console.info("Email notification", {
         to: user.email,
         subject: payload.subject,
         type: payload.type
       });
+
+      await logNotification({
+        userId: payload.userId,
+        assignmentId: payload.assignmentId,
+        type: payload.type,
+        channel: payload.channel ?? "EMAIL",
+        status: "SENT",
+        metadata: {
+          ...payload.metadata,
+          simulated: true
+        }
+      });
+      return;
     } else {
       await transport.sendMail({
-        from: process.env.SMTP_FROM,
+        from: smtpConfig?.from,
         to: user.email,
         subject: payload.subject,
         html: payload.html
@@ -103,18 +115,22 @@ export async function sendEmailNotification(payload: NotificationPayload) {
       metadata: payload.metadata
     });
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Error desconocido al enviar la notificación";
+
     await logNotification({
       userId: payload.userId,
       assignmentId: payload.assignmentId,
       type: payload.type,
       channel: payload.channel ?? "EMAIL",
       status: "FAILED",
-      errorMessage:
-        error instanceof Error
-          ? error.message
-          : "Error desconocido al enviar la notificación",
+      errorMessage: message,
       metadata: payload.metadata
     });
+
+    throw new AppError(message, 500);
   }
 }
 

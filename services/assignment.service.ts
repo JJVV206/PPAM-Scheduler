@@ -36,6 +36,7 @@ import {
   resendConfirmationReminder,
   sendEmailNotification
 } from "@/services/notification.service";
+import { getAppBaseUrl } from "@/lib/env/config";
 import { safePercentage } from "@/lib/utils";
 import { determineAssignmentStatus } from "@/services/assignment-engine";
 
@@ -230,8 +231,7 @@ async function assertPointSupportsSlot(input: {
 }
 
 function buildConfirmationLink(responseId: string) {
-  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-  return `${baseUrl}/volunteer/confirm/${responseId}`;
+  return `${getAppBaseUrl()}/volunteer/confirm/${responseId}`;
 }
 
 async function assertNoVolunteerConflicts(input: {
