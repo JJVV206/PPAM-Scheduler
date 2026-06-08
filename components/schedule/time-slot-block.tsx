@@ -14,12 +14,12 @@ export function TimeSlotBlock({
   emptyState
 }: TimeSlotBlockProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
         <div className="h-2 w-2 rounded-full bg-primary" />
-        {TIME_SLOT_DEFINITIONS[timeSlot].label}
+        <span>{TIME_SLOT_DEFINITIONS[timeSlot].label}</span>
       </div>
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {assignments.length ? (
           assignments.map((assignment) => (
             <SchedulePointGroup
@@ -29,7 +29,7 @@ export function TimeSlotBlock({
           ))
         ) : (
           emptyState ?? (
-            <div className="rounded-2xl border border-dashed border-border/80 bg-white/[0.02] p-4 text-sm text-muted-foreground">
+            <div className="rounded-2xl border border-dashed border-border/80 bg-white/[0.02] px-3 py-2 text-sm text-muted-foreground">
               Sin asignaciones
             </div>
           )

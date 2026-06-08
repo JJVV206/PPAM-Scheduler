@@ -115,10 +115,11 @@ export function ScheduleWeekToolbar({
 
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="grid w-full gap-2 sm:flex sm:flex-wrap sm:items-center lg:w-auto">
         <Button
           type="button"
           variant="secondary"
+          className="w-full sm:w-auto"
           onClick={() =>
             navigateToWeek(
               format(
@@ -134,6 +135,7 @@ export function ScheduleWeekToolbar({
         <Button
           type="button"
           variant="secondary"
+          className="w-full sm:w-auto"
           onClick={() =>
             navigateToWeek(
               format(
@@ -150,7 +152,7 @@ export function ScheduleWeekToolbar({
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button size="lg">
+          <Button size="lg" className="w-full sm:w-auto">
             <CalendarPlus2 className="h-4 w-4" />
             Crear o duplicar semana
           </Button>

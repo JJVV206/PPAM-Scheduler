@@ -42,10 +42,10 @@ export default async function AdminSchedulePage({
     ]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden sm:gap-6">
       <div className="shrink-0 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="font-heading text-4xl font-semibold">
+          <h1 className="font-heading text-3xl font-semibold sm:text-4xl">
             Horario semanal
           </h1>
           <p className="text-sm text-muted-foreground">{schedule.weekLabel}</p>
@@ -94,7 +94,7 @@ export default async function AdminSchedulePage({
         <CardHeader className="shrink-0 p-4 pb-3 xl:px-5 xl:pt-5">
           <CardTitle>Planeador</CardTitle>
         </CardHeader>
-        <CardContent className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pb-2 pt-0 xl:px-5">
+        <CardContent className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 pb-3 pt-0 sm:px-4 xl:px-5">
           {schedule.days.some((day) =>
             Object.values(day.items).some((items) => items.length > 0)
           ) ? (

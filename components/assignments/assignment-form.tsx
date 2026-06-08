@@ -229,7 +229,9 @@ export function AssignmentForm({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="lg">Agregar pareja</Button>
+        <Button size="lg" className="w-full sm:w-auto">
+          Agregar pareja
+        </Button>
       </DialogTrigger>
       <DialogContent className="max-w-[1080px] overflow-hidden p-5 sm:p-6">
         <DialogHeader className="space-y-1 pr-8">
