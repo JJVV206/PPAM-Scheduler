@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { updateSettingsSchema } from "@/lib/validations/settings";
@@ -19,7 +20,10 @@ type SettingsFormProps = {
 };
 
 export function SettingsForm({ initialValues }: SettingsFormProps) {
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(updateSettingsSchema),
     defaultValues: initialValues
@@ -32,7 +36,10 @@ export function SettingsForm({ initialValues }: SettingsFormProps) {
       body: JSON.stringify(values)
     });
     const result = await response.json();
-    setMessage(response.ok ? "Configuración actualizada." : result.error);
+    setFeedback({
+      tone: response.ok ? "success" : "error",
+      text: response.ok ? "Configuración actualizada." : result.error
+    });
   }
 
   return (
@@ -83,7 +90,11 @@ export function SettingsForm({ initialValues }: SettingsFormProps) {
             <Button type="submit">Guardar configuración</Button>
           </form>
         </Form>
-        {message ? <p className="mt-3 text-sm text-muted-foreground">{message}</p> : null}
+        <FeedbackMessage
+          className="mt-3"
+          message={feedback?.text}
+          tone={feedback?.tone}
+        />
       </CardContent>
     </Card>
   );

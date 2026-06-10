@@ -8,6 +8,7 @@ import {
 
 import { db } from "@/lib/db/prisma";
 import { getSmtpConfig } from "@/lib/env/config";
+import { humanizeErrorMessage } from "@/lib/utils/error-message";
 import { AppError } from "@/services/errors";
 
 type NotificationPayload = {
@@ -115,10 +116,14 @@ export async function sendEmailNotification(payload: NotificationPayload) {
       metadata: payload.metadata
     });
   } catch (error) {
-    const message =
+    const technicalMessage =
       error instanceof Error
         ? error.message
         : "Error desconocido al enviar la notificación";
+    const userMessage = humanizeErrorMessage(
+      technicalMessage,
+      "No fue posible enviar la notificación."
+    );
 
     await logNotification({
       userId: payload.userId,
@@ -126,11 +131,11 @@ export async function sendEmailNotification(payload: NotificationPayload) {
       type: payload.type,
       channel: payload.channel ?? "EMAIL",
       status: "FAILED",
-      errorMessage: message,
+      errorMessage: userMessage,
       metadata: payload.metadata
     });
 
-    throw new AppError(message, 500);
+    throw new AppError(userMessage, 500);
   }
 }
 

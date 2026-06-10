@@ -20,6 +20,7 @@ import {
   DialogTitle,
   DialogTrigger
 } from "@/components/ui/dialog";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -57,7 +58,10 @@ export function ScheduleWeekToolbar({
   const [targetWeekStart, setTargetWeekStart] = useState(selectedWeekStart);
   const [sourceWeekId, setSourceWeekId] = useState(availableWeeks[0]?.id ?? "");
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
 
   useEffect(() => {
     setTargetWeekStart(selectedWeekStart);
@@ -75,7 +79,7 @@ export function ScheduleWeekToolbar({
 
   async function handleSubmit() {
     setSubmitting(true);
-    setMessage(null);
+    setFeedback(null);
 
     const endpoint =
       mode === "EMPTY" ? "/api/schedule/week" : "/api/schedule/duplicate";
@@ -99,14 +103,21 @@ export function ScheduleWeekToolbar({
     const result = await response.json();
 
     if (!response.ok) {
-      setMessage(result.error ?? "No fue posible preparar la semana.");
+      setFeedback({
+        tone: "error",
+        text: result.error ?? "No fue posible preparar la semana."
+      });
       setSubmitting(false);
       return;
     }
 
-    setMessage(
-      mode === "EMPTY" ? "Semana creada." : "Semana duplicada correctamente."
-    );
+    setFeedback({
+      tone: "success",
+      text:
+        mode === "EMPTY"
+          ? "Semana creada."
+          : "Semana duplicada correctamente."
+    });
     setSubmitting(false);
     setOpen(false);
     router.push(`/admin/schedule?weekStart=${targetWeekStart}`);
@@ -114,7 +125,7 @@ export function ScheduleWeekToolbar({
   }
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
       <div className="grid w-full gap-2 sm:flex sm:flex-wrap sm:items-center lg:w-auto">
         <Button
           type="button"
@@ -150,9 +161,9 @@ export function ScheduleWeekToolbar({
         </Button>
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button size="lg" className="w-full sm:w-auto">
+          <Button className="w-full sm:w-auto">
             <CalendarPlus2 className="h-4 w-4" />
             Crear o duplicar semana
           </Button>
@@ -248,9 +259,7 @@ export function ScheduleWeekToolbar({
               </div>
             ) : null}
 
-            {message ? (
-              <p className="text-sm text-muted-foreground">{message}</p>
-            ) : null}
+            <FeedbackMessage message={feedback?.text} tone={feedback?.tone} />
 
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button

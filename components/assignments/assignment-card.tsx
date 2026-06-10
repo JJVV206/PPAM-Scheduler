@@ -3,19 +3,25 @@ import { Clock3, MapPin, Users2 } from "lucide-react";
 import { StatusBadge } from "@/components/assignments/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
+import { cn } from "@/lib/utils";
 import type { AssignmentDetailDto } from "@/types/domain";
 
 type AssignmentCardProps = {
   assignment: AssignmentDetailDto;
   action?: React.ReactNode;
+  className?: string;
 };
 
-export function AssignmentCard({ assignment, action }: AssignmentCardProps) {
+export function AssignmentCard({
+  assignment,
+  action,
+  className
+}: AssignmentCardProps) {
   const volunteerNames = assignment.volunteers.map((item) => item.volunteer.name);
   const point = assignment.preachingPoint;
 
   return (
-    <Card className="h-full border border-white/5 bg-white/[0.03]">
+    <Card className={cn("h-full border border-white/5 bg-white/[0.03]", className)}>
       <CardContent className="space-y-4 p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">

@@ -76,5 +76,35 @@ export const authOptions: NextAuthOptions = {
 };
 
 export function getServerAuthSession() {
-  return getServerSession(authOptions);
+  return getServerSession(authOptions).then(async (session) => {
+    if (!session?.user) return session;
+
+    const userById = session.user.id
+      ? await db.user.findUnique({
+          where: { id: session.user.id },
+          include: { volunteerProfile: true }
+        })
+      : null;
+
+    const currentUser =
+      userById ??
+      (session.user.email
+        ? await db.user.findUnique({
+            where: { email: session.user.email.toLowerCase() },
+            include: { volunteerProfile: true }
+          })
+        : null);
+
+    if (!currentUser || !currentUser.active) {
+      return null;
+    }
+
+    session.user.id = currentUser.id;
+    session.user.name = currentUser.name;
+    session.user.email = currentUser.email;
+    session.user.role = currentUser.role;
+    session.user.volunteerProfileId = currentUser.volunteerProfile?.id ?? null;
+
+    return session;
+  });
 }

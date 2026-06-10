@@ -38,30 +38,28 @@ export default async function AdminVolunteerProfilePage({
     ).length;
 
     return (
-      <div className="flex min-h-full flex-col gap-6 pb-6">
-        <div className="space-y-3">
-          <Button variant="ghost" size="sm" asChild className="w-fit">
-            <Link href="/admin/volunteers">
-              <ArrowLeft className="h-4 w-4" />
-              Volver a voluntarios
-            </Link>
-          </Button>
-          <div>
-            <h1 className="font-heading text-3xl font-semibold">
-              {volunteer.name}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Revisa su perfil, seguimiento y todas las asignaciones
-              registradas.
-            </p>
-          </div>
-        </div>
+      <div className="flex min-h-full flex-col gap-5 pb-6">
+        <div className="surface-panel rounded-[28px] px-5 py-4">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div className="space-y-3">
+              <Button variant="ghost" size="sm" asChild className="w-fit">
+                <Link href="/admin/volunteers">
+                  <ArrowLeft className="h-4 w-4" />
+                  Volver a voluntarios
+                </Link>
+              </Button>
+              <div>
+                <h1 className="font-heading text-3xl font-semibold sm:text-4xl">
+                  {volunteer.name}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Revisa su perfil, seguimiento y todas las asignaciones
+                  registradas.
+                </p>
+              </div>
+            </div>
 
-        <div className="grid items-start gap-6 xl:grid-cols-[380px,minmax(0,1fr)]">
-          <VolunteerProfileCard volunteer={volunteer} />
-
-          <div className="min-w-0 space-y-6">
-            <section className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <VolunteerMetricCard
                 icon={ClipboardList}
                 label="Asignaciones"
@@ -85,19 +83,25 @@ export default async function AdminVolunteerProfilePage({
                 value={replacementAssignments}
                 tone="danger"
               />
-            </section>
+            </div>
+          </div>
+        </div>
 
-            <Card className="surface-panel min-w-0">
+        <div className="grid items-start gap-5 xl:grid-cols-[360px_minmax(0,1fr)] 2xl:grid-cols-[380px_minmax(0,1fr)]">
+          <VolunteerProfileCard volunteer={volunteer} />
+
+          <div className="min-w-0 space-y-6">
+            <Card className="surface-panel min-w-0 overflow-hidden">
               <CardHeader className="pb-4">
-              <CardTitle>Historial de asignaciones</CardTitle>
-              <CardDescription>
-                Accede al detalle de cada asignación y revisa el seguimiento del
-                voluntario en el tiempo.
-              </CardDescription>
+                <CardTitle>Historial de asignaciones</CardTitle>
+                <CardDescription>
+                  Accede al detalle de cada asignación y revisa el seguimiento del
+                  voluntario en el tiempo.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {history.length ? (
-                  <div className="grid gap-4 2xl:grid-cols-2">
+                  <div className="grid gap-4 xl:grid-cols-2">
                     {history.map((assignment) => (
                       <AssignmentCard
                         key={assignment.id}
@@ -168,20 +172,20 @@ function VolunteerMetricCard({
   } as const;
 
   return (
-    <div className="rounded-[28px] border border-white/5 bg-white/[0.03] p-5">
+    <div className="min-w-0 rounded-[24px] border border-white/5 bg-white/[0.03] px-4 py-3.5">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+          <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
             {label}
           </p>
-          <p className="font-heading text-4xl font-semibold text-foreground">
+          <p className="font-heading text-3xl font-semibold text-foreground">
             {value}
           </p>
         </div>
         <div
-          className={`rounded-2xl border p-3 ${toneMap[tone]}`}
+          className={`rounded-2xl border p-2.5 ${toneMap[tone]}`}
         >
-          <Icon className="h-5 w-5" />
+          <Icon className="h-4 w-4" />
         </div>
       </div>
     </div>

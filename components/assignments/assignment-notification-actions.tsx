@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 
 type AssignmentNotificationActionsProps = {
   assignmentId: string;
@@ -18,11 +19,14 @@ export function AssignmentNotificationActions({
 }: AssignmentNotificationActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState<"request" | "reminder" | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
 
   async function trigger(kind: "request" | "reminder") {
     setLoading(kind);
-    setMessage(null);
+    setFeedback(null);
 
     const response = await fetch(
       `/api/assignments/${assignmentId}/notifications/${kind}`,
@@ -33,13 +37,14 @@ export function AssignmentNotificationActions({
     const result = await response.json();
 
     setLoading(null);
-    setMessage(
-      response.ok
+    setFeedback({
+      tone: response.ok ? "success" : "error",
+      text: response.ok
         ? kind === "request"
           ? `Solicitudes enviadas (${result.sentCount}).`
           : `Recordatorios reenviados (${result.sentCount}).`
         : result.error ?? "No fue posible completar la acción."
-    );
+    });
 
     if (response.ok) {
       router.refresh();
@@ -67,11 +72,11 @@ export function AssignmentNotificationActions({
           {loading === "reminder" ? "Reenviando..." : "Reenviar recordatorio"}
         </Button>
       </div>
-      {message ? (
-        <p className={compact ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>
-          {message}
-        </p>
-      ) : null}
+      <FeedbackMessage
+        className={compact ? "text-xs" : undefined}
+        message={feedback?.text}
+        tone={feedback?.tone}
+      />
     </div>
   );
 }

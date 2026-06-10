@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { forgotPasswordSchema } from "@/lib/validations/auth";
@@ -15,7 +16,10 @@ import { forgotPasswordSchema } from "@/lib/validations/auth";
 type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
 export function ForgotPasswordForm() {
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
   const form = useForm<ForgotPasswordValues>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
@@ -24,17 +28,25 @@ export function ForgotPasswordForm() {
   });
 
   async function onSubmit(values: ForgotPasswordValues) {
-    setMessage(null);
+    setFeedback(null);
     const response = await fetch("/api/auth/forgot-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(values)
     });
     if (response.ok) {
-      setMessage("Si el correo existe, ya enviamos un enlace para restablecer la contraseña.");
+      setFeedback({
+        tone: "success",
+        text: "Si el correo existe, ya enviamos un enlace para restablecer la contraseña."
+      });
     } else {
       const result = await response.json();
-      setMessage(result.error ?? "No fue posible enviar las instrucciones de restablecimiento.");
+      setFeedback({
+        tone: "error",
+        text:
+          result.error ??
+          "No fue posible enviar las instrucciones de restablecimiento."
+      });
     }
   }
 
@@ -67,7 +79,7 @@ export function ForgotPasswordForm() {
             </Button>
           </form>
         </Form>
-        {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+        <FeedbackMessage message={feedback?.text} tone={feedback?.tone} />
         <Link href="/login" className="block text-sm text-primary">
           Volver al acceso
         </Link>

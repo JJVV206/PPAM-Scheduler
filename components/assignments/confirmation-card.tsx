@@ -5,6 +5,7 @@ import { CheckCircle2, CircleOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Input } from "@/components/ui/input";
 import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
 import { formatDisplayDate } from "@/lib/utils";
@@ -28,11 +29,14 @@ export function ConfirmationCard({
   const [submitting, setSubmitting] = useState<"confirm" | "decline" | null>(
     null
   );
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
 
   async function respond(intent: "confirm" | "decline") {
     setSubmitting(intent);
-    setMessage(null);
+    setFeedback(null);
     const endpoint = responseId
       ? `/api/assignment-responses/${responseId}/${intent}`
       : `/api/assignments/${assignmentId}/${intent}`;
@@ -44,11 +48,12 @@ export function ConfirmationCard({
       body: JSON.stringify({ note })
     });
     const result = await response.json();
-    setMessage(
-      response.ok
+    setFeedback({
+      tone: response.ok ? "success" : "error",
+      text: response.ok
         ? `Respuesta guardada: ${intent === "confirm" ? "confirmada" : "rechazada"}.`
         : result.error
-    );
+    });
     setSubmitting(null);
   }
 
@@ -95,9 +100,11 @@ export function ConfirmationCard({
             {submitting === "decline" ? "Guardando..." : "No podré asistir"}
           </Button>
         </div>
-        {message ? (
-          <p className="text-center text-sm text-muted-foreground">{message}</p>
-        ) : null}
+        <FeedbackMessage
+          className="justify-center text-center"
+          message={feedback?.text}
+          tone={feedback?.tone}
+        />
       </CardContent>
     </Card>
   );

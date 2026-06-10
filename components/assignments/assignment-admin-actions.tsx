@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { TimeSlotOptionButton } from "@/components/assignments/time-slot-option-button";
 import { Input } from "@/components/ui/input";
 import {
@@ -80,7 +81,10 @@ export function AssignmentAdminActions({
   );
   const [notes, setNotes] = useState(assignment.notes ?? "");
   const [loading, setLoading] = useState<"save" | "delete" | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const selectedDayOfWeek = useMemo(
     () => getDayOfWeekFromDate(assignmentDate),
@@ -113,7 +117,7 @@ export function AssignmentAdminActions({
 
   async function handleSave() {
     setLoading("save");
-    setMessage(null);
+    setFeedback(null);
 
     const response = await fetch(`/api/assignments/${assignment.id}`, {
       method: "PATCH",
@@ -139,7 +143,10 @@ export function AssignmentAdminActions({
     const result = await response.json();
 
     setLoading(null);
-    setMessage(response.ok ? "Asignación actualizada." : result.error);
+    setFeedback({
+      tone: response.ok ? "success" : "error",
+      text: response.ok ? "Asignación actualizada." : result.error
+    });
 
     if (response.ok) {
       router.refresh();
@@ -152,7 +159,7 @@ export function AssignmentAdminActions({
     }
 
     setLoading("delete");
-    setMessage(null);
+    setFeedback(null);
 
     const response = await fetch(`/api/assignments/${assignment.id}`, {
       method: "DELETE"
@@ -160,7 +167,10 @@ export function AssignmentAdminActions({
     const result = await response.json();
 
     setLoading(null);
-    setMessage(response.ok ? "Asignación eliminada." : result.error);
+    setFeedback({
+      tone: response.ok ? "success" : "error",
+      text: response.ok ? "Asignación eliminada." : result.error
+    });
 
     if (response.ok) {
       router.refresh();
@@ -287,11 +297,11 @@ export function AssignmentAdminActions({
         />
       </div>
 
-      {message ? (
-        <p className={compact ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>
-          {message}
-        </p>
-      ) : null}
+      <FeedbackMessage
+        className={compact ? "text-xs" : undefined}
+        message={feedback?.text}
+        tone={feedback?.tone}
+      />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
         <Button

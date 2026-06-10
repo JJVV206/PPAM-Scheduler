@@ -35,13 +35,9 @@ export function DayColumn({ day }: DayColumnProps) {
         {TIME_SLOTS.map((timeSlot) => (
           <TimeSlotBlock
             key={timeSlot}
+            date={day.date}
             timeSlot={timeSlot}
             assignments={day.items[timeSlot]}
-            emptyState={
-              <div className="rounded-2xl border border-dashed border-border/70 bg-background/25 px-3 py-2 text-xs text-muted-foreground">
-                Sin parejas asignadas
-              </div>
-            }
           />
         ))}
       </div>

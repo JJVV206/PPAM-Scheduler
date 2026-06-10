@@ -14,6 +14,7 @@ import {
   DialogTrigger
 } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { createVolunteerSchema } from "@/lib/validations/volunteer";
@@ -21,7 +22,10 @@ import { createVolunteerSchema } from "@/lib/validations/volunteer";
 type VolunteerFormValues = z.infer<typeof createVolunteerSchema>;
 
 export function CreateVolunteerForm() {
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error" | "warning";
+    text: string;
+  } | null>(null);
   const [open, setOpen] = useState(false);
   const form = useForm<VolunteerFormValues>({
     resolver: zodResolver(createVolunteerSchema),
@@ -38,21 +42,56 @@ export function CreateVolunteerForm() {
   });
 
   async function onSubmit(values: VolunteerFormValues) {
+    setFeedback(null);
+    form.clearErrors();
+
     const response = await fetch("/api/volunteers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(values)
     });
     const result = await response.json();
-    setMessage(response.ok ? "Voluntario creado." : result.error);
+
     if (response.ok) {
-      setOpen(false);
       form.reset();
+      if (result.warning) {
+        setFeedback({
+          tone: "warning",
+          text: result.warning
+        });
+      } else {
+        setFeedback(null);
+        setOpen(false);
+      }
+      return;
     }
+
+    if (response.status === 409) {
+      form.setError("email", {
+        type: "server",
+        message: result.error ?? "Ese correo ya está registrado."
+      });
+      return;
+    }
+
+    setFeedback({
+      tone: "error",
+      text: result.error ?? "No se pudo guardar el voluntario."
+    });
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
+          form.reset();
+          form.clearErrors();
+          setFeedback(null);
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button>Agregar voluntario</Button>
       </DialogTrigger>
@@ -113,7 +152,10 @@ export function CreateVolunteerForm() {
                 </FormItem>
               )}
             />
-            {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+            <FeedbackMessage
+              message={feedback?.text}
+              tone={feedback?.tone}
+            />
             <Button type="submit" className="w-full">
               Guardar voluntario
             </Button>

@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, TriangleAlert, Users2 } from "lucide-react";
+import { MapPin, Users2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import {
   Select,
   SelectContent,
@@ -35,7 +36,10 @@ export function OpenSlotCard({
   const [selectedVolunteerId, setSelectedVolunteerId] = useState(
     currentVolunteerId ?? openSlot.suggestedVolunteers[0]?.id ?? ""
   );
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const selectedVolunteer = useMemo(
@@ -48,7 +52,7 @@ export function OpenSlotCard({
 
   async function handleAssign() {
     setSubmitting(true);
-    setMessage(null);
+    setFeedback(null);
     const response = await fetch("/api/open-slots", {
       method: "POST",
       headers: {
@@ -60,7 +64,10 @@ export function OpenSlotCard({
       })
     });
     const result = await response.json();
-    setMessage(response.ok ? "Vacante cubierta." : result.error);
+    setFeedback({
+      tone: response.ok ? "success" : "error",
+      text: response.ok ? "Vacante cubierta." : result.error
+    });
     setSubmitting(false);
 
     if (response.ok) {
@@ -144,12 +151,7 @@ export function OpenSlotCard({
             {submitting ? "Aceptando..." : "Aceptar asignación"}
           </Button>
         )}
-        {message ? (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <TriangleAlert className="h-4 w-4" />
-            {message}
-          </p>
-        ) : null}
+        <FeedbackMessage message={feedback?.text} tone={feedback?.tone} />
       </CardContent>
     </Card>
   );

@@ -12,6 +12,7 @@ import {
   NOTIFICATION_STATUS_LABELS,
   NOTIFICATION_TYPE_LABELS
 } from "@/lib/constants/domain";
+import { humanizeErrorMessage } from "@/lib/utils/error-message";
 import { formatDisplayDate } from "@/lib/utils";
 
 type NotificationTableProps = {
@@ -74,9 +75,15 @@ export function NotificationTable({ notifications }: NotificationTableProps) {
             <TableCell>
               {notification.assignment?.preachingPoint.name ?? "General"}
             </TableCell>
-            <TableCell className="text-sm text-muted-foreground">
+            <TableCell
+              className={
+                notification.errorMessage
+                  ? "text-sm text-danger"
+                  : "text-sm text-muted-foreground"
+              }
+            >
               {notification.errorMessage
-                ? notification.errorMessage
+                ? humanizeErrorMessage(notification.errorMessage)
                 : notification.sentAt
                   ? `Enviada ${formatDisplayDate(notification.sentAt, "d 'de' MMM, h:mm a")}`
                   : "Registrada en entorno local"}

@@ -570,6 +570,22 @@ export async function getAssignmentDetail(assignmentId: string) {
   return mapAssignmentDetail(assignment);
 }
 
+export async function getAssignmentsForScheduleSlot(input: {
+  date: Date;
+  timeSlot: TimeSlot;
+}) {
+  const assignments = await db.assignment.findMany({
+    where: {
+      date: input.date,
+      timeSlot: input.timeSlot
+    },
+    include: assignmentInclude,
+    orderBy: [{ preachingPoint: { name: "asc" } }, { pairNumber: "asc" }]
+  });
+
+  return assignments.map(mapAssignmentDetail);
+}
+
 export async function getWeeklySchedule(input?: {
   weekStart?: Date;
   filters?: {

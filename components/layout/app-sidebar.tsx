@@ -257,8 +257,8 @@ export function AppSidebar({ role }: AppSidebarProps) {
         </DialogContent>
       </Dialog>
 
-      <aside className="surface-panel hidden h-full min-w-72 shrink-0 flex-col justify-between p-5 lg:flex">
-        <div className="space-y-8">
+      <aside className="surface-panel hidden h-full w-[268px] min-w-[268px] shrink-0 flex-col justify-between p-4 xl:w-[284px] xl:min-w-[284px] xl:p-5 lg:flex">
+        <div className="space-y-7">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-glow">
               <Sparkles className="h-6 w-6" />

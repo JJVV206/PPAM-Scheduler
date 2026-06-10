@@ -1,10 +1,12 @@
 import {
   AlertTriangle,
+  ArrowUpRight,
   CalendarCheck2,
   CheckCircle2,
   ClipboardCheck,
   Sparkles
 } from "lucide-react";
+import Link from "next/link";
 
 import { AssignmentCard } from "@/components/assignments/assignment-card";
 import { DashboardStatCard } from "@/components/dashboard/dashboard-stat-card";
@@ -54,7 +56,23 @@ export default async function AdminDashboardPage() {
           <CardContent className="grid gap-4 md:grid-cols-2">
             {dashboard.todaysAssignments.length ? (
               dashboard.todaysAssignments.map((assignment) => (
-                <AssignmentCard key={assignment.id} assignment={assignment} />
+                <Link
+                  key={assignment.id}
+                  href={`/admin/assignments/${assignment.id}`}
+                  aria-label={`Ver especificaciones de ${assignment.preachingPoint.name}, pareja ${assignment.pairNumber}`}
+                  className="group block h-full rounded-[24px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  <AssignmentCard
+                    assignment={assignment}
+                    className="transition-all duration-200 group-hover:border-primary/35 group-hover:bg-primary/[0.05] group-hover:shadow-[0_18px_48px_rgba(59,130,246,0.12)]"
+                    action={
+                      <div className="flex items-center justify-between border-t border-white/5 pt-3 text-sm font-medium text-primary">
+                        <span>Ver especificaciones</span>
+                        <ArrowUpRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                      </div>
+                    }
+                  />
+                </Link>
               ))
             ) : (
               <EmptyState

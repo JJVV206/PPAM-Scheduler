@@ -8,6 +8,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -77,7 +78,10 @@ export function AvailabilitySelector({
       reason: item.reason ?? ""
     }))
   );
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   function toggle(dayOfWeek: DayOfWeek, timeSlot: TimeSlot, checked: boolean) {
@@ -111,7 +115,7 @@ export function AvailabilitySelector({
 
   async function save() {
     setSubmitting(true);
-    setMessage(null);
+    setFeedback(null);
 
     const items = Array.from(selected).map((item) => {
       const [dayOfWeek, timeSlot] = item.split(":") as [DayOfWeek, TimeSlot];
@@ -143,7 +147,10 @@ export function AvailabilitySelector({
     });
 
     const result = await response.json();
-    setMessage(response.ok ? "Disponibilidad actualizada." : result.error);
+    setFeedback({
+      tone: response.ok ? "success" : "error",
+      text: response.ok ? "Disponibilidad actualizada." : result.error
+    });
     setSubmitting(false);
 
     if (response.ok) {
@@ -325,9 +332,10 @@ export function AvailabilitySelector({
             <Button className="w-full" onClick={save} disabled={submitting}>
               {submitting ? "Guardando..." : "Guardar preferencias"}
             </Button>
-            {message ? (
-              <p className="text-sm text-muted-foreground">{message}</p>
-            ) : null}
+            <FeedbackMessage
+              message={feedback?.text}
+              tone={feedback?.tone}
+            />
           </CardContent>
         </Card>
       </div>

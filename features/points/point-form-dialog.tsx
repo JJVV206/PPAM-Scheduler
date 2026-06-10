@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogTrigger
 } from "@/components/ui/dialog";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -44,7 +45,10 @@ export function PointFormDialog({ point, trigger }: PointFormDialogProps) {
     )
   );
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const isEditing = Boolean(point);
 
@@ -75,7 +79,7 @@ export function PointFormDialog({ point, trigger }: PointFormDialogProps) {
 
   async function handleSubmit() {
     setSubmitting(true);
-    setMessage(null);
+    setFeedback(null);
 
     const response = await fetch(
       isEditing ? `/api/points/${point?.id}` : "/api/points",
@@ -97,7 +101,10 @@ export function PointFormDialog({ point, trigger }: PointFormDialogProps) {
     const result = await response.json();
 
     if (!response.ok) {
-      setMessage(result.error ?? "No fue posible guardar el punto.");
+      setFeedback({
+        tone: "error",
+        text: result.error ?? "No fue posible guardar el punto."
+      });
       setSubmitting(false);
       return;
     }
@@ -201,9 +208,7 @@ export function PointFormDialog({ point, trigger }: PointFormDialogProps) {
           </div>
         </div>
 
-        {message ? (
-          <p className="text-sm text-muted-foreground">{message}</p>
-        ) : null}
+        <FeedbackMessage message={feedback?.text} tone={feedback?.tone} />
 
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <Button

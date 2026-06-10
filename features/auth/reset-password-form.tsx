@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { resetPasswordSchema } from "@/lib/validations/auth";
@@ -18,7 +19,10 @@ type ResetPasswordFormProps = {
 };
 
 export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
   const form = useForm<ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
@@ -28,16 +32,20 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   });
 
   async function onSubmit(values: ResetPasswordValues) {
-    setMessage(null);
+    setFeedback(null);
     const response = await fetch("/api/auth/reset-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(values)
     });
     const result = await response.json();
-    setMessage(
-      response.ok ? "Contraseña actualizada. Ya puedes iniciar sesión." : result.error
-    );
+    setFeedback({
+      tone: response.ok ? "success" : "error",
+      text:
+        response.ok
+          ? "Contraseña actualizada. Ya puedes iniciar sesión."
+          : result.error
+    });
   }
 
   return (
@@ -69,7 +77,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
             </Button>
           </form>
         </Form>
-        {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+        <FeedbackMessage message={feedback?.text} tone={feedback?.tone} />
       </CardContent>
     </Card>
   );

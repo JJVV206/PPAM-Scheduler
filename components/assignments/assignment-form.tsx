@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
+import type { ButtonProps } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ import {
   FormLabel,
   FormMessage
 } from "@/components/ui/form";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import {
   Select,
   SelectContent,
@@ -35,6 +37,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   DAY_LABELS,
+  TIME_SLOT_DEFINITIONS,
   TIME_SLOTS
 } from "@/lib/constants/domain";
 import { TimeSlotOptionButton } from "@/components/assignments/time-slot-option-button";
@@ -42,6 +45,7 @@ import { cn } from "@/lib/utils";
 import type {
   DayOfWeek,
   PreachingPointSummary,
+  TimeSlot,
   VolunteerSummary
 } from "@/types/domain";
 
@@ -69,7 +73,15 @@ const assignmentFormSchema = z
 type AssignmentFormValues = z.infer<typeof assignmentFormSchema>;
 
 type AssignmentFormProps = {
+  dialogDescription?: string;
+  dialogTitle?: string;
+  lockDateAndTime?: boolean;
   scheduleWeekId: string;
+  presetAssignmentDate?: string;
+  presetTimeSlot?: TimeSlot;
+  triggerClassName?: string;
+  triggerLabel?: string;
+  triggerSize?: ButtonProps["size"];
   weekStartDate: string;
   preachingPoints: PreachingPointSummary[];
   volunteers: VolunteerSummary[];
@@ -95,7 +107,15 @@ function toAssignmentIsoDate(value: string) {
 }
 
 export function AssignmentForm({
+  dialogDescription = "Cada guardado crea una pareja nueva para ese mismo horario.",
+  dialogTitle = "Agregar pareja al horario",
+  lockDateAndTime = false,
+  presetAssignmentDate,
+  presetTimeSlot,
   scheduleWeekId,
+  triggerClassName,
+  triggerLabel = "Agregar pareja",
+  triggerSize = "lg",
   weekStartDate,
   preachingPoints,
   volunteers
@@ -103,7 +123,10 @@ export function AssignmentForm({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const weekDateOptions = useMemo(
     () =>
@@ -122,14 +145,16 @@ export function AssignmentForm({
     () => ({
       scheduleWeekId,
       assignmentDate:
-        weekDateOptions[0]?.value ?? format(new Date(), "yyyy-MM-dd"),
-      timeSlot: "SLOT_09_11",
+        presetAssignmentDate ??
+        weekDateOptions[0]?.value ??
+        format(new Date(), "yyyy-MM-dd"),
+      timeSlot: presetTimeSlot ?? "SLOT_09_11",
       preachingPointId: preachingPoints[0]?.id ?? "",
       notes: "",
       volunteerOneId: "",
       volunteerTwoId: ""
     }),
-    [preachingPoints, scheduleWeekId, weekDateOptions]
+    [preachingPoints, presetAssignmentDate, presetTimeSlot, scheduleWeekId, weekDateOptions]
   );
 
   const form = useForm<AssignmentFormValues>({
@@ -145,6 +170,13 @@ export function AssignmentForm({
   const selectedTimeSlot = form.watch("timeSlot");
   const selectedDayOfWeek = useMemo(
     () => getDayOfWeekFromDate(selectedDate),
+    [selectedDate]
+  );
+  const selectedDateLabel = useMemo(
+    () =>
+      format(new Date(`${selectedDate}T12:00:00`), "EEEE d 'de' MMM", {
+        locale: es
+      }),
     [selectedDate]
   );
 
@@ -178,7 +210,7 @@ export function AssignmentForm({
 
   async function onSubmit(values: AssignmentFormValues) {
     setSubmitting(true);
-    setMessage(null);
+    setFeedback(null);
 
     const payload = {
       scheduleWeekId: values.scheduleWeekId,
@@ -208,14 +240,18 @@ export function AssignmentForm({
     const result = await response.json();
 
     if (!response.ok) {
-      setMessage(result.error ?? "No fue posible crear la pareja asignada.");
+      setFeedback({
+        tone: "error",
+        text: result.error ?? "No fue posible crear la pareja asignada."
+      });
       setSubmitting(false);
       return;
     }
 
-    setMessage(
-      `Pareja ${result.pairNumber} creada. Guarda de nuevo para agregar otra pareja al mismo punto y horario.`
-    );
+    setFeedback({
+      tone: "success",
+      text: `Pareja ${result.pairNumber} creada. Puedes guardar otra vez para sumar otra pareja en este horario.`
+    });
     form.reset({
       ...values,
       volunteerOneId: "",
@@ -229,104 +265,144 @@ export function AssignmentForm({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="lg" className="w-full sm:w-auto">
-          Agregar pareja
+        <Button
+          size={triggerSize}
+          className={cn("w-full sm:w-auto", triggerClassName)}
+        >
+          {triggerLabel}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-[1080px] overflow-hidden p-5 sm:p-6">
         <DialogHeader className="space-y-1 pr-8">
-          <DialogTitle>Agregar pareja al horario</DialogTitle>
-          <DialogDescription>
-            Cada guardado crea una pareja nueva para ese mismo horario.
-          </DialogDescription>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="assignmentDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Día de la semana</FormLabel>
-                  <FormControl>
-                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                      {weekDateOptions.map((option) => {
-                        const isActive = field.value === option.value;
-
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => field.onChange(option.value)}
-                            className={cn(
-                              "rounded-2xl border px-4 py-2.5 text-left transition-colors",
-                              isActive
-                                ? "border-primary bg-primary/15 text-foreground shadow-[0_8px_24px_rgba(102,145,255,0.18)]"
-                                : "border-border/70 bg-background/35 text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                            )}
-                          >
-                            <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                              {option.shortLabel}
-                            </p>
-                            <p className="mt-1 text-[13px] font-semibold leading-snug text-inherit lg:text-sm">
-                              {option.label}
-                            </p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid gap-4 md:grid-cols-[1.2fr,0.8fr]">
-              <FormField
-                control={form.control}
-                name="timeSlot"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Horario</FormLabel>
-                    <FormControl>
-                      <div className="grid gap-2 sm:grid-cols-5">
-                        {TIME_SLOTS.map((timeSlot) => {
-                          const isActive = field.value === timeSlot;
-
-                          return (
-                            <TimeSlotOptionButton
-                              key={timeSlot}
-                              slot={timeSlot}
-                              selected={isActive}
-                              onClick={() => field.onChange(timeSlot)}
-                              dense
-                            />
-                          );
-                        })}
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                  Día
+            {lockDateAndTime ? (
+              <div className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-4">
+                <p className="text-xs uppercase tracking-[0.16em] text-primary/80">
+                  Horario seleccionado
                 </p>
-                <p className="mt-1 font-semibold text-foreground">
-                  {DAY_LABELS[selectedDayOfWeek]}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {compatiblePoints.length} punto
-                  {compatiblePoints.length === 1 ? "" : "s"} compatible
-                  {compatiblePoints.length === 1 ? "" : "s"} en este horario.
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Los puntos sin slots activos siguen disponibles en cualquier
-                  franja.
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-white/6 bg-background/25 px-3 py-2.5">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                      Día
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
+                      {DAY_LABELS[selectedDayOfWeek]}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-white/6 bg-background/25 px-3 py-2.5">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                      Fecha
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
+                      {selectedDateLabel}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-white/6 bg-background/25 px-3 py-2.5">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                      Franja
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
+                      {TIME_SLOT_DEFINITIONS[selectedTimeSlot].label}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Esta pareja quedará creada dentro de este mismo horario.
                 </p>
               </div>
-            </div>
+            ) : (
+              <>
+                <FormField
+                  control={form.control}
+                  name="assignmentDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Día de la semana</FormLabel>
+                      <FormControl>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                          {weekDateOptions.map((option) => {
+                            const isActive = field.value === option.value;
+
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => field.onChange(option.value)}
+                                className={cn(
+                                  "rounded-2xl border px-4 py-2.5 text-left transition-colors",
+                                  isActive
+                                    ? "border-primary bg-primary/15 text-foreground shadow-[0_8px_24px_rgba(102,145,255,0.18)]"
+                                    : "border-border/70 bg-background/35 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                                )}
+                              >
+                                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                                  {option.shortLabel}
+                                </p>
+                                <p className="mt-1 text-[13px] font-semibold leading-snug text-inherit lg:text-sm">
+                                  {option.label}
+                                </p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid gap-4 md:grid-cols-[1.2fr,0.8fr]">
+                  <FormField
+                    control={form.control}
+                    name="timeSlot"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Horario</FormLabel>
+                        <FormControl>
+                          <div className="grid gap-2 sm:grid-cols-5">
+                            {TIME_SLOTS.map((timeSlot) => {
+                              const isActive = field.value === timeSlot;
+
+                              return (
+                                <TimeSlotOptionButton
+                                  key={timeSlot}
+                                  slot={timeSlot}
+                                  selected={isActive}
+                                  onClick={() => field.onChange(timeSlot)}
+                                  dense
+                                />
+                              );
+                            })}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                      Día
+                    </p>
+                    <p className="mt-1 font-semibold text-foreground">
+                      {DAY_LABELS[selectedDayOfWeek]}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {compatiblePoints.length} punto
+                      {compatiblePoints.length === 1 ? "" : "s"} compatible
+                      {compatiblePoints.length === 1 ? "" : "s"} en este horario.
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Los puntos sin slots activos siguen disponibles en cualquier
+                      franja.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
 
             {!hasSinglePoint ? (
               <div className="grid gap-4 md:grid-cols-2">
@@ -427,9 +503,10 @@ export function AssignmentForm({
               )}
             />
 
-            {message ? (
-              <p className="text-sm text-muted-foreground">{message}</p>
-            ) : null}
+            <FeedbackMessage
+              message={feedback?.text}
+              tone={feedback?.tone}
+            />
 
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button
