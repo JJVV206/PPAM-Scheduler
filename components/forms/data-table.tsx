@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 type DataTableProps = {
@@ -23,7 +23,11 @@ export function DataTable({
       {(title || actions) && (
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="space-y-1">
-            {title ? <CardTitle>{title}</CardTitle> : null}
+            {title ? (
+              <h1 className="font-heading text-xl font-semibold tracking-tight">
+                {title}
+              </h1>
+            ) : null}
             {description ? (
               <p className="text-sm text-muted-foreground">{description}</p>
             ) : null}

@@ -20,6 +20,7 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
+      <h1 className="sr-only">Panel administrativo</h1>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         <DashboardStatCard
           label="Asignaciones semanales"

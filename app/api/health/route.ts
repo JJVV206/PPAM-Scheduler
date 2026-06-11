@@ -7,25 +7,30 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   const checks = {
     appEnv: "ok" as "ok" | "error",
-    database: "ok" as "ok" | "error",
+    database: "ok" as "ok" | "error"
+  };
+  const readiness = {
     email: "configured" as "configured" | "simulated" | "error"
   };
-  const issues: string[] = [];
+  const coreIssues: string[] = [];
+  const readinessIssues: string[] = [];
+  const scope = new URL(request.url).searchParams.get("scope");
+  const requireReadiness = scope === "readiness";
 
   const missingEnv = getMissingRequiredAppEnv();
   if (missingEnv.length) {
     checks.appEnv = "error";
-    issues.push(`Missing env: ${missingEnv.join(", ")}`);
+    coreIssues.push(`Missing env: ${missingEnv.join(", ")}`);
   }
 
   try {
     await db.$queryRaw`SELECT 1`;
   } catch (error) {
     checks.database = "error";
-    issues.push(
+    coreIssues.push(
       error instanceof Error ? error.message : "Database connection failed."
     );
   }
@@ -33,26 +38,42 @@ export async function GET() {
   try {
     const smtpConfig = getSmtpConfig();
     if (!smtpConfig) {
-      checks.email = "simulated";
+      readiness.email = "simulated";
       if (isProductionRuntime()) {
-        checks.email = "error";
-        issues.push("SMTP is not configured for production.");
+        readiness.email = "error";
+        readinessIssues.push("SMTP is not configured for production.");
       }
     }
   } catch (error) {
-    checks.email = "error";
-    issues.push(
+    readiness.email = "error";
+    readinessIssues.push(
       error instanceof Error ? error.message : "SMTP configuration is invalid."
     );
   }
 
-  const status = issues.length ? 503 : 200;
+  const hasCoreIssues = coreIssues.length > 0;
+  const hasReadinessIssues = readinessIssues.length > 0;
+  const status =
+    hasCoreIssues || (requireReadiness && hasReadinessIssues) ? 503 : 200;
+  const responseStatus = hasCoreIssues
+    ? "down"
+    : hasReadinessIssues
+      ? requireReadiness
+        ? "degraded"
+        : "core_ok"
+      : "ok";
 
   return Response.json(
     {
       checks,
-      issues,
-      status: status === 200 ? "ok" : "degraded",
+      coreIssues,
+      readiness: {
+        checks: readiness,
+        issues: readinessIssues,
+        status: hasReadinessIssues ? "degraded" : "ok"
+      },
+      scope: requireReadiness ? "readiness" : "core",
+      status: responseStatus,
       timestamp: new Date().toISOString()
     },
     { status }

@@ -9,6 +9,7 @@ export default async function AdminReportsPage() {
 
   return (
     <div className="space-y-6">
+      <h1 className="sr-only">Reportes</h1>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <DashboardStatCard label="Asignaciones" value={report.totalAssignments} icon={BarChart3} />
         <DashboardStatCard label="Tasa de confirmación" value={`${report.confirmationRate}%`} icon={Percent} />

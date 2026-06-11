@@ -17,6 +17,7 @@ export default async function VolunteerDashboardPage() {
 
   return (
     <div className="space-y-6">
+      <h1 className="sr-only">Panel de voluntario</h1>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <DashboardStatCard
           label="Próximas"

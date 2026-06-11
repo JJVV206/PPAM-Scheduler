@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
@@ -86,15 +87,15 @@ enum AssignmentActivityType {
 }
 
 model User {
-  id               String              @id @default(cuid())
+  id               String               @id @default(cuid())
   name             String
-  email            String              @unique
+  email            String               @unique
   passwordHash     String
   role             UserRole
   phone            String?
-  active           Boolean             @default(true)
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  active           Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
   volunteerProfile VolunteerProfile?
   accounts         Account[]
   sessions         Session[]
@@ -105,18 +106,18 @@ model User {
 }
 
 model VolunteerProfile {
-  id                   String                 @id @default(cuid())
-  userId               String                 @unique
+  id                   String                  @id @default(cuid())
+  userId               String                  @unique
   notes                String?
   transportationNotes  String?
   preferredAreas       String[]
-  reliabilityScore     Float                  @default(100)
-  confirmationCount    Int                    @default(0)
-  declineCount         Int                    @default(0)
-  noResponseCount      Int                    @default(0)
-  active               Boolean                @default(true)
-  temporaryUnavailable Boolean                @default(false)
-  user                 User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reliabilityScore     Float                   @default(100)
+  confirmationCount    Int                     @default(0)
+  declineCount         Int                     @default(0)
+  noResponseCount      Int                     @default(0)
+  active               Boolean                 @default(true)
+  temporaryUnavailable Boolean                 @default(false)
+  user                 User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignments          AssignmentVolunteer[]
   responses            AssignmentResponse[]
   availability         VolunteerAvailability[]
@@ -124,13 +125,13 @@ model VolunteerProfile {
 }
 
 model PreachingPoint {
-  id          String                    @id @default(cuid())
+  id          String                     @id @default(cuid())
   name        String
   area        String
   notes       String?
-  active      Boolean                   @default(true)
-  createdAt   DateTime                  @default(now())
-  updatedAt   DateTime                  @updatedAt
+  active      Boolean                    @default(true)
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
   activeSlots PreachingPointActiveSlot[]
   assignments Assignment[]
 }
@@ -159,21 +160,21 @@ model ScheduleWeek {
 }
 
 model Assignment {
-  id               String               @id @default(cuid())
+  id               String                @id @default(cuid())
   scheduleWeekId   String
   date             DateTime
   dayOfWeek        DayOfWeek
   timeSlot         TimeSlot
   preachingPointId String
-  pairNumber       Int                  @default(1)
-  status           AssignmentStatus     @default(SCHEDULED)
+  pairNumber       Int                   @default(1)
+  status           AssignmentStatus      @default(SCHEDULED)
   notes            String?
   completedAt      DateTime?
   cancelledAt      DateTime?
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-  scheduleWeek     ScheduleWeek         @relation(fields: [scheduleWeekId], references: [id], onDelete: Cascade)
-  preachingPoint   PreachingPoint       @relation(fields: [preachingPointId], references: [id])
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  scheduleWeek     ScheduleWeek          @relation(fields: [scheduleWeekId], references: [id], onDelete: Cascade)
+  preachingPoint   PreachingPoint        @relation(fields: [preachingPointId], references: [id])
   volunteers       AssignmentVolunteer[]
   responses        AssignmentResponse[]
   notifications    NotificationLog[]
@@ -200,13 +201,13 @@ model AssignmentVolunteer {
 }
 
 model AssignmentResponse {
-  id             String          @id @default(cuid())
+  id             String           @id @default(cuid())
   assignmentId   String
   volunteerId    String
-  responseStatus ResponseStatus  @default(PENDING)
+  responseStatus ResponseStatus   @default(PENDING)
   note           String?
   respondedAt    DateTime?
-  assignment     Assignment      @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  assignment     Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   volunteer      VolunteerProfile @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
 
   @@unique([assignmentId, volunteerId])
@@ -214,13 +215,13 @@ model AssignmentResponse {
 }
 
 model VolunteerAvailability {
-  id            String           @id @default(cuid())
+  id             String           @id @default(cuid())
   volunteerId    String
   dayOfWeek      DayOfWeek
   timeSlot       TimeSlot
   areaPreference String?
-  available      Boolean         @default(true)
-  recurring      Boolean         @default(true)
+  available      Boolean          @default(true)
+  recurring      Boolean          @default(true)
   volunteer      VolunteerProfile @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
 
   @@unique([volunteerId, dayOfWeek, timeSlot])
@@ -238,7 +239,7 @@ model AvailabilityException {
 }
 
 model NotificationLog {
-  id           String             @id @default(cuid())
+  id           String              @id @default(cuid())
   userId       String
   assignmentId String?
   type         NotificationType
@@ -247,22 +248,22 @@ model NotificationLog {
   sentAt       DateTime?
   errorMessage String?
   metadata     Json?
-  createdAt    DateTime           @default(now())
-  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assignment   Assignment?        @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  createdAt    DateTime            @default(now())
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignment   Assignment?         @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
 
   @@index([userId, sentAt])
 }
 
 model AssignmentActivity {
-  id          String                 @id @default(cuid())
+  id           String                 @id @default(cuid())
   assignmentId String
-  actorUserId String?
-  actionType  AssignmentActivityType
-  metadata    Json?
-  createdAt   DateTime               @default(now())
-  assignment  Assignment             @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  actorUser   User?                  @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorUserId  String?
+  actionType   AssignmentActivityType
+  metadata     Json?
+  createdAt    DateTime               @default(now())
+  assignment   Assignment             @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  actorUser    User?                  @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
 
   @@index([assignmentId, createdAt])
 }
@@ -276,13 +277,13 @@ model AppSetting {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  token     String   @unique
+  token     String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
 }
