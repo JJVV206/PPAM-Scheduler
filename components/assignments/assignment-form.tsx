@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { addDays, format } from "date-fns";
@@ -74,6 +74,7 @@ const assignmentFormSchema = z
 type AssignmentFormValues = z.infer<typeof assignmentFormSchema>;
 
 type AssignmentFormProps = {
+  closeOnSuccess?: boolean;
   dialogDescription?: string;
   dialogTitle?: string;
   lockDateAndTime?: boolean;
@@ -97,6 +98,7 @@ const DAY_ORDER: DayOfWeek[] = [
   "FRIDAY",
   "SATURDAY"
 ];
+const SUCCESS_CLOSE_DELAY_MS = 900;
 
 function getDayOfWeekFromDate(value: string): DayOfWeek {
   const date = new Date(`${value}T12:00:00`);
@@ -108,6 +110,7 @@ function toAssignmentIsoDate(value: string) {
 }
 
 export function AssignmentForm({
+  closeOnSuccess = true,
   dialogDescription = "Cada guardado crea una pareja nueva para ese mismo horario.",
   dialogTitle = "Agregar pareja al horario",
   lockDateAndTime = false,
@@ -128,6 +131,13 @@ export function AssignmentForm({
     tone: "success" | "error";
     text: string;
   } | null>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
+
+  function clearCloseTimeout() {
+    if (!closeTimeoutRef.current) return;
+    window.clearTimeout(closeTimeoutRef.current);
+    closeTimeoutRef.current = null;
+  }
 
   const weekDateOptions = useMemo(
     () =>
@@ -166,6 +176,19 @@ export function AssignmentForm({
   useEffect(() => {
     form.reset(defaultValues);
   }, [defaultValues, form]);
+
+  useEffect(() => {
+    return () => clearCloseTimeout();
+  }, []);
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
+      clearCloseTimeout();
+      setFeedback(null);
+    }
+
+    setOpen(nextOpen);
+  }
 
   const selectedDate = form.watch("assignmentDate");
   const selectedTimeSlot = form.watch("timeSlot");
@@ -249,7 +272,7 @@ export function AssignmentForm({
 
     setFeedback({
       tone: "success",
-      text: `Pareja ${result.pairNumber} creada. Puedes guardar otra vez para sumar otra pareja en este horario.`
+      text: `Pareja ${result.pairNumber} creada. Cerrando ventana...`
     });
     form.reset({
       ...values,
@@ -258,11 +281,19 @@ export function AssignmentForm({
       notes: ""
     });
     router.refresh();
+    if (closeOnSuccess) {
+      clearCloseTimeout();
+      closeTimeoutRef.current = window.setTimeout(() => {
+        setOpen(false);
+        setFeedback(null);
+        closeTimeoutRef.current = null;
+      }, SUCCESS_CLOSE_DELAY_MS);
+    }
     setSubmitting(false);
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button
           size={triggerSize}
@@ -477,7 +508,7 @@ export function AssignmentForm({
                 type="button"
                 size="sm"
                 variant="secondary"
-                onClick={() => setOpen(false)}
+                onClick={() => handleOpenChange(false)}
               >
                 Cerrar
               </Button>

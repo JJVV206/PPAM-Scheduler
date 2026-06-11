@@ -1,6 +1,7 @@
 import {
   addDays,
   differenceInCalendarDays,
+  endOfDay,
   endOfWeek,
   isSameDay,
   startOfDay,
@@ -581,7 +582,10 @@ export async function getAssignmentsForScheduleSlot(input: {
 }) {
   const assignments = await db.assignment.findMany({
     where: {
-      date: input.date,
+      date: {
+        gte: startOfDay(input.date),
+        lte: endOfDay(input.date)
+      },
       timeSlot: input.timeSlot
     },
     include: assignmentInclude,

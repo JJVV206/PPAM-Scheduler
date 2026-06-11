@@ -13,15 +13,15 @@ type WeeklyScheduleGridProps = {
 
 export function WeeklyScheduleGrid({ schedule }: WeeklyScheduleGridProps) {
   return (
-    <div className="h-full overflow-x-hidden">
-      <div className="space-y-3 md:hidden">
+    <div className="h-full min-w-0 overflow-x-auto overflow-y-auto">
+      <div className="space-y-3 xl:hidden">
         {schedule.days.map((day) => (
           <DayColumn key={day.dayOfWeek} day={day} />
         ))}
       </div>
 
-      <div className="hidden h-full md:block">
-        <div className="grid h-full w-full grid-cols-[86px_repeat(7,minmax(0,1fr))] grid-rows-[64px_repeat(5,minmax(0,1fr))] gap-px overflow-hidden rounded-[24px] border border-border/70 bg-border/70 xl:grid-cols-[92px_repeat(7,minmax(0,1fr))] xl:grid-rows-[68px_repeat(5,minmax(0,1fr))]">
+      <div className="hidden h-full min-w-[980px] xl:block">
+        <div className="grid h-full min-h-[720px] w-full grid-cols-[92px_repeat(7,minmax(0,1fr))] grid-rows-[68px_repeat(5,minmax(112px,1fr))] gap-px overflow-hidden rounded-[24px] border border-border/70 bg-border/70">
           <div className="bg-surface-elevated p-2" />
           {schedule.days.map((day) => (
             <div

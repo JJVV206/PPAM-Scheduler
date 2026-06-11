@@ -130,20 +130,21 @@ export function ScheduleSlotPreview({
     return (
       <div
         className={cn(
-          "flex h-full min-h-0 flex-col overflow-hidden rounded-[16px] border p-3",
+          "flex h-full min-h-[96px] min-w-0 flex-col overflow-hidden rounded-[16px] border p-2.5 xl:p-3",
           primaryPair
             ? "border-primary/10 bg-white/[0.05]"
             : "border-white/8 bg-white/[0.04]"
         )}
       >
-        <div className="flex items-start justify-between gap-2">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            <p className="break-words text-[10px] font-semibold uppercase leading-tight tracking-[0.1em] text-muted-foreground xl:tracking-[0.14em]">
               {pairCount ? `${pairCount} pareja${pairCount === 1 ? "" : "s"}` : "Libre"}
             </p>
           </div>
           <Link
             href={slotHref}
+            aria-label="Abrir horario"
             className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary transition hover:bg-primary/15 hover:text-primary"
           >
             <ArrowUpRight className="h-3.5 w-3.5" />
@@ -155,7 +156,7 @@ export function ScheduleSlotPreview({
             <div className="flex min-h-0 flex-1 items-end">
               <span
                 className={cn(
-                  "inline-flex min-h-8 max-w-full items-center overflow-hidden rounded-full border px-3.5 py-1.5 text-[11px] font-bold leading-none tracking-[0.01em] text-ellipsis shadow-[0_10px_30px_rgba(5,10,24,0.18)] ring-1 ring-white/5 whitespace-nowrap",
+                  "inline-flex min-h-8 w-full max-w-full items-center justify-center break-words rounded-full border px-2 py-1.5 text-center text-[10px] font-bold leading-tight tracking-[0.01em] shadow-[0_10px_30px_rgba(5,10,24,0.18)] ring-1 ring-white/5 xl:text-[11px]",
                   compactSummary.className
                 )}
               >
@@ -167,7 +168,7 @@ export function ScheduleSlotPreview({
           <div className="mt-2 flex flex-1 items-end">
             <Link
               href={slotHref}
-              className="inline-flex text-[11px] font-medium text-primary/90 transition hover:text-primary"
+              className="inline-flex max-w-full break-words text-[11px] font-medium leading-tight text-primary/90 transition hover:text-primary"
             >
               Abrir horario
             </Link>
