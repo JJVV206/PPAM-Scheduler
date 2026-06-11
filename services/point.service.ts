@@ -1,16 +1,42 @@
 import { db } from "@/lib/db/prisma";
+import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
+import { AppError } from "@/services/errors";
+
+function withFixedPointName<T extends { name: string }>(point: T): T {
+  return {
+    ...point,
+    name: FIXED_PREACHING_POINT_NAME
+  };
+}
+
+export async function getSingletonPreachingPoint() {
+  const point =
+    (await db.preachingPoint.findFirst({
+      where: { name: FIXED_PREACHING_POINT_NAME },
+      include: {
+        activeSlots: true
+      }
+    })) ??
+    (await db.preachingPoint.findFirst({
+      include: {
+        activeSlots: true
+      },
+      orderBy: [{ active: "desc" }, { name: "asc" }]
+    }));
+
+  if (!point) {
+    throw new AppError("No hay un punto de predicación configurado.", 500);
+  }
+
+  return withFixedPointName(point);
+}
 
 export async function getPreachingPoints() {
-  return db.preachingPoint.findMany({
-    include: {
-      activeSlots: true
-    },
-    orderBy: [{ active: "desc" }, { name: "asc" }]
-  });
+  return [await getSingletonPreachingPoint()];
 }
 
 export async function getPreachingPoint(pointId: string) {
-  return db.preachingPoint.findUniqueOrThrow({
+  const point = await db.preachingPoint.findUniqueOrThrow({
     where: { id: pointId },
     include: {
       activeSlots: true,
@@ -20,6 +46,8 @@ export async function getPreachingPoint(pointId: string) {
       }
     }
   });
+
+  return withFixedPointName(point);
 }
 
 export async function createPreachingPoint(input: {
@@ -32,20 +60,11 @@ export async function createPreachingPoint(input: {
     timeSlot: import("@/types/domain").TimeSlot;
   }>;
 }) {
-  return db.preachingPoint.create({
-    data: {
-      name: input.name,
-      area: input.area,
-      notes: input.notes,
-      active: input.active,
-      activeSlots: {
-        createMany: {
-          data: input.activeSlots
-        }
-      }
-    },
-    include: { activeSlots: true }
-  });
+  void input;
+  throw new AppError(
+    "Esta instalación usa un único punto fijo de predicación y no permite crear otros.",
+    403
+  );
 }
 
 export async function updatePreachingPoint(
@@ -61,37 +80,18 @@ export async function updatePreachingPoint(
     }>;
   }
 ) {
-  return db.$transaction(async (tx) => {
-    if (input.activeSlots) {
-      await tx.preachingPointActiveSlot.deleteMany({
-        where: { preachingPointId: pointId }
-      });
-    }
-
-    const point = await tx.preachingPoint.update({
-      where: { id: pointId },
-      data: {
-        name: input.name,
-        area: input.area,
-        notes: input.notes,
-        active: input.active,
-        activeSlots: input.activeSlots
-          ? {
-              createMany: {
-                data: input.activeSlots
-              }
-            }
-          : undefined
-      },
-      include: { activeSlots: true }
-    });
-
-    return point;
-  });
+  void pointId;
+  void input;
+  throw new AppError(
+    "El punto de predicación está fijado y no puede editarse desde esta instalación.",
+    403
+  );
 }
 
 export async function deletePreachingPoint(pointId: string) {
-  return db.preachingPoint.delete({
-    where: { id: pointId }
-  });
+  void pointId;
+  throw new AppError(
+    "El punto de predicación fijo no puede eliminarse.",
+    403
+  );
 }

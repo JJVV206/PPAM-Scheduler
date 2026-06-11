@@ -7,6 +7,9 @@ import {
 } from "@prisma/client";
 
 import { db } from "@/lib/db/prisma";
+import { getSmtpConfig } from "@/lib/env/config";
+import { humanizeErrorMessage } from "@/lib/utils/error-message";
+import { AppError } from "@/services/errors";
 
 type NotificationPayload = {
   userId: string;
@@ -19,21 +22,17 @@ type NotificationPayload = {
 };
 
 function createTransport() {
-  if (!process.env.SMTP_HOST) {
+  const smtpConfig = getSmtpConfig();
+
+  if (!smtpConfig) {
     return null;
   }
 
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT ?? 1025),
-    secure: false,
-    auth:
-      process.env.SMTP_USER && process.env.SMTP_PASS
-        ? {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS
-          }
-        : undefined
+    host: smtpConfig.host,
+    port: smtpConfig.port,
+    secure: smtpConfig.secure,
+    auth: smtpConfig.auth
   });
 }
 
@@ -70,24 +69,38 @@ export async function sendEmailNotification(payload: NotificationPayload) {
       type: payload.type,
       channel: payload.channel ?? "EMAIL",
       status: "FAILED",
-      errorMessage: "Recipient email not found",
+      errorMessage: "No se encontró un correo para el destinatario",
       metadata: payload.metadata
     });
     return;
   }
 
-  const transport = createTransport();
-
   try {
-    if (!transport || process.env.NODE_ENV === "development") {
+    const smtpConfig = getSmtpConfig();
+    const transport = smtpConfig ? createTransport() : null;
+
+    if (!transport) {
       console.info("Email notification", {
         to: user.email,
         subject: payload.subject,
         type: payload.type
       });
+
+      await logNotification({
+        userId: payload.userId,
+        assignmentId: payload.assignmentId,
+        type: payload.type,
+        channel: payload.channel ?? "EMAIL",
+        status: "SENT",
+        metadata: {
+          ...payload.metadata,
+          simulated: true
+        }
+      });
+      return;
     } else {
       await transport.sendMail({
-        from: process.env.SMTP_FROM,
+        from: smtpConfig?.from,
         to: user.email,
         subject: payload.subject,
         html: payload.html
@@ -103,15 +116,26 @@ export async function sendEmailNotification(payload: NotificationPayload) {
       metadata: payload.metadata
     });
   } catch (error) {
+    const technicalMessage =
+      error instanceof Error
+        ? error.message
+        : "Error desconocido al enviar la notificación";
+    const userMessage = humanizeErrorMessage(
+      technicalMessage,
+      "No fue posible enviar la notificación."
+    );
+
     await logNotification({
       userId: payload.userId,
       assignmentId: payload.assignmentId,
       type: payload.type,
       channel: payload.channel ?? "EMAIL",
       status: "FAILED",
-      errorMessage: error instanceof Error ? error.message : "Unknown notification error",
+      errorMessage: userMessage,
       metadata: payload.metadata
     });
+
+    throw new AppError(userMessage, 500);
   }
 }
 
@@ -122,15 +146,17 @@ export async function resendConfirmationReminder(input: {
   pointName: string;
   dateLabel: string;
   timeSlotLabel: string;
+  confirmationLink?: string | null;
 }) {
   return sendEmailNotification({
     userId: input.volunteerUserId,
     assignmentId: input.assignmentId,
     type: "REMINDER",
-    subject: "Reminder: confirm your PPAM assignment",
-    html: `<p>Hello ${input.volunteerName},</p><p>Please confirm your PPAM assignment for ${input.dateLabel} at ${input.timeSlotLabel} in ${input.pointName}.</p>`,
+    subject: "Recordatorio: confirma tu asignación de PPAM",
+    html: `<p>Hola ${input.volunteerName},</p><p>Confirma tu asignación de PPAM para ${input.dateLabel} a las ${input.timeSlotLabel} en ${input.pointName}.</p>${input.confirmationLink ? `<p><a href="${input.confirmationLink}">Abrir confirmación directa</a></p>` : ""}`,
     metadata: {
-      pointName: input.pointName
+      pointName: input.pointName,
+      confirmationLink: input.confirmationLink
     }
   });
 }

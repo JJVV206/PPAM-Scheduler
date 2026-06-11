@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { ConfirmationCard } from "@/components/assignments/confirmation-card";
+import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import { db } from "@/lib/db/prisma";
 
 type VolunteerConfirmPageProps = {
@@ -29,8 +30,8 @@ export default async function VolunteerConfirmPage({
 
   return (
     <ConfirmationCard
-      assignmentId={response.assignmentId}
-      pointName={response.assignment.preachingPoint.name}
+      responseId={response.id}
+      pointName={FIXED_PREACHING_POINT_NAME}
       date={response.assignment.date}
       timeSlot={response.assignment.timeSlot}
     />

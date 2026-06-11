@@ -14,9 +14,12 @@ export default async function VolunteerAvailabilityPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-4xl font-semibold">My Availability</h1>
+        <h1 className="font-heading text-4xl font-semibold">
+          Mi disponibilidad
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Define recurring weekly time slots you are available to serve.
+          Define los horarios recurrentes de la semana en los que estás
+          disponible para servir.
         </p>
       </div>
       <AvailabilitySelector
@@ -26,6 +29,12 @@ export default async function VolunteerAvailabilityPage() {
           timeSlot: item.timeSlot
         }))}
         initialTemporaryUnavailable={volunteer.temporaryUnavailable}
+        initialExceptions={volunteer.availabilityBlocks.map((item) => ({
+          id: item.id,
+          startDate: item.startDate.toISOString().slice(0, 10),
+          endDate: item.endDate.toISOString().slice(0, 10),
+          reason: item.reason
+        }))}
       />
     </div>
   );

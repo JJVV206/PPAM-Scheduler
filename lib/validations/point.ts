@@ -8,9 +8,9 @@ export const preachingPointActiveSlotSchema = z.object({
 });
 
 export const createPreachingPointSchema = z.object({
-  name: z.string().min(2),
-  area: z.string().min(2),
-  notes: z.string().max(1000).optional(),
+  name: z.string().min(2, "Ingresa al menos 2 caracteres."),
+  area: z.string().min(2, "Ingresa al menos 2 caracteres."),
+  notes: z.string().max(1000, "No excedas 1000 caracteres.").optional(),
   active: z.boolean().default(true),
   activeSlots: z.array(preachingPointActiveSlotSchema).default([])
 });

@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { forgotPasswordSchema } from "@/lib/validations/auth";
@@ -15,7 +16,10 @@ import { forgotPasswordSchema } from "@/lib/validations/auth";
 type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
 export function ForgotPasswordForm() {
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
   const form = useForm<ForgotPasswordValues>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
@@ -24,26 +28,34 @@ export function ForgotPasswordForm() {
   });
 
   async function onSubmit(values: ForgotPasswordValues) {
-    setMessage(null);
+    setFeedback(null);
     const response = await fetch("/api/auth/forgot-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(values)
     });
     if (response.ok) {
-      setMessage("If the email exists, a reset link has been sent.");
+      setFeedback({
+        tone: "success",
+        text: "Si el correo existe, ya enviamos un enlace para restablecer la contraseña."
+      });
     } else {
       const result = await response.json();
-      setMessage(result.error ?? "Unable to send reset instructions.");
+      setFeedback({
+        tone: "error",
+        text:
+          result.error ??
+          "No fue posible enviar las instrucciones de restablecimiento."
+      });
     }
   }
 
   return (
     <Card className="surface-elevated w-full max-w-md">
       <CardHeader className="space-y-2">
-        <CardTitle className="text-3xl">Reset password</CardTitle>
+        <CardTitle className="text-3xl">Restablecer contraseña</CardTitle>
         <CardDescription>
-          Enter your email and we will send a reset link.
+          Ingresa tu correo y te enviaremos un enlace de restablecimiento.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -63,13 +75,13 @@ export function ForgotPasswordForm() {
               )}
             />
             <Button type="submit" className="w-full">
-              Send reset link
+              Enviar enlace
             </Button>
           </form>
         </Form>
-        {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+        <FeedbackMessage message={feedback?.text} tone={feedback?.tone} />
         <Link href="/login" className="block text-sm text-primary">
-          Back to login
+          Volver al acceso
         </Link>
       </CardContent>
     </Card>

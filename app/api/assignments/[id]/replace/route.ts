@@ -24,7 +24,7 @@ export async function POST(
         : auth.session.user.volunteerProfileId;
 
     if (!volunteerId) {
-      throw new AppError("Volunteer selection is required.", 400);
+      throw new AppError("Debes seleccionar un voluntario.", 400);
     }
 
     const result = await assignReplacementVolunteer({

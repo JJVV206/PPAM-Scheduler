@@ -4,6 +4,7 @@ import { Bell, CalendarRange, PanelLeftClose } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { ROLE_LABELS } from "@/lib/constants/domain";
 import { formatDisplayDate } from "@/lib/utils";
 import type { UserRole } from "@/types/domain";
 
@@ -21,11 +22,11 @@ export function TopNavbar({ role, userName }: TopNavbarProps) {
         </Button>
         <div>
           <p className="font-heading text-lg font-semibold">
-            {role === "ADMIN" ? "Coordinator Console" : "Volunteer Portal"}
+            {role === "ADMIN" ? "Consola de coordinación" : "Portal del voluntario"}
           </p>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <CalendarRange className="h-4 w-4" />
-            {formatDisplayDate(new Date(), "EEEE, MMMM d")}
+            {formatDisplayDate(new Date(), "EEEE d 'de' MMMM")}
           </div>
         </div>
       </div>
@@ -40,7 +41,7 @@ export function TopNavbar({ role, userName }: TopNavbarProps) {
           <div className="hidden text-left md:block">
             <p className="text-sm font-semibold">{userName}</p>
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              {role}
+              {ROLE_LABELS[role]}
             </p>
           </div>
         </div>

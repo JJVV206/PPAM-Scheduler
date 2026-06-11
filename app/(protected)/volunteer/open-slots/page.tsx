@@ -25,8 +25,8 @@ export default async function VolunteerOpenSlotsPage() {
     </div>
   ) : (
     <EmptyState
-      title="No matching open slots"
-      description="You are currently covered or unavailable for open replacement needs."
+      title="No hay vacantes compatibles"
+      description="Por ahora estás cubierto o no disponible para necesidades abiertas de reemplazo."
     />
   );
 }

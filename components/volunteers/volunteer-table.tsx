@@ -21,11 +21,11 @@ export function VolunteerTable({ volunteers }: VolunteerTableProps) {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Contact</TableHead>
-          <TableHead>Reliability</TableHead>
-          <TableHead>Preferred Areas</TableHead>
-          <TableHead>Status</TableHead>
+          <TableHead>Nombre</TableHead>
+          <TableHead>Contacto</TableHead>
+          <TableHead>Confiabilidad</TableHead>
+          <TableHead>Áreas preferidas</TableHead>
+          <TableHead>Estado</TableHead>
           <TableHead />
         </TableRow>
       </TableHeader>
@@ -35,16 +35,16 @@ export function VolunteerTable({ volunteers }: VolunteerTableProps) {
             <TableCell className="font-medium">{volunteer.name}</TableCell>
             <TableCell>
               <p>{volunteer.email}</p>
-              <p className="text-xs text-muted-foreground">{volunteer.phone ?? "No phone"}</p>
+              <p className="text-xs text-muted-foreground">{volunteer.phone ?? "Sin teléfono"}</p>
             </TableCell>
             <TableCell>{Math.round(volunteer.reliabilityScore)}%</TableCell>
-            <TableCell>{volunteer.preferredAreas.join(", ") || "None"}</TableCell>
+            <TableCell>{volunteer.preferredAreas.join(", ") || "Ninguna"}</TableCell>
             <TableCell>
               <StatusBadge status={volunteer.active ? "CONFIRMED" : "CANCELLED"} />
             </TableCell>
             <TableCell className="text-right">
               <Button variant="secondary" asChild>
-                <Link href={`/admin/volunteers/${volunteer.id}`}>View</Link>
+                <Link href={`/admin/volunteers/${volunteer.id}`}>Ver</Link>
               </Button>
             </TableCell>
           </TableRow>

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>PPAM Scheduler - Presentacion General</title>
+    <link rel="stylesheet" href="./ppam-scheduler-presentacion.css" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">PPAM Scheduler</p>
+          <p class="topbar-title">Presentacion general del proyecto</p>
+        </div>
+        <nav class="topbar-links">
+          <a href="./ppam-scheduler-mvp.html">MVP visual previo</a>
+          <a href="./ppam-scheduler-arquitectura.html">Arquitectura tecnica</a>
+        </nav>
+      </header>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Vision del producto</p>
+          <h1>Una plataforma para coordinar la semana completa sin hojas sueltas ni seguimiento manual.</h1>
+          <p class="hero-text">
+            PPAM Scheduler organiza la operacion semanal de predicacion publica.
+            Un coordinador arma el horario por punto, dia y franja; los voluntarios
+            reciben su asignacion, responden y mantienen actualizada su disponibilidad.
+          </p>
+          <div class="hero-actions">
+            <a class="primary-link" href="./ppam-scheduler-arquitectura.html">Ver pagina tecnica</a>
+            <a class="secondary-link" href="./ppam-scheduler-mvp.html">Ver pagina MVP</a>
+          </div>
+        </div>
+
+        <aside class="hero-panel">
+          <p class="panel-label">Resumen ejecutivo</p>
+          <p class="hero-statement">
+            El sistema ya apunta a un objetivo concreto: preparar una semana,
+            asignar parejas sin conflictos, pedir confirmacion, detectar vacantes
+            y resolver reemplazos desde un mismo flujo.
+          </p>
+
+          <div class="metric-grid">
+            <article class="metric-card">
+              <strong>2</strong>
+              <span>roles principales</span>
+            </article>
+            <article class="metric-card">
+              <strong>1</strong>
+              <span>operacion semanal centralizada</span>
+            </article>
+            <article class="metric-card">
+              <strong>7</strong>
+              <span>pasos del flujo MVP</span>
+            </article>
+            <article class="metric-card">
+              <strong>P0</strong>
+              <span>prioridad en planeacion y confirmacion</span>
+            </article>
+          </div>
+        </aside>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Marco general</p>
+          <h2>Que resuelve el proyecto</h2>
+        </div>
+
+        <div class="problem-grid">
+          <article class="problem-card">
+            <h3>Antes</h3>
+            <ul class="plain-list">
+              <li>La planeacion semanal depende de memoria, mensajes y seguimiento manual.</li>
+              <li>Es facil perder visibilidad de quien ya confirmo y quien rechazo.</li>
+              <li>Los huecos se detectan tarde y los reemplazos consumen tiempo.</li>
+            </ul>
+          </article>
+
+          <article class="problem-card highlight">
+            <h3>Despues</h3>
+            <ul class="plain-list">
+              <li>La semana se arma desde un planner con puntos, horarios y parejas.</li>
+              <li>Las respuestas quedan visibles y los estados cambian dentro del sistema.</li>
+              <li>Las vacantes se convierten en un flujo accionable de reemplazo.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Usuarios</p>
+          <h2>Quien usa el sistema y para que</h2>
+        </div>
+
+        <div class="role-grid">
+          <article class="role-card admin">
+            <span class="role-badge">Admin / Coordinador</span>
+            <h3>Centro operativo</h3>
+            <p>
+              Gestiona voluntarios, puntos de predicacion, horarios semanales,
+              solicitudes de confirmacion, respuestas y huecos por cubrir.
+            </p>
+            <ul class="check-list">
+              <li>Prepara o duplica una semana</li>
+              <li>Asigna parejas sin conflictos</li>
+              <li>Monitorea confirmaciones y rechazos</li>
+              <li>Cubre vacantes y registra actividad</li>
+            </ul>
+          </article>
+
+          <article class="role-card volunteer">
+            <span class="role-badge">Voluntario</span>
+            <h3>Portal personal</h3>
+            <p>
+              Revisa sus asignaciones, responde cuando se le solicita y mantiene
+              actualizada su disponibilidad recurrente o temporal.
+            </p>
+            <ul class="check-list">
+              <li>Consulta proximas asignaciones</li>
+              <li>Confirma o rechaza una participacion</li>
+              <li>Gestiona disponibilidad basica</li>
+              <li>Revisa notificaciones y perfil</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Flujo MVP</p>
+          <h2>Como opera la version minima viable</h2>
+        </div>
+
+        <div class="flow-stage">
+          <div class="stage-callout">
+            <p class="panel-label">Definicion del MVP</p>
+            <p>
+              El MVP esta pensado para operar una semana real de punta a punta,
+              no para cubrir toda la vision futura del producto.
+            </p>
+          </div>
+
+          <ol class="flow-list">
+            <li>
+              <span class="flow-step">1</span>
+              <div>
+                <h3>Preparar semana</h3>
+                <p>El coordinador abre la semana o parte de una semana previa.</p>
+              </div>
+            </li>
+            <li>
+              <span class="flow-step">2</span>
+              <div>
+                <h3>Armar el horario</h3>
+                <p>Selecciona punto, dia, franja y pareja para cada bloque necesario.</p>
+              </div>
+            </li>
+            <li>
+              <span class="flow-step">3</span>
+              <div>
+                <h3>Validar conflictos</h3>
+                <p>El sistema evita doble asignacion en la misma fecha y horario.</p>
+              </div>
+            </li>
+            <li>
+              <span class="flow-step">4</span>
+              <div>
+                <h3>Pedir confirmacion</h3>
+                <p>Se envian solicitudes basicas por email y quedan registradas.</p>
+              </div>
+            </li>
+            <li>
+              <span class="flow-step">5</span>
+              <div>
+                <h3>Recibir respuestas</h3>
+                <p>Los voluntarios confirman o rechazan desde su experiencia propia.</p>
+              </div>
+            </li>
+            <li>
+              <span class="flow-step">6</span>
+              <div>
+                <h3>Detectar vacantes</h3>
+                <p>Si falta alguien o hay rechazo, la asignacion entra a reemplazo.</p>
+              </div>
+            </li>
+            <li>
+              <span class="flow-step">7</span>
+              <div>
+                <h3>Cerrar con reemplazo</h3>
+                <p>El coordinador reasigna rapido y sostiene la operacion semanal.</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Flujo final</p>
+          <h2>Como se veria el producto terminado</h2>
+        </div>
+
+        <div class="future-grid">
+          <article class="future-card">
+            <p class="panel-label">Operacion ampliada</p>
+            <ol class="future-list">
+              <li>La siguiente semana se crea o duplica desde la UI sin friccion.</li>
+              <li>Los puntos definen slots activos por dia y franja con mas precision.</li>
+              <li>Los voluntarios manejan recurrencia y excepciones temporales completas.</li>
+              <li>El sistema sugiere reemplazos por disponibilidad, conflictos y afinidad de area.</li>
+              <li>Los recordatorios salen automaticamente segun configuracion.</li>
+              <li>Las notificaciones se extienden a mas canales cuando el producto lo requiera.</li>
+              <li>Los reportes muestran salud operativa, tasa de confirmacion y carga por semana.</li>
+            </ol>
+          </article>
+
+          <article class="future-card accent">
+            <p class="panel-label">Meta de negocio</p>
+            <p class="future-summary">
+              La version terminada no solo ayuda a programar; se convierte en el
+              centro de coordinacion, seguimiento y mejora continua de toda la
+              operacion semanal.
+            </p>
+            <div class="delta-block">
+              <h3>Que cambia frente al MVP</h3>
+              <ul class="plain-list">
+                <li>Mas automatizacion y menos seguimiento manual</li>
+                <li>Mas visibilidad historica y mejores reportes</li>
+                <li>Mas contexto para decidir reemplazos y priorizar acciones</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Comparativa</p>
+          <h2>MVP versus producto terminado</h2>
+        </div>
+
+        <div class="compare-grid">
+          <article class="compare-card">
+            <p class="compare-tag">MVP</p>
+            <ul class="plain-list">
+              <li>Planeador semanal</li>
+              <li>Asignacion por parejas</li>
+              <li>Validacion de conflictos</li>
+              <li>Confirmacion y rechazo</li>
+              <li>Vacantes y reemplazos</li>
+              <li>Email basico e historial simple</li>
+            </ul>
+          </article>
+
+          <article class="compare-card">
+            <p class="compare-tag">Terminado</p>
+            <ul class="plain-list">
+              <li>Creacion y duplicacion pulida de semanas</li>
+              <li>Slots activos por punto y reglas mas completas</li>
+              <li>Excepciones temporales visibles en la experiencia del voluntario</li>
+              <li>Recordatorios automaticos y multiples canales</li>
+              <li>Reportes, metricas y seguimiento historico</li>
+              <li>Sugerencias mas inteligentes y operacion mas autonoma</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section outcome-section">
+        <div class="section-heading">
+          <p class="eyebrow">Resultado esperado</p>
+          <h2>Que gana la operacion si este proyecto sale bien</h2>
+        </div>
+
+        <div class="outcome-grid">
+          <article class="outcome-card">
+            <h3>Menos friccion</h3>
+            <p>Menos mensajes dispersos, menos listas paralelas y menos memoria operativa.</p>
+          </article>
+          <article class="outcome-card">
+            <h3>Mas control</h3>
+            <p>Estados visibles, huecos identificados a tiempo y seguimiento mas claro.</p>
+          </article>
+          <article class="outcome-card">
+            <h3>Mas continuidad</h3>
+            <p>La semana puede mantenerse operativa aunque cambien respuestas o disponibilidad.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,5 +1,19 @@
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  NOTIFICATION_CHANNEL_LABELS,
+  NOTIFICATION_STATUS_LABELS,
+  NOTIFICATION_TYPE_LABELS
+} from "@/lib/constants/domain";
+import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
+import { humanizeErrorMessage } from "@/lib/utils/error-message";
 import { formatDisplayDate } from "@/lib/utils";
 
 type NotificationTableProps = {
@@ -9,6 +23,8 @@ type NotificationTableProps = {
     channel: string;
     status: string;
     createdAt: Date;
+    sentAt?: Date | null;
+    errorMessage?: string | null;
     user: { name: string };
     assignment?: { preachingPoint: { name: string } } | null;
   }>;
@@ -19,20 +35,29 @@ export function NotificationTable({ notifications }: NotificationTableProps) {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Recipient</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Channel</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Assignment</TableHead>
-          <TableHead>Created</TableHead>
+          <TableHead>Destinatario</TableHead>
+          <TableHead>Tipo</TableHead>
+          <TableHead>Canal</TableHead>
+          <TableHead>Estado</TableHead>
+          <TableHead>Asignación</TableHead>
+          <TableHead>Detalle</TableHead>
+          <TableHead>Creada</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {notifications.map((notification) => (
           <TableRow key={notification.id}>
             <TableCell>{notification.user.name}</TableCell>
-            <TableCell>{notification.type.replaceAll("_", " ")}</TableCell>
-            <TableCell>{notification.channel}</TableCell>
+            <TableCell>
+              {NOTIFICATION_TYPE_LABELS[
+                notification.type as keyof typeof NOTIFICATION_TYPE_LABELS
+              ] ?? notification.type}
+            </TableCell>
+            <TableCell>
+              {NOTIFICATION_CHANNEL_LABELS[
+                notification.channel as keyof typeof NOTIFICATION_CHANNEL_LABELS
+              ] ?? notification.channel}
+            </TableCell>
             <TableCell>
               <Badge
                 variant={
@@ -43,13 +68,30 @@ export function NotificationTable({ notifications }: NotificationTableProps) {
                       : "warning"
                 }
               >
-                {notification.status}
+                {NOTIFICATION_STATUS_LABELS[
+                  notification.status as keyof typeof NOTIFICATION_STATUS_LABELS
+                ] ?? notification.status}
               </Badge>
             </TableCell>
             <TableCell>
-              {notification.assignment?.preachingPoint.name ?? "General"}
+              {notification.assignment ? FIXED_PREACHING_POINT_NAME : "General"}
             </TableCell>
-            <TableCell>{formatDisplayDate(notification.createdAt, "MMM d, h:mm a")}</TableCell>
+            <TableCell
+              className={
+                notification.errorMessage
+                  ? "text-sm text-danger"
+                  : "text-sm text-muted-foreground"
+              }
+            >
+              {notification.errorMessage
+                ? humanizeErrorMessage(notification.errorMessage)
+                : notification.sentAt
+                  ? `Enviada ${formatDisplayDate(notification.sentAt, "d 'de' MMM, h:mm a")}`
+                  : "Registrada en entorno local"}
+            </TableCell>
+            <TableCell>
+              {formatDisplayDate(notification.createdAt, "d 'de' MMM, h:mm a")}
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>

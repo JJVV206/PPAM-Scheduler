@@ -8,9 +8,9 @@ export default async function AdminOpenSlotsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-4xl font-semibold">Open Slots</h1>
+        <h1 className="font-heading text-4xl font-semibold">Vacantes</h1>
         <p className="text-sm text-muted-foreground">
-          Cover missing volunteers before assignments go unserved.
+          Cubre los voluntarios faltantes antes de que una asignación quede sin atender.
         </p>
       </div>
       {openSlots.length ? (
@@ -21,8 +21,8 @@ export default async function AdminOpenSlotsPage() {
         </div>
       ) : (
         <EmptyState
-          title="All covered"
-          description="There are no open assignments needing replacements."
+          title="Todo cubierto"
+          description="No hay asignaciones abiertas que requieran reemplazo."
         />
       )}
     </div>

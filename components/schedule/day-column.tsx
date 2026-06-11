@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 import { TimeSlotBlock } from "@/components/schedule/time-slot-block";
 import { TIME_SLOTS } from "@/lib/constants/domain";
@@ -9,21 +10,37 @@ type DayColumnProps = {
 };
 
 export function DayColumn({ day }: DayColumnProps) {
+  const occupiedSlotCount = TIME_SLOTS.filter(
+    (timeSlot) => day.items[timeSlot].length > 0
+  ).length;
+
   return (
-    <div className="surface-panel min-w-[280px] space-y-5 p-5">
-      <div>
-        <p className="font-heading text-xl font-semibold">
-          {format(day.date, "EEEE")}
-        </p>
-        <p className="text-sm text-muted-foreground">{format(day.date, "MMM d")}</p>
+    <section className="surface-panel space-y-4 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-heading text-xl font-semibold capitalize">
+            {format(day.date, "EEEE", { locale: es })}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {format(day.date, "d 'de' MMM", { locale: es })}
+          </p>
+        </div>
+        <span className="rounded-full border border-white/8 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          {occupiedSlotCount
+            ? `${occupiedSlotCount} horario${occupiedSlotCount > 1 ? "s" : ""}`
+            : "Libre"}
+        </span>
       </div>
-      {TIME_SLOTS.map((timeSlot) => (
-        <TimeSlotBlock
-          key={timeSlot}
-          timeSlot={timeSlot}
-          assignments={day.items[timeSlot]}
-        />
-      ))}
-    </div>
+      <div className="space-y-3">
+        {TIME_SLOTS.map((timeSlot) => (
+          <TimeSlotBlock
+            key={timeSlot}
+            date={day.date}
+            timeSlot={timeSlot}
+            assignments={day.items[timeSlot]}
+          />
+        ))}
+      </div>
+    </section>
   );
 }

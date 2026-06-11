@@ -15,7 +15,7 @@ export async function PUT(request: Request) {
         : auth.session.user.volunteerProfileId;
 
     if (!volunteerId) {
-      throw new AppError("Volunteer profile missing.", 400);
+      throw new AppError("Falta el perfil del voluntario.", 400);
     }
 
     const result = await updateVolunteerAvailability({

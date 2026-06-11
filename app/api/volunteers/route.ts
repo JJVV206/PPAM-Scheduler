@@ -32,9 +32,16 @@ export async function POST(request: Request) {
       passwordHash
     });
 
-    await requestPasswordReset(result.email);
+    let warning: string | undefined;
 
-    return ok(result, { status: 201 });
+    try {
+      await requestPasswordReset(result.email);
+    } catch {
+      warning =
+        "Voluntario creado, pero no se pudo enviar el correo de acceso.";
+    }
+
+    return ok({ ...result, warning }, { status: 201 });
   } catch (error) {
     return handleRouteError(error);
   }

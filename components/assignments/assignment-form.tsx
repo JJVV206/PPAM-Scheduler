@@ -4,13 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { addDays, format } from "date-fns";
+import { es } from "date-fns/locale";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
+import type { ButtonProps } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger
@@ -23,6 +26,7 @@ import {
   FormLabel,
   FormMessage
 } from "@/components/ui/form";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import {
   Select,
   SelectContent,
@@ -33,21 +37,28 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   DAY_LABELS,
-  TIME_SLOTS,
-  TIME_SLOT_DEFINITIONS
+  TIME_SLOT_DEFINITIONS,
+  TIME_SLOTS
 } from "@/lib/constants/domain";
+import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
+import { TimeSlotOptionButton } from "@/components/assignments/time-slot-option-button";
 import { cn } from "@/lib/utils";
-import type { DayOfWeek, PreachingPointSummary, VolunteerSummary } from "@/types/domain";
+import type {
+  DayOfWeek,
+  PreachingPointSummary,
+  TimeSlot,
+  VolunteerSummary
+} from "@/types/domain";
 
 const assignmentFormSchema = z
   .object({
     scheduleWeekId: z.string().min(1),
-    assignmentDate: z.string().min(1, "Select a date"),
+    assignmentDate: z.string().min(1, "Selecciona una fecha."),
     timeSlot: z.enum(TIME_SLOTS),
-    preachingPointId: z.string().min(1, "Select a preaching point"),
+    preachingPointId: z.string().min(1, "Selecciona un punto de predicación."),
     volunteerOneId: z.string().optional(),
     volunteerTwoId: z.string().optional(),
-    notes: z.string().max(1000).optional()
+    notes: z.string().max(1000, "No excedas 1000 caracteres.").optional()
   })
   .refine(
     (values) =>
@@ -55,7 +66,7 @@ const assignmentFormSchema = z
       !values.volunteerTwoId ||
       values.volunteerOneId !== values.volunteerTwoId,
     {
-      message: "Select two different volunteers for a couple.",
+      message: "Selecciona dos voluntarios distintos para la pareja.",
       path: ["volunteerTwoId"]
     }
   );
@@ -63,7 +74,15 @@ const assignmentFormSchema = z
 type AssignmentFormValues = z.infer<typeof assignmentFormSchema>;
 
 type AssignmentFormProps = {
+  dialogDescription?: string;
+  dialogTitle?: string;
+  lockDateAndTime?: boolean;
   scheduleWeekId: string;
+  presetAssignmentDate?: string;
+  presetTimeSlot?: TimeSlot;
+  triggerClassName?: string;
+  triggerLabel?: string;
+  triggerSize?: ButtonProps["size"];
   weekStartDate: string;
   preachingPoints: PreachingPointSummary[];
   volunteers: VolunteerSummary[];
@@ -89,7 +108,15 @@ function toAssignmentIsoDate(value: string) {
 }
 
 export function AssignmentForm({
+  dialogDescription = "Cada guardado crea una pareja nueva para ese mismo horario.",
+  dialogTitle = "Agregar pareja al horario",
+  lockDateAndTime = false,
+  presetAssignmentDate,
+  presetTimeSlot,
   scheduleWeekId,
+  triggerClassName,
+  triggerLabel = "Agregar pareja",
+  triggerSize = "lg",
   weekStartDate,
   preachingPoints,
   volunteers
@@ -97,7 +124,10 @@ export function AssignmentForm({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const weekDateOptions = useMemo(
     () =>
@@ -105,8 +135,8 @@ export function AssignmentForm({
         const date = addDays(new Date(weekStartDate), index);
         return {
           value: format(date, "yyyy-MM-dd"),
-          label: format(date, "EEEE, MMM d"),
-          shortLabel: format(date, "EEE d")
+          label: format(date, "EEEE d 'de' MMM", { locale: es }),
+          shortLabel: format(date, "EEE d", { locale: es })
         };
       }),
     [weekStartDate]
@@ -115,14 +145,17 @@ export function AssignmentForm({
   const defaultValues = useMemo<AssignmentFormValues>(
     () => ({
       scheduleWeekId,
-      assignmentDate: weekDateOptions[0]?.value ?? format(new Date(), "yyyy-MM-dd"),
-      timeSlot: "SLOT_09_11",
+      assignmentDate:
+        presetAssignmentDate ??
+        weekDateOptions[0]?.value ??
+        format(new Date(), "yyyy-MM-dd"),
+      timeSlot: presetTimeSlot ?? "SLOT_09_11",
       preachingPointId: preachingPoints[0]?.id ?? "",
       notes: "",
       volunteerOneId: "",
       volunteerTwoId: ""
     }),
-    [preachingPoints, scheduleWeekId, weekDateOptions]
+    [preachingPoints, presetAssignmentDate, presetTimeSlot, scheduleWeekId, weekDateOptions]
   );
 
   const form = useForm<AssignmentFormValues>({
@@ -140,13 +173,23 @@ export function AssignmentForm({
     () => getDayOfWeekFromDate(selectedDate),
     [selectedDate]
   );
+  const selectedDateLabel = useMemo(
+    () =>
+      format(new Date(`${selectedDate}T12:00:00`), "EEEE d 'de' MMM", {
+        locale: es
+      }),
+    [selectedDate]
+  );
 
   const compatiblePoints = useMemo(() => {
-    const matches = preachingPoints.filter((point) =>
-      point.activeSlots.some(
-        (slot) =>
-          slot.dayOfWeek === selectedDayOfWeek && slot.timeSlot === selectedTimeSlot
-      )
+    const matches = preachingPoints.filter(
+      (point) =>
+        point.activeSlots.length === 0 ||
+        point.activeSlots.some(
+          (slot) =>
+            slot.dayOfWeek === selectedDayOfWeek &&
+            slot.timeSlot === selectedTimeSlot
+        )
     );
 
     return matches.length ? matches : preachingPoints;
@@ -166,7 +209,7 @@ export function AssignmentForm({
 
   async function onSubmit(values: AssignmentFormValues) {
     setSubmitting(true);
-    setMessage(null);
+    setFeedback(null);
 
     const payload = {
       scheduleWeekId: values.scheduleWeekId,
@@ -196,14 +239,18 @@ export function AssignmentForm({
     const result = await response.json();
 
     if (!response.ok) {
-      setMessage(result.error ?? "Unable to create the couple assignment.");
+      setFeedback({
+        tone: "error",
+        text: result.error ?? "No fue posible crear la pareja asignada."
+      });
       setSubmitting(false);
       return;
     }
 
-    setMessage(
-      `Couple ${result.pairNumber} created. Save again to add another couple for the same point and time.`
-    );
+    setFeedback({
+      tone: "success",
+      text: `Pareja ${result.pairNumber} creada. Puedes guardar otra vez para sumar otra pareja en este horario.`
+    });
     form.reset({
       ...values,
       volunteerOneId: "",
@@ -217,135 +264,138 @@ export function AssignmentForm({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="lg">Add Couple</Button>
+        <Button
+          size={triggerSize}
+          className={cn("w-full sm:w-auto", triggerClassName)}
+        >
+          {triggerLabel}
+        </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Add Couple To Schedule</DialogTitle>
+      <DialogContent className="max-w-[1080px] overflow-hidden p-5 sm:p-6">
+        <DialogHeader className="space-y-1 pr-8">
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
-        <div className="rounded-2xl border border-primary/15 bg-primary/8 px-4 py-3 text-sm text-muted-foreground">
-          Each save creates one couple assignment. To add more couples to the same point and time slot, save again with another pair.
-        </div>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-            <FormField
-              control={form.control}
-              name="assignmentDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Week Day</FormLabel>
-                  <FormControl>
-                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                      {weekDateOptions.map((option) => {
-                        const isActive = field.value === option.value;
-
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => field.onChange(option.value)}
-                            className={cn(
-                              "rounded-2xl border px-4 py-3 text-left transition-colors",
-                              isActive
-                                ? "border-primary bg-primary/15 text-foreground shadow-[0_8px_24px_rgba(102,145,255,0.18)]"
-                                : "border-border/70 bg-background/35 text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                            )}
-                          >
-                            <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                              {option.shortLabel}
-                            </p>
-                            <p className="mt-1 text-sm font-semibold text-inherit">
-                              {option.label}
-                            </p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid gap-4 md:grid-cols-[1.2fr,0.8fr]">
-              <FormField
-                control={form.control}
-                name="timeSlot"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Time Slot</FormLabel>
-                    <FormControl>
-                      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                        {TIME_SLOTS.map((timeSlot) => {
-                          const isActive = field.value === timeSlot;
-
-                          return (
-                            <button
-                              key={timeSlot}
-                              type="button"
-                              onClick={() => field.onChange(timeSlot)}
-                              className={cn(
-                                "rounded-2xl border px-4 py-3 text-left transition-colors",
-                                isActive
-                                  ? "border-primary bg-primary/15 text-foreground shadow-[0_8px_24px_rgba(102,145,255,0.18)]"
-                                  : "border-border/70 bg-background/35 text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                              )}
-                            >
-                              <p className="text-sm font-semibold text-inherit">
-                                {TIME_SLOT_DEFINITIONS[timeSlot].shortLabel}
-                              </p>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {TIME_SLOT_DEFINITIONS[timeSlot].label}
-                              </p>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                  Day
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {lockDateAndTime ? (
+              <div className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-4">
+                <p className="text-xs uppercase tracking-[0.16em] text-primary/80">
+                  Horario seleccionado
                 </p>
-                <p className="mt-1 font-semibold text-foreground">
-                  {DAY_LABELS[selectedDayOfWeek]}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {compatiblePoints.length} compatible point
-                  {compatiblePoints.length === 1 ? "" : "s"} for this slot
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-white/6 bg-background/25 px-3 py-2.5">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                      Día
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
+                      {DAY_LABELS[selectedDayOfWeek]}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-white/6 bg-background/25 px-3 py-2.5">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                      Fecha
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
+                      {selectedDateLabel}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-white/6 bg-background/25 px-3 py-2.5">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                      Franja
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
+                      {TIME_SLOT_DEFINITIONS[selectedTimeSlot].label}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Esta pareja quedará creada dentro de este mismo horario.
                 </p>
               </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="preachingPointId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Preaching Point</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+            ) : (
+              <>
+                <FormField
+                  control={form.control}
+                  name="assignmentDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Día de la semana</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a point" />
-                        </SelectTrigger>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                          {weekDateOptions.map((option) => {
+                            const isActive = field.value === option.value;
+
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => field.onChange(option.value)}
+                                className={cn(
+                                  "rounded-2xl border px-4 py-2.5 text-left transition-colors",
+                                  isActive
+                                    ? "border-primary bg-primary/15 text-foreground shadow-[0_8px_24px_rgba(102,145,255,0.18)]"
+                                    : "border-border/70 bg-background/35 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                                )}
+                              >
+                                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                                  {option.shortLabel}
+                                </p>
+                                <p className="mt-1 text-[13px] font-semibold leading-snug text-inherit lg:text-sm">
+                                  {option.label}
+                                </p>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </FormControl>
-                      <SelectContent>
-                        {compatiblePoints.map((point) => (
-                          <SelectItem key={point.id} value={point.id}>
-                            {point.name} • {point.area}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid gap-4 md:grid-cols-[1.2fr,0.8fr]">
+                  <FormField
+                    control={form.control}
+                    name="timeSlot"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Horario</FormLabel>
+                        <FormControl>
+                          <div className="grid gap-2 sm:grid-cols-5">
+                            {TIME_SLOTS.map((timeSlot) => {
+                              const isActive = field.value === timeSlot;
+
+                              return (
+                                <TimeSlotOptionButton
+                                  key={timeSlot}
+                                  slot={timeSlot}
+                                  selected={isActive}
+                                  onClick={() => field.onChange(timeSlot)}
+                                  dense
+                                />
+                              );
+                            })}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                      Día
+                    </p>
+                    <p className="mt-1 font-semibold text-foreground">
+                      {DAY_LABELS[selectedDayOfWeek]}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Este horario se registrará en {FIXED_PREACHING_POINT_NAME}.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
@@ -353,11 +403,11 @@ export function AssignmentForm({
                 name="volunteerOneId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Volunteer 1</FormLabel>
+                    <FormLabel>Voluntario 1</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Assign first volunteer" />
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="Asignar primer voluntario" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -377,11 +427,11 @@ export function AssignmentForm({
                 name="volunteerTwoId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Volunteer 2</FormLabel>
+                    <FormLabel>Voluntario 2</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Assign second volunteer" />
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="Asignar segundo voluntario" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -403,12 +453,13 @@ export function AssignmentForm({
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel>Notas</FormLabel>
                   <FormControl>
                     <Textarea
                       {...field}
                       value={field.value ?? ""}
-                      placeholder="Optional instructions for this couple"
+                      className="min-h-[96px]"
+                      placeholder="Indicaciones opcionales para esta pareja"
                     />
                   </FormControl>
                   <FormMessage />
@@ -416,20 +467,22 @@ export function AssignmentForm({
               )}
             />
 
-            {message ? (
-              <p className="text-sm text-muted-foreground">{message}</p>
-            ) : null}
+            <FeedbackMessage
+              message={feedback?.text}
+              tone={feedback?.tone}
+            />
 
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button
                 type="button"
+                size="sm"
                 variant="secondary"
                 onClick={() => setOpen(false)}
               >
-                Close
+                Cerrar
               </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? "Saving..." : "Save Couple"}
+              <Button type="submit" size="sm" disabled={submitting}>
+                {submitting ? "Guardando..." : "Guardar pareja"}
               </Button>
             </div>
           </form>

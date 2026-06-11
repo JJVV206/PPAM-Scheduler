@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { resetPasswordSchema } from "@/lib/validations/auth";
@@ -18,7 +19,10 @@ type ResetPasswordFormProps = {
 };
 
 export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
   const form = useForm<ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
@@ -28,22 +32,28 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   });
 
   async function onSubmit(values: ResetPasswordValues) {
-    setMessage(null);
+    setFeedback(null);
     const response = await fetch("/api/auth/reset-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(values)
     });
     const result = await response.json();
-    setMessage(response.ok ? "Password updated. You can sign in now." : result.error);
+    setFeedback({
+      tone: response.ok ? "success" : "error",
+      text:
+        response.ok
+          ? "Contraseña actualizada. Ya puedes iniciar sesión."
+          : result.error
+    });
   }
 
   return (
     <Card className="surface-elevated w-full max-w-md">
       <CardHeader className="space-y-2">
-        <CardTitle className="text-3xl">Create a new password</CardTitle>
+        <CardTitle className="text-3xl">Crear nueva contraseña</CardTitle>
         <CardDescription>
-          Use a strong password with uppercase, lowercase, and numbers.
+          Usa una contraseña segura con mayúsculas, minúsculas y números.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -54,7 +64,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>New password</FormLabel>
+                  <FormLabel>Nueva contraseña</FormLabel>
                   <FormControl>
                     <Input type="password" {...field} />
                   </FormControl>
@@ -63,11 +73,11 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
               )}
             />
             <Button type="submit" className="w-full">
-              Update password
+              Actualizar contraseña
             </Button>
           </form>
         </Form>
-        {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+        <FeedbackMessage message={feedback?.text} tone={feedback?.tone} />
       </CardContent>
     </Card>
   );

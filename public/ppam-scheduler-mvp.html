@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PPAM Scheduler - MVP</title>
+    <link rel="stylesheet" href="./ppam-scheduler-mvp.css" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">PPAM Scheduler</p>
+          <h1>MVP definido para operar una semana real</h1>
+          <p class="hero-text">
+            El MVP no busca cubrir todo el producto. Busca resolver el flujo
+            minimo que necesita un coordinador para planificar, confirmar y
+            cubrir huecos sin salir del sistema.
+          </p>
+        </div>
+        <div class="hero-card">
+          <p class="card-label">Definicion ejecutiva</p>
+          <p class="hero-statement">
+            Un coordinador puede preparar la semana, asignar parejas sin
+            conflictos, pedir confirmacion, recibir respuestas y cubrir huecos
+            abiertos. Un voluntario puede ver su asignacion, responder y
+            mantener su disponibilidad basica.
+          </p>
+        </div>
+      </section>
+
+      <section class="decision-rule">
+        <div class="section-heading">
+          <p class="eyebrow">Regla de alcance</p>
+          <h2>Si no ayuda a este flujo, no es MVP</h2>
+        </div>
+        <div class="flow-strip">
+          <div class="flow-pill">1. Crear o duplicar semana</div>
+          <div class="flow-pill">2. Asignar parejas</div>
+          <div class="flow-pill">3. Validar conflictos</div>
+          <div class="flow-pill">4. Enviar confirmaciones</div>
+          <div class="flow-pill">5. Recibir respuestas</div>
+          <div class="flow-pill">6. Detectar huecos</div>
+          <div class="flow-pill">7. Reemplazar rapido</div>
+        </div>
+      </section>
+
+      <section class="grid-section">
+        <div class="section-heading">
+          <p class="eyebrow">Contenido del MVP</p>
+          <h2>Lo minimo que debe existir</h2>
+        </div>
+
+        <div class="two-column">
+          <article class="panel">
+            <div class="panel-head">
+              <span class="role-badge admin">Admin / Coordinador</span>
+              <h3>Capacidades necesarias</h3>
+            </div>
+            <ul class="check-list">
+              <li>Gestion basica de voluntarios</li>
+              <li>Gestion basica de puntos de predicacion</li>
+              <li>Planeador semanal por dia, horario y punto</li>
+              <li>Creacion de asignaciones por parejas</li>
+              <li>Prevencion de double-booking y conflictos</li>
+              <li>Navegacion por semana y duplicacion de semana</li>
+              <li>Estados: pendiente, confirmada, rechazada, cancelada o abierta</li>
+              <li>Envio de solicitud de confirmacion por email</li>
+              <li>Vista de huecos abiertos</li>
+              <li>Reasignacion manual de reemplazos</li>
+              <li>Edicion y eliminacion basica de asignaciones</li>
+            </ul>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <span class="role-badge volunteer">Voluntario</span>
+              <h3>Capacidades necesarias</h3>
+            </div>
+            <ul class="check-list">
+              <li>Ver proximas asignaciones</li>
+              <li>Ver detalle de asignacion</li>
+              <li>Confirmar o rechazar</li>
+              <li>Definir disponibilidad recurrente</li>
+              <li>Marcar indisponibilidad temporal</li>
+              <li>Acceso simple a su portal y a sus respuestas pendientes</li>
+            </ul>
+
+            <div class="mini-panel">
+              <p class="mini-label">Comunicacion minima</p>
+              <ul class="check-list compact">
+                <li>Email de solicitud de confirmacion</li>
+                <li>Registro basico de notificaciones enviadas</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="priority-section">
+        <div class="section-heading">
+          <p class="eyebrow">Priorizacion</p>
+          <h2>Que entra primero y que puede esperar</h2>
+        </div>
+
+        <div class="priority-grid">
+          <article class="priority-card p0">
+            <p class="priority-tag">P0</p>
+            <h3>Absolutamente necesario</h3>
+            <ul class="plain-list">
+              <li>Planeador semanal</li>
+              <li>Roster de voluntarios</li>
+              <li>Catalogo de puntos</li>
+              <li>Asignaciones por parejas</li>
+              <li>Prevencion de conflictos</li>
+              <li>Confirmar / rechazar</li>
+              <li>Gestion de reemplazos</li>
+              <li>Email basico de confirmacion</li>
+            </ul>
+          </article>
+
+          <article class="priority-card p1">
+            <p class="priority-tag">P1</p>
+            <h3>Importante muy pronto</h3>
+            <ul class="plain-list">
+              <li>Duplicar o crear siguiente semana</li>
+              <li>Recordatorios automaticos</li>
+              <li>Indisponibilidad temporal</li>
+              <li>Slots activos por punto</li>
+              <li>Sugerencias basicas de reemplazo</li>
+              <li>Historial simple de notificaciones</li>
+            </ul>
+          </article>
+
+          <article class="priority-card p2">
+            <p class="priority-tag">P2</p>
+            <h3>Valioso, pero no urgente</h3>
+            <ul class="plain-list">
+              <li>Dashboard con metricas</li>
+              <li>Historial de asignaciones del voluntario</li>
+              <li>Preferencias por zona</li>
+              <li>Mejores filtros por semana y estado</li>
+              <li>Reportes visibles en navegacion</li>
+            </ul>
+          </article>
+
+          <article class="priority-card p3">
+            <p class="priority-tag">P3</p>
+            <h3>Mejor dejarlo despues</h3>
+            <ul class="plain-list">
+              <li>SMS y WhatsApp</li>
+              <li>Scoring automatico de confiabilidad</li>
+              <li>Reportes avanzados</li>
+              <li>Centro de notificaciones complejo</li>
+              <li>Marketplace de open slots</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="journey-section">
+        <div class="section-heading">
+          <p class="eyebrow">Flujos clave</p>
+          <h2>Como opera cada tipo de usuario</h2>
+        </div>
+
+        <div class="journey-grid">
+          <article class="journey-card">
+            <div class="journey-head">
+              <span class="role-badge admin">Flujo Admin / Coordinador</span>
+              <p>Flujo operativo semanal</p>
+            </div>
+            <ol class="step-list">
+              <li>Abre la semana actual o duplica la siguiente.</li>
+              <li>Revisa voluntarios disponibles y puntos activos.</li>
+              <li>Crea asignaciones por pareja, dia, horario y punto.</li>
+              <li>El sistema valida conflictos y evita double-booking.</li>
+              <li>Envia solicitudes de confirmacion por email.</li>
+              <li>Monitorea respuestas: pendiente, confirmada o rechazada.</li>
+              <li>Si alguien rechaza, el hueco pasa a open slot.</li>
+              <li>Busca reemplazo y reasigna rapido.</li>
+              <li>Cierra la semana con registro basico de lo sucedido.</li>
+            </ol>
+          </article>
+
+          <article class="journey-card">
+            <div class="journey-head">
+              <span class="role-badge volunteer">Flujo Voluntario</span>
+              <p>Flujo personal de respuesta</p>
+            </div>
+            <ol class="step-list">
+              <li>Recibe una solicitud de confirmacion.</li>
+              <li>Abre el detalle de su asignacion.</li>
+              <li>Revisa dia, hora, punto y companero.</li>
+              <li>Confirma si puede asistir.</li>
+              <li>Rechaza si no puede cubrirla.</li>
+              <li>Actualiza su disponibilidad recurrente.</li>
+              <li>Marca indisponibilidad temporal cuando haga falta.</li>
+              <li>Vuelve al portal para revisar futuras asignaciones.</li>
+            </ol>
+          </article>
+        </div>
+      </section>
+
+      <section class="scope-section">
+        <div class="section-heading">
+          <p class="eyebrow">Limites del MVP</p>
+          <h2>Lo que conscientemente se deja fuera</h2>
+        </div>
+
+        <div class="scope-grid">
+          <article class="scope-card">
+            <h3>No construir todavia</h3>
+            <ul class="plain-list">
+              <li>Reportes detallados</li>
+              <li>Analitica avanzada</li>
+              <li>Canales multiples de mensajeria</li>
+              <li>Automatizaciones complejas</li>
+              <li>Features sociales para voluntarios</li>
+            </ul>
+          </article>
+
+          <article class="scope-card highlight">
+            <h3>Resultado esperado</h3>
+            <p>
+              Si este MVP funciona, el coordinador ya puede operar la semana
+              real desde el sistema, con menos seguimiento manual y menos riesgo
+              de errores de agenda.
+            </p>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

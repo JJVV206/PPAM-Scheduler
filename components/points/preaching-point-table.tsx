@@ -1,5 +1,14 @@
 import { StatusBadge } from "@/components/assignments/status-badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
+import { PointFormDialog } from "@/features/points/point-form-dialog";
 import { DAY_LABELS, TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
 import type { PreachingPointSummary } from "@/types/domain";
 
@@ -12,10 +21,12 @@ export function PreachingPointTable({ points }: PreachingPointTableProps) {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Point</TableHead>
-          <TableHead>Area</TableHead>
-          <TableHead>Active Slots</TableHead>
-          <TableHead>Status</TableHead>
+          <TableHead>Punto</TableHead>
+          <TableHead>Área</TableHead>
+          <TableHead>Horarios activos</TableHead>
+          <TableHead>Política</TableHead>
+          <TableHead>Estado</TableHead>
+          <TableHead />
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -31,10 +42,21 @@ export function PreachingPointTable({ points }: PreachingPointTableProps) {
                         `${DAY_LABELS[slot.dayOfWeek]} ${TIME_SLOT_DEFINITIONS[slot.timeSlot].shortLabel}`
                     )
                     .join(", ")
-                : "No active windows"}
+                : "Sin horarios activos"}
+            </TableCell>
+            <TableCell className="text-sm text-muted-foreground">
+              {point.activeSlots.length
+                ? "Restringido a slots definidos"
+                : "Disponible en cualquier franja mientras siga sin slots"}
             </TableCell>
             <TableCell>
               <StatusBadge status={point.active ? "CONFIRMED" : "CANCELLED"} />
+            </TableCell>
+            <TableCell className="text-right">
+              <PointFormDialog
+                point={point}
+                trigger={<Button variant="secondary">Editar</Button>}
+              />
             </TableCell>
           </TableRow>
         ))}

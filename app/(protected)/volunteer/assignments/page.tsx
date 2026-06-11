@@ -21,15 +21,15 @@ export default async function VolunteerAssignmentsPage() {
         <div key={assignment.id} className="space-y-3">
           <AssignmentCard assignment={assignment} />
           <Button variant="secondary" asChild>
-            <Link href={`/volunteer/assignments/${assignment.id}`}>Open details</Link>
+            <Link href={`/volunteer/assignments/${assignment.id}`}>Ver detalles</Link>
           </Button>
         </div>
       ))}
     </div>
   ) : (
     <EmptyState
-      title="No assignments yet"
-      description="Your confirmed and upcoming assignments will appear here."
+      title="Sin asignaciones todavía"
+      description="Tus asignaciones confirmadas y próximas aparecerán aquí."
     />
   );
 }

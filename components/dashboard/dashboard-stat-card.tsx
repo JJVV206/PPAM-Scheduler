@@ -17,12 +17,12 @@ export function DashboardStatCard({
 }: DashboardStatCardProps) {
   return (
     <Card className="surface-elevated">
-      <CardContent className="flex items-start justify-between p-6">
+      <CardContent className="flex items-start justify-between gap-4 p-5 xl:p-6">
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground xl:text-xs xl:tracking-[0.22em]">
             {label}
           </p>
-          <p className="font-heading text-4xl font-semibold">{value}</p>
+          <p className="font-heading text-3xl font-semibold xl:text-4xl">{value}</p>
           {hint ? <p className="text-sm text-muted-foreground">{hint}</p> : null}
         </div>
         <div className="rounded-2xl bg-primary/15 p-3 text-primary">

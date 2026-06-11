@@ -1,4 +1,4 @@
-export const APP_NAME = "PPAM Scheduler";
+export const APP_NAME = "PPAM Planificador";
 
 export const AUTH_ROUTES = ["/login", "/forgot-password", "/reset-password"];
 

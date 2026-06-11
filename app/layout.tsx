@@ -8,7 +8,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: APP_NAME,
   description:
-    "Manage weekly public preaching assignments, confirmations, and replacements."
+    "Gestiona asignaciones semanales de predicación pública, confirmaciones y reemplazos."
 };
 
 export default function RootLayout({
@@ -17,7 +17,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <body className="font-sans">
         <Providers>{children}</Providers>
       </body>

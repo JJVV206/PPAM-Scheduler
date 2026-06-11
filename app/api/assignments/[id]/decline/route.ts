@@ -16,7 +16,7 @@ export async function POST(
     const auth = await requireRole(["VOLUNTEER"]);
     if ("error" in auth) return auth.error;
     if (!auth.session.user.volunteerProfileId) {
-      throw new AppError("Volunteer profile missing.", 400);
+      throw new AppError("Falta el perfil del voluntario.", 400);
     }
     const { id } = await params;
     const body = declineAssignmentSchema.parse(await request.json());

@@ -23,8 +23,8 @@ export default async function VolunteerNotificationsPage() {
 
   return (
     <DataTable
-      title="My Notifications"
-      description="Confirmation requests, reminders, and assignment changes."
+      title="Mis notificaciones"
+      description="Solicitudes de confirmación, recordatorios y cambios de asignación."
     >
       <NotificationTable notifications={notifications} />
     </DataTable>

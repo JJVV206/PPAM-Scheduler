@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { format, isSameDay } from "date-fns";
+import { es } from "date-fns/locale";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -7,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDisplayDate(value: Date | string, output = "EEE, MMM d") {
-  return format(new Date(value), output);
+  return format(new Date(value), output, { locale: es });
 }
 
 export function isToday(value: Date | string) {

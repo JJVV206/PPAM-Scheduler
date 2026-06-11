@@ -22,7 +22,7 @@ export async function GET(_: Request, { params }: AssignmentRouteContext) {
         (volunteer) => volunteer.volunteerId === auth.session.user.volunteerProfileId
       )
     ) {
-      throw new AppError("Forbidden", 403);
+      throw new AppError("Acceso denegado", 403);
     }
 
     return ok(assignment);

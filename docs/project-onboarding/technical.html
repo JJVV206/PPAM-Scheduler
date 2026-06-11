@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PPAM Scheduler - Vista tecnica</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Avenir Next"', '"Segoe UI"', '"Helvetica Neue"', "sans-serif"],
+              mono: ['"SFMono-Regular"', "Menlo", "monospace"],
+            },
+            colors: {
+              night: "#020617",
+              panel: "#0b1220",
+              panelsoft: "#101a2e",
+              azure: "#38bdf8",
+              electric: "#1d4ed8",
+              mist: "#cbd5e1",
+            },
+            boxShadow: {
+              circuit: "0 30px 90px rgba(2, 6, 23, 0.44)",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      @page {
+        size: A4;
+        margin: 12mm;
+      }
+
+      body {
+        background:
+          radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 30%),
+          radial-gradient(circle at bottom right, rgba(29, 78, 216, 0.16), transparent 26%),
+          linear-gradient(180deg, #020617 0%, #08111f 100%);
+      }
+
+      @media print {
+        body {
+          background: #020617;
+        }
+      }
+    </style>
+  </head>
+  <body class="min-h-screen bg-night text-slate-100">
+    <div class="mx-auto max-w-7xl px-5 py-6 sm:px-8 lg:px-10">
+      <header class="mb-8 rounded-[2rem] border border-slate-700/80 bg-panel/92 p-8 text-white shadow-circuit">
+        <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div class="max-w-3xl">
+            <p class="mb-3 text-xs font-medium uppercase tracking-[0.28em] text-sky-300">Vista tecnica</p>
+            <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">PPAM Scheduler</h1>
+            <p class="mt-4 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">Guia tecnica ordenada para entender arquitectura, operacion, riesgos y puntos de entrada sin asumir contexto oculto.</p>
+          </div>
+          <div class="flex flex-col gap-3 lg:items-end">
+            <div class="flex flex-wrap gap-2 lg:justify-end"><span class="rounded-full border border-slate-600 bg-slate-800/80 px-3 py-1 text-xs font-medium text-slate-100">Tipo: Aplicacion full-stack</span><span class="rounded-full border border-slate-600 bg-slate-800/80 px-3 py-1 text-xs font-medium text-slate-100">Estado: Borrador basado en evidencia</span><span class="rounded-full border border-slate-600 bg-slate-800/80 px-3 py-1 text-xs font-medium text-slate-100">Archivos analizados: 163</span><span class="rounded-full border border-slate-600 bg-slate-800/80 px-3 py-1 text-xs font-medium text-slate-100">Generado: 4/6/2026, 2:30:19 p.m.</span></div>
+            <div class="flex flex-wrap gap-3 text-sm font-medium">
+              <a class="rounded-full border border-slate-600 bg-slate-900/70 px-4 py-2 text-slate-100 transition hover:border-slate-500 hover:bg-slate-800" href="index.html">Abrir vista general</a>
+              <a class="rounded-full border border-sky-500/35 bg-sky-500/10 px-4 py-2 text-sky-100 transition hover:border-sky-400/55 hover:bg-sky-500/16" href="project-context.json">Ver contexto JSON</a>
+            </div>
+          </div>
+        </div>
+        <div class="mt-6 rounded-3xl border border-slate-700 bg-slate-900/60 px-5 py-4 text-sm leading-6 text-slate-200">
+          Borrador generado a partir de evidencia del repositorio. Completa los campos narrativos antes de compartirlo fuera del equipo.
+        </div>
+      </header>
+      <main class="space-y-6">
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">1. Explicacion tecnica progresiva</h2>
+      <div class="mt-5 space-y-4"><p class="text-base leading-7 text-slate-200">El repo combina UI, handlers y logica de negocio en una sola base. `app/` contiene superficies web, `app/api` expone endpoints protegidos por rol, `services/` concentra reglas de dominio y Prisma persiste el estado operativo en PostgreSQL.</p><p class="text-base leading-7 text-slate-200">Admin y volunteer entran por areas protegidas distintas. La UI envia formularios a route handlers que validan con Zod, revisan sesion/rol y delegan en servicios como `assignment.service.ts`, donde se recalculan estados, se sincronizan respuestas y se registran actividades o notificaciones.</p><p class="text-base leading-7 text-slate-200">El entorno local visible usa Next.js en `localhost:3000`, PostgreSQL por Docker Compose en `localhost:5432` y SMTP opcional via Nodemailer. No se observan aun pipelines CI/CD ni manifiestos de despliegue productivo.</p><p class="text-base leading-7 text-slate-200">La forma correcta de leer este sistema es verlo como monolito web de Next.js: rutas y pantallas en `app/`, backend HTTP en `app/api`, reglas del dominio en `services/` y persistencia en Prisma. El archivo mas importante para comportamiento real es `services/assignment.service.ts`.</p><p class="text-base leading-7 text-slate-200">Localmente el flujo visible es: levantar PostgreSQL con `npm run db:start`, sincronizar schema con `db:push`, cargar demo users con `db:seed` y arrancar la app con `npm run dev`. El script de DB ya es idempotente cuando el contenedor `ppam-scheduler-postgres` existe de una sesion anterior.</p></div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">Stack detectado</h2>
+      <div class="mt-5 space-y-4"><div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <article class="rounded-3xl border border-slate-700 bg-slate-900/50 p-5">
+                <p class="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">Runtime</p>
+                <p class="mt-3 text-sm leading-6 text-slate-200">Node.js</p>
+              </article>
+            
+              <article class="rounded-3xl border border-slate-700 bg-slate-900/50 p-5">
+                <p class="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">Frameworks</p>
+                <p class="mt-3 text-sm leading-6 text-slate-200">Next.js, React</p>
+              </article>
+            
+              <article class="rounded-3xl border border-slate-700 bg-slate-900/50 p-5">
+                <p class="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">UI</p>
+                <p class="mt-3 text-sm leading-6 text-slate-200">Componentized UI, HTML templates, Lucide Icons, Radix UI, Tailwind CSS</p>
+              </article>
+            
+              <article class="rounded-3xl border border-slate-700 bg-slate-900/50 p-5">
+                <p class="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">Tooling</p>
+                <p class="mt-3 text-sm leading-6 text-slate-200">ESLint, Markdown, PostCSS, Prettier, TypeScript, YAML</p>
+              </article>
+            
+              <article class="rounded-3xl border border-slate-700 bg-slate-900/50 p-5">
+                <p class="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">Pruebas</p>
+                <p class="mt-3 text-sm leading-6 text-slate-200">Vitest</p>
+              </article>
+            
+              <article class="rounded-3xl border border-slate-700 bg-slate-900/50 p-5">
+                <p class="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">Data</p>
+                <p class="mt-3 text-sm leading-6 text-slate-200">Prisma, Prisma Client</p>
+              </article>
+            
+              <article class="rounded-3xl border border-slate-700 bg-slate-900/50 p-5">
+                <p class="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">Infra</p>
+                <p class="mt-3 text-sm leading-6 text-slate-200">Docker Compose, PostgreSQL, SMTP / Nodemailer</p>
+              </article>
+            </div></div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">Estructura del proyecto</h2>
+      <div class="mt-5 space-y-4">
+    <div class="overflow-hidden rounded-3xl border border-slate-700 bg-slate-950/85">
+      <table class="min-w-full text-left text-sm">
+        <thead class="bg-slate-900 text-slate-300">
+          <tr>
+            <th class="px-4 py-3 font-medium">Ruta</th><th class="px-4 py-3 font-medium">Uso aparente</th><th class="px-4 py-3 font-medium">Fuente</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">app</code></td><td class="px-4 py-3 align-top"><span>App Router con login, reset de password y workspaces protegidos para admin y volunteer.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">app</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">app/api</code></td><td class="px-4 py-3 align-top"><span>Route handlers para asignaciones, availability, open-slots, puntos, auth, schedule y dashboards.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">app/api</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">components</code></td><td class="px-4 py-3 align-top"><span>Componentes de UI y dominio como assignment cards, planner semanal, tablas, modales y formularios.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">components</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">services</code></td><td class="px-4 py-3 align-top"><span>Capa principal de negocio para asignaciones, disponibilidad, voluntarios, settings y notificaciones.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">services</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">lib</code></td><td class="px-4 py-3 align-top"><span>Auth, constantes, utilidades, validaciones y acceso base a Prisma.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">lib</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">prisma</code></td><td class="px-4 py-3 align-top"><span>Schema de dominio, seed y configuracion del cliente de base de datos.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">prisma</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">tests</code></td><td class="px-4 py-3 align-top"><span>Pruebas automatizadas, hoy enfocadas en el motor de estados de asignacion.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">tests</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">scripts</code></td><td class="px-4 py-3 align-top"><span>Scripts de soporte para levantar, detener y diagnosticar la base local.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">scripts</code></td>
+                </tr>
+              
+        </tbody>
+      </table>
+    </div>
+  </div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">Entrypoints</h2>
+      <div class="mt-5 space-y-4"><div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">app/layout.tsx</h3>
+        <p class="mt-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">app/layout.tsx</p>
+        <p class="mt-3 text-sm leading-6 text-slate-200">Layout raiz y shell global de la aplicacion.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">app/page.tsx</h3>
+        <p class="mt-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">app/page.tsx</p>
+        <p class="mt-3 text-sm leading-6 text-slate-200">Resuelve el punto de entrada segun sesion y rol del usuario.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">app/api/auth/[...nextauth]/route.ts</h3>
+        <p class="mt-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">app/api/auth/[...nextauth]/route.ts</p>
+        <p class="mt-3 text-sm leading-6 text-slate-200">Bootstrap de autenticacion por credenciales y sesion.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">app/(protected)/admin/schedule/page.tsx</h3>
+        <p class="mt-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">app/(protected)/admin/schedule/page.tsx</p>
+        <p class="mt-3 text-sm leading-6 text-slate-200">Surface principal para preparar semanas, navegar el planner y abrir la creacion de asignaciones.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">app/api/assignments/route.ts</h3>
+        <p class="mt-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">app/api/assignments/route.ts</p>
+        <p class="mt-3 text-sm leading-6 text-slate-200">Endpoint central para listar y crear asignaciones desde el workspace admin.</p>
+        
+      </article>
+    </div></div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">Comandos</h2>
+      <div class="mt-5 space-y-4">
+    <div class="overflow-hidden rounded-3xl border border-slate-700 bg-slate-950/85">
+      <table class="min-w-full text-left text-sm">
+        <thead class="bg-slate-900 text-slate-300">
+          <tr>
+            <th class="px-4 py-3 font-medium">Script</th><th class="px-4 py-3 font-medium">Command</th><th class="px-4 py-3 font-medium">Proposito</th><th class="px-4 py-3 font-medium">Fuente</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">dev</code></td><td class="px-4 py-3 align-top"><code class="text-xs">next dev</code></td><td class="px-4 py-3 align-top"><span>Inicia el entorno local de desarrollo.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">build</code></td><td class="px-4 py-3 align-top"><code class="text-xs">next build</code></td><td class="px-4 py-3 align-top"><span>Genera el artefacto de build.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">start</code></td><td class="px-4 py-3 align-top"><code class="text-xs">next start</code></td><td class="px-4 py-3 align-top"><span>Inicia la aplicacion o servicio.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">lint</code></td><td class="px-4 py-3 align-top"><code class="text-xs">next lint</code></td><td class="px-4 py-3 align-top"><span>Aplica validaciones de lint.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">typecheck</code></td><td class="px-4 py-3 align-top"><code class="text-xs">tsc --noEmit</code></td><td class="px-4 py-3 align-top"><span>Verifica tipos.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">test</code></td><td class="px-4 py-3 align-top"><code class="text-xs">vitest run</code></td><td class="px-4 py-3 align-top"><span>Ejecuta la suite de pruebas.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">test:watch</code></td><td class="px-4 py-3 align-top"><code class="text-xs">vitest</code></td><td class="px-4 py-3 align-top"><span>Script observado en el manifest.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">db:start</code></td><td class="px-4 py-3 align-top"><code class="text-xs">bash scripts/db-start.sh</code></td><td class="px-4 py-3 align-top"><span>Inicia la aplicacion o servicio.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">db:stop</code></td><td class="px-4 py-3 align-top"><code class="text-xs">bash scripts/db-stop.sh</code></td><td class="px-4 py-3 align-top"><span>Script observado en el manifest.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">db:status</code></td><td class="px-4 py-3 align-top"><code class="text-xs">bash scripts/db-status.sh</code></td><td class="px-4 py-3 align-top"><span>Script observado en el manifest.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">db:prepare</code></td><td class="px-4 py-3 align-top"><code class="text-xs">npm run db:start &amp;&amp; npm run db:push &amp;&amp; npm run db:seed</code></td><td class="px-4 py-3 align-top"><span>Script observado en el manifest.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">db:generate</code></td><td class="px-4 py-3 align-top"><code class="text-xs">prisma generate</code></td><td class="px-4 py-3 align-top"><span>Script observado en el manifest.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">db:push</code></td><td class="px-4 py-3 align-top"><code class="text-xs">prisma db push</code></td><td class="px-4 py-3 align-top"><span>Script observado en el manifest.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">db:migrate</code></td><td class="px-4 py-3 align-top"><code class="text-xs">prisma migrate dev</code></td><td class="px-4 py-3 align-top"><span>Script observado en el manifest.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">db:seed</code></td><td class="px-4 py-3 align-top"><code class="text-xs">tsx prisma/seed.ts</code></td><td class="px-4 py-3 align-top"><span>Script observado en el manifest.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><code class="text-xs">postinstall</code></td><td class="px-4 py-3 align-top"><code class="text-xs">prisma generate</code></td><td class="px-4 py-3 align-top"><span>Script observado en el manifest.</span></td><td class="px-4 py-3 align-top"><code class="text-xs">package.json</code></td>
+                </tr>
+              
+        </tbody>
+      </table>
+    </div>
+  </div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">6. Configuracion, testing y delivery</h2>
+      <div class="mt-5 space-y-4">
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Entorno</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">.env, .env.example, .env.local</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">CI</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">No se detecto CI visible en el repositorio.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Deploy</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">No se detectaron artefactos de despliegue visibles.</p>
+        
+      </article>
+    </div>
+        <div class="mt-6">
+    <div class="grid gap-4 md:grid-cols-3">
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/50 p-5">
+        <p class="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">Pruebas</p>
+        <p class="mt-3 text-sm leading-6 text-slate-200">Vitest</p>
+      </article>
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/50 p-5">
+        <p class="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">Ubicaciones</p>
+        <p class="mt-3 text-sm leading-6 text-slate-200">tests</p>
+      </article>
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/50 p-5">
+        <p class="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">Cantidad visible</p>
+        <p class="mt-3 text-sm leading-6 text-slate-200">1</p>
+      </article>
+    </div>
+    <p class="text-sm leading-7 text-slate-300">Hoy la cobertura automatizada visible es baja y se concentra en `determineAssignmentStatus`. El repo necesita seguir apoyandose en smoke tests manuales de admin y volunteer para cambios funcionales grandes.</p>
+  </div>
+        <div class="mt-6">
+    <div class="grid gap-6 xl:grid-cols-2">
+      <div>
+        <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Dependencias clave</h3>
+        
+    <div class="grid gap-4 lg:grid-cols-2">
+      
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@hookform/resolvers</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">dependencies ^3.9.0</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@next-auth/prisma-adapter</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">dependencies ^1.0.7</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@prisma/client</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">dependencies ^5.22.0</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@radix-ui/react-avatar</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">dependencies ^1.1.1</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@radix-ui/react-checkbox</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">dependencies ^1.1.2</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@radix-ui/react-dialog</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">dependencies ^1.1.4</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@radix-ui/react-dropdown-menu</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">dependencies ^2.1.4</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@radix-ui/react-label</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">dependencies ^2.1.1</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@radix-ui/react-scroll-area</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">dependencies ^1.2.2</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@radix-ui/react-select</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">dependencies ^2.1.4</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@radix-ui/react-separator</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">dependencies ^1.1.1</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@radix-ui/react-slot</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">dependencies ^1.1.1</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@radix-ui/react-switch</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">dependencies ^1.1.2</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@tanstack/react-query</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">dependencies ^5.59.20</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@tanstack/react-query-devtools</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">dependencies ^5.59.20</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@types/bcryptjs</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">devDependencies ^2.4.6</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@types/node</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">devDependencies ^22.9.0</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@types/nodemailer</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">devDependencies ^6.4.17</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@types/react</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">devDependencies ^19.0.2</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">@types/react-dom</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">devDependencies ^19.0.2</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+    </div>
+  
+      </div>
+      <div>
+        <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Integraciones</h3>
+        
+    <div class="grid gap-4 lg:grid-cols-2">
+      
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">PostgreSQL local</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">La persistencia local usa PostgreSQL por Docker Compose y Prisma.</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">compose.yaml</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">NextAuth credentials</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">La autenticacion se resuelve dentro del repo con NextAuth y adaptador Prisma.</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">app/api/auth/[...nextauth]/route.ts</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">SMTP / Nodemailer</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">Las solicitudes y recordatorios de confirmacion se envian por correo y quedan registradas en NotificationLog.</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">services/notification.service.ts</p>
+            </article>
+          
+    </div>
+  
+      </div>
+    </div>
+  </div>
+      </div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">7. Conceptos relacionados y uso especifico</h2>
+      <div class="mt-5 space-y-4">
+        <p class="text-base leading-7 text-slate-200">El uso especifico visible es coordinacion semanal de predicacion publica con dos superficies de trabajo: admins que operan la semana y volunteers que responden asignaciones. Eso esta mucho mas claro en las rutas protegidas que en el README corto.</p>
+        <div class="mt-6">
+          <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Conceptos tecnicos relacionados</h3>
+          <div class="mt-4">
+    <ul class="space-y-3">
+      <li class="text-slate-200 leading-7">• Next.js App Router y route handlers en el mismo repo.</li><li class="text-slate-200 leading-7">• NextAuth con guards por rol y sesiones enriquecidas.</li><li class="text-slate-200 leading-7">• Prisma como modelo de dominio y repositorio efectivo.</li><li class="text-slate-200 leading-7">• State transitions de asignacion segun ventana de confirmacion y respuestas.</li><li class="text-slate-200 leading-7">• Sincronizacion de notificaciones, responses y assignment activities.</li>
+    </ul>
+  </div>
+        </div>
+      </div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">8. Orden de lectura y fuentes clave</h2>
+      <div class="mt-5 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Lectura sugerida</h3>
+          <div class="mt-4">
+    <div class="overflow-hidden rounded-3xl border border-slate-700 bg-slate-950/85">
+      <table class="min-w-full text-left text-sm">
+        <thead class="bg-slate-900 text-slate-300">
+          <tr>
+            <th class="px-4 py-3 font-medium">Paso</th><th class="px-4 py-3 font-medium">Archivo</th><th class="px-4 py-3 font-medium">Por que leerlo</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><span class="text-slate-300">1</span></td><td class="px-4 py-3 align-top"><code class="text-xs">README.md</code></td><td class="px-4 py-3 align-top"><span>Da el mejor contexto funcional disponible para una lectura inicial.</span></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><span class="text-slate-300">2</span></td><td class="px-4 py-3 align-top"><code class="text-xs">prisma/schema.prisma</code></td><td class="px-4 py-3 align-top"><span>Define el vocabulario del dominio y muestra que el repo no es solo frontend.</span></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><span class="text-slate-300">3</span></td><td class="px-4 py-3 align-top"><code class="text-xs">services/assignment.service.ts</code></td><td class="px-4 py-3 align-top"><span>Resume casi todo el comportamiento operativo importante.</span></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><span class="text-slate-300">4</span></td><td class="px-4 py-3 align-top"><code class="text-xs">app/(protected)/admin/schedule/page.tsx</code></td><td class="px-4 py-3 align-top"><span>Aterriza el planner y la preparacion de semanas desde la UI.</span></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><span class="text-slate-300">5</span></td><td class="px-4 py-3 align-top"><code class="text-xs">app/(protected)/admin/assignments/page.tsx</code></td><td class="px-4 py-3 align-top"><span>Muestra la superficie de seguimiento detallado y acciones de notificacion.</span></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><span class="text-slate-300">6</span></td><td class="px-4 py-3 align-top"><code class="text-xs">components/availability/availability-selector.tsx</code></td><td class="px-4 py-3 align-top"><span>Aclara como disponibilidad recurrente y excepciones temporales llegan al flujo real.</span></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><span class="text-slate-300">7</span></td><td class="px-4 py-3 align-top"><code class="text-xs">services/notification.service.ts</code></td><td class="px-4 py-3 align-top"><span>Explica el envio real de correos y su trazabilidad en NotificationLog.</span></td>
+                </tr>
+              
+        </tbody>
+      </table>
+    </div>
+  </div>
+        </div>
+        <div class="mt-6">
+          <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Fuentes clave consultadas</h3>
+          <div class="mt-4"><div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">README.md</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Fuente primaria para descripcion, objetivo y posicionamiento del proyecto.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">prisma/schema.prisma</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">De aqui salen los conceptos mas fuertes del negocio: scheduleWeek, assignment, response, activeSlot y notificationLog.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">services/assignment.service.ts</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Es la columna vertebral del dominio: duplicacion de semanas, confirmaciones, vacantes, reemplazos y dashboard.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">app/(protected)/admin/schedule/page.tsx</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Revela que preparar la semana ya es un flujo visible de UI y no solo capacidad de backend.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">app/(protected)/volunteer/confirm/[responseId]/page.tsx</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Muestra el acceso directo desde correo para confirmar o rechazar sin navegar por todo el portal.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">scripts/db-start.sh</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Documenta una decision operativa clave: reutilizar el contenedor existente para que el setup local sea recuperable.</p>
+        
+      </article>
+    </div></div>
+        </div>
+      </div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">9. Checklist junior y errores comunes</h2>
+      <div class="mt-5 space-y-4">
+        <div class="grid gap-6 xl:grid-cols-2">
+          <div>
+            <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Checklist inicial</h3>
+            <div class="mt-4">
+    <ul class="space-y-3">
+      <li class="text-slate-200 leading-7">• Antes de tocar UI, reproduce un flujo real con datos seed: crear semana, crear asignacion, confirmar y cubrir vacante.</li><li class="text-slate-200 leading-7">• Lee `prisma/schema.prisma` antes de cambiar servicios o validaciones; ahi vive el contrato de dominio.</li><li class="text-slate-200 leading-7">• Busca reglas en `services/` antes de asumir que una pantalla controla el comportamiento.</li><li class="text-slate-200 leading-7">• Verifica siempre el rol requerido en `lib/auth/guards.ts` cuando abras o agregues endpoints.</li><li class="text-slate-200 leading-7">• No des por hecho cobertura automatica amplia; valida typecheck, test y smoke manual.</li>
+    </ul>
+  </div>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Pitfalls o confusiones</h3>
+            <div class="mt-4">
+    <ul class="space-y-3">
+      <li class="text-slate-200 leading-7">• Confundir `app/api` con logica de negocio; los handlers son delgados y el comportamiento importante vive en servicios.</li><li class="text-slate-200 leading-7">• Asumir que un punto sin active slots esta deshabilitado; en este repo se interpreta como unrestricted temporalmente.</li><li class="text-slate-200 leading-7">• Olvidar que confirmacion, rechazo y reemplazo deben mantener consistencia entre estado, responses, actividades y NotificationLog.</li>
+    </ul>
+  </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">Observado vs inferido</h2>
+      <div class="mt-5 space-y-4">
+    <div class="grid gap-6 xl:grid-cols-2">
+      <div>
+        <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Observado</h3>
+        
+    <div class="grid gap-4 lg:grid-cols-2">
+      
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Manifest</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">package.json</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Descripcion</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">Production-ready MVP for managing weekly public preaching assignments with role-based admin and volunteer experiences.</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">README.md</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Frameworks</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">Next.js, React</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">UI</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">Componentized UI, HTML templates, Lucide Icons, Radix UI, Tailwind CSS</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Entrypoints</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">app/layout.tsx, app/page.tsx</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">app/layout.tsx</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Superficies visibles</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">(auth) y (protected)</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">app/(auth)/forgot-password/page.tsx</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Archivos de entorno</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">.env, .env.example, .env.local</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">.env</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Pruebas</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">1 archivos de prueba detectados</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">tests</p>
+            </article>
+          
+    </div>
+  
+      </div>
+      <div>
+        <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Inferido</h3>
+        
+    <div class="grid gap-4 lg:grid-cols-2">
+      
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Tipo de repositorio</h3>
+                <span class="rounded-full border border-slate-600 bg-slate-800/80 px-3 py-1 text-xs font-medium text-slate-100">medium</span>
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">Aplicacion frontend</p>
+              <p class="mt-3 text-sm leading-6 text-slate-400">Inferido por frameworks, manifiestos y estructura del arbol.</p>
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Resumen de arquitectura</h3>
+                <span class="rounded-full border border-slate-600 bg-slate-800/80 px-3 py-1 text-xs font-medium text-slate-100">medium</span>
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">El repositorio apunta a una aplicacion frontend centrada en React, Next.js, TypeScript, Tailwind CSS.</p>
+              <p class="mt-3 text-sm leading-6 text-slate-400">Inferido a partir del stack detectado.</p>
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+    </div>
+  
+      </div>
+    </div>
+  </div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">Riesgos y vacios</h2>
+      <div class="mt-5 space-y-4">
+    <ul class="space-y-3">
+      <li class="text-slate-200 leading-7">• La cobertura automatizada visible sigue siendo baja para un flujo tan operativo; hoy solo hay un test unitario en el motor de estados.</li><li class="text-slate-200 leading-7">• No se observan CI, despliegue, monitoreo ni politicas de rollback; el camino a produccion no queda demostrado por el repo.</li><li class="text-slate-200 leading-7">• El acceso directo de confirmacion via `responseId` cumple el MVP, pero conviene revisar endurecimiento antes de un entorno mas expuesto.</li><li class="text-slate-200 leading-7">• La configuracion SMTP y secretos de sesion pueden romper el piloto silenciosamente si no se validan al levantar el entorno.</li><li class="text-slate-200 leading-7">• Existe algun pipeline externo, checklist de release o despliegue manual que no este versionado aqui?</li><li class="text-slate-200 leading-7">• Se espera hardening adicional para los links directos de confirmacion antes de salir de piloto interno?</li><li class="text-slate-200 leading-7">• Los reportes visibles en sidebar son parte del alcance estable o siguen siendo una capacidad secundaria no critica?</li>
+    </ul>
+  </div>
+    </section>
+  </main>
+      <footer class="mt-8 border-t border-slate-700/80 py-6 text-sm text-slate-400">Generado por project-onboarding-docs a partir de /Users/josejaredvillatorovargas/Code/clients/jw/PPAM/PPAM_Scheduler.</footer>
+    </div>
+  </body>
+</html>

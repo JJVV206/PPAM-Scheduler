@@ -11,15 +11,17 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:start": "docker compose up -d postgres",
-    "db:stop": "docker compose stop postgres",
-    "db:status": "docker compose ps",
+    "db:start": "bash scripts/db-start.sh",
+    "db:stop": "bash scripts/db-stop.sh",
+    "db:status": "bash scripts/db-status.sh",
     "db:prepare": "npm run db:start && npm run db:push && npm run db:seed",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "ready:prod": "npm run lint && npm run test && npm run build"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

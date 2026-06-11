@@ -1,6 +1,7 @@
 import { db } from "@/lib/db/prisma";
 import type { VolunteerDashboardData, VolunteerSummary } from "@/types/domain";
 import { getOpenSlots, getVolunteerHistory } from "@/services/assignment.service";
+import { AppError } from "@/services/errors";
 
 function mapVolunteer(record: {
   id: string;
@@ -83,10 +84,25 @@ export async function createVolunteer(input: {
   active: boolean;
   passwordHash: string;
 }) {
+  const normalizedEmail = input.email.toLowerCase();
+  const existingUser = await db.user.findUnique({
+    where: { email: normalizedEmail },
+    include: { volunteerProfile: true }
+  });
+
+  if (existingUser) {
+    throw new AppError(
+      existingUser.volunteerProfile
+        ? "Ya existe un voluntario registrado con ese correo."
+        : "Ya existe una cuenta registrada con ese correo. Usa otro correo o actualiza el registro existente.",
+      409
+    );
+  }
+
   const user = await db.user.create({
     data: {
       name: input.name,
-      email: input.email.toLowerCase(),
+      email: normalizedEmail,
       phone: input.phone,
       role: input.role,
       active: input.active,
@@ -127,6 +143,20 @@ export async function updateVolunteer(
   const volunteer = await db.volunteerProfile.findUniqueOrThrow({
     where: { id: volunteerId }
   });
+
+  if (input.email) {
+    const normalizedEmail = input.email.toLowerCase();
+    const existingUser = await db.user.findUnique({
+      where: { email: normalizedEmail }
+    });
+
+    if (existingUser && existingUser.id !== volunteer.userId) {
+      throw new AppError(
+        "Ya existe otra cuenta registrada con ese correo.",
+        409
+      );
+    }
+  }
 
   return db.$transaction(async (tx) => {
     await tx.user.update({

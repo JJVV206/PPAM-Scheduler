@@ -1,13 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { getSessionSecret } from "@/lib/env/config";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const secret =
-    process.env.NEXTAUTH_SECRET ??
-    (process.env.NODE_ENV !== "production"
-      ? "ppam-scheduler-local-dev-secret"
-      : undefined);
 
   if (pathname.startsWith("/api/auth")) {
     return NextResponse.next();
@@ -15,7 +11,7 @@ export async function middleware(request: NextRequest) {
 
   const token = await getToken({
     req: request,
-    secret
+    secret: getSessionSecret()
   });
 
   const isProtectedRoute =

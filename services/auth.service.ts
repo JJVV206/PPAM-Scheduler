@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 
 import { db } from "@/lib/db/prisma";
 import { hashPassword } from "@/lib/auth/password";
+import { getAppBaseUrl } from "@/lib/env/config";
 import { AppError } from "@/services/errors";
 import { sendEmailNotification } from "@/services/notification.service";
 
@@ -16,6 +17,7 @@ export async function requestPasswordReset(email: string) {
   }
 
   const token = randomBytes(32).toString("hex");
+  const resetUrl = `${getAppBaseUrl()}/reset-password/${token}`;
 
   await db.passwordResetToken.create({
     data: {
@@ -28,8 +30,8 @@ export async function requestPasswordReset(email: string) {
   await sendEmailNotification({
     userId: user.id,
     type: "RESET_PASSWORD",
-    subject: "Reset your PPAM Scheduler password",
-    html: `<p>Hello ${user.name},</p><p>Use this link to reset your password:</p><p><a href="${process.env.NEXTAUTH_URL}/reset-password/${token}">${process.env.NEXTAUTH_URL}/reset-password/${token}</a></p>`,
+    subject: "Restablece tu contraseña de PPAM Planificador",
+    html: `<p>Hola ${user.name},</p><p>Usa este enlace para restablecer tu contraseña:</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
     metadata: {
       token
     }
@@ -42,7 +44,7 @@ export async function resetPassword(token: string, password: string) {
   });
 
   if (!resetToken || resetToken.usedAt || isAfter(new Date(), resetToken.expiresAt)) {
-    throw new AppError("This reset token is invalid or expired.", 400);
+    throw new AppError("Este token de restablecimiento no es válido o ya expiró.", 400);
   }
 
   const passwordHash = await hashPassword(password);

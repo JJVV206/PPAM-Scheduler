@@ -1,4 +1,10 @@
-import { addDays, differenceInCalendarDays, endOfWeek, isSameDay, startOfWeek } from "date-fns";
+import {
+  addDays,
+  differenceInCalendarDays,
+  endOfWeek,
+  isSameDay,
+  startOfWeek
+} from "date-fns";
 import {
   AssignmentStatus,
   DayOfWeek,
@@ -15,6 +21,7 @@ import {
   TIME_SLOT_DEFINITIONS,
   TIME_SLOTS
 } from "@/lib/constants/domain";
+import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import type {
   AdminDashboardStats,
   AssignmentDetailDto,
@@ -26,9 +33,14 @@ import type {
 } from "@/types/domain";
 import { AppError } from "@/services/errors";
 import { getAppSettings } from "@/services/setting.service";
-import { logNotification, resendConfirmationReminder, sendEmailNotification } from "@/services/notification.service";
+import {
+  resendConfirmationReminder,
+  sendEmailNotification
+} from "@/services/notification.service";
+import { getAppBaseUrl } from "@/lib/env/config";
 import { safePercentage } from "@/lib/utils";
 import { determineAssignmentStatus } from "@/services/assignment-engine";
+import { getSingletonPreachingPoint } from "@/services/point.service";
 
 const assignmentInclude = {
   scheduleWeek: true,
@@ -100,30 +112,35 @@ function calculateWarnings(input: {
 }): string[] {
   const warnings: string[] = [];
 
-  if (input.volunteerCount < 2) warnings.push("Incomplete pair");
-  if (input.hasDecline) warnings.push("Replacement required");
-  if (input.duplicateBooking) warnings.push("Possible duplicate booking");
+  if (input.volunteerCount < 2) warnings.push("Pareja incompleta");
+  if (input.hasDecline) warnings.push("Se requiere reemplazo");
+  if (input.duplicateBooking) warnings.push("Posible asignación duplicada");
 
   return warnings;
 }
 
-function mapAssignmentDetail(assignment: Prisma.AssignmentGetPayload<{ include: typeof assignmentInclude }>): AssignmentDetailDto {
-  const volunteers: AssignmentVolunteerDto[] = assignment.volunteers.map((slot) => {
-    const response = assignment.responses.find(
-      (item) => item.volunteerId === slot.volunteerId
-    );
+function mapAssignmentDetail(
+  assignment: Prisma.AssignmentGetPayload<{ include: typeof assignmentInclude }>
+): AssignmentDetailDto {
+  const volunteers: AssignmentVolunteerDto[] = assignment.volunteers.map(
+    (slot) => {
+      const response = assignment.responses.find(
+        (item) => item.volunteerId === slot.volunteerId
+      );
 
-    return {
-      volunteerId: slot.volunteerId,
-      assignmentVolunteerId: slot.id,
-      position: slot.position,
-      isReplacement: slot.isReplacement,
-      responseStatus: response?.responseStatus ?? "PENDING",
-      respondedAt: response?.respondedAt ?? null,
-      responseNote: response?.note ?? null,
-      volunteer: mapVolunteerSummary(slot.volunteer)
-    };
-  });
+      return {
+        volunteerId: slot.volunteerId,
+        assignmentVolunteerId: slot.id,
+        responseId: response?.id ?? null,
+        position: slot.position,
+        isReplacement: slot.isReplacement,
+        responseStatus: response?.responseStatus ?? "PENDING",
+        respondedAt: response?.respondedAt ?? null,
+        responseNote: response?.note ?? null,
+        volunteer: mapVolunteerSummary(slot.volunteer)
+      };
+    }
+  );
 
   return {
     id: assignment.id,
@@ -136,7 +153,7 @@ function mapAssignmentDetail(assignment: Prisma.AssignmentGetPayload<{ include: 
     notes: assignment.notes,
     preachingPoint: {
       id: assignment.preachingPoint.id,
-      name: assignment.preachingPoint.name,
+      name: FIXED_PREACHING_POINT_NAME,
       area: assignment.preachingPoint.area,
       notes: assignment.preachingPoint.notes,
       active: assignment.preachingPoint.active,
@@ -156,9 +173,67 @@ function mapAssignmentDetail(assignment: Prisma.AssignmentGetPayload<{ include: 
     })),
     warnings: calculateWarnings({
       volunteerCount: volunteers.length,
-      hasDecline: volunteers.some((volunteer) => volunteer.responseStatus === "DECLINED")
+      hasDecline: volunteers.some(
+        (volunteer) => volunteer.responseStatus === "DECLINED"
+      )
     })
   };
+}
+
+function normalizeWeekStart(date: Date) {
+  return startOfWeek(date, { weekStartsOn: 1 });
+}
+
+async function assertWeekDoesNotExist(startDate: Date) {
+  const endDate = addDays(startDate, 6);
+  const existingWeek = await db.scheduleWeek.findUnique({
+    where: {
+      startDate_endDate: {
+        startDate,
+        endDate
+      }
+    }
+  });
+
+  if (existingWeek) {
+    throw new AppError(
+      `Ya existe una semana creada para el ${startDate.toLocaleDateString("es-MX")}.`,
+      409
+    );
+  }
+}
+
+async function assertPointSupportsSlot(input: {
+  preachingPointId: string;
+  dayOfWeek: DayOfWeek;
+  timeSlot: TimeSlot;
+}) {
+  const point = await db.preachingPoint.findUniqueOrThrow({
+    where: { id: input.preachingPointId },
+    include: {
+      activeSlots: true
+    }
+  });
+
+  if (!point.activeSlots.length) {
+    return;
+  }
+
+  const isAllowed = point.activeSlots.some(
+    (slot) =>
+      slot.dayOfWeek === input.dayOfWeek && slot.timeSlot === input.timeSlot
+  );
+
+  if (!isAllowed) {
+    throw new AppError(
+      `El punto ${FIXED_PREACHING_POINT_NAME} no está habilitado para ${DAY_LABELS[input.dayOfWeek]} en ${TIME_SLOT_DEFINITIONS[input.timeSlot].label}.`,
+      409
+    );
+  }
+}
+
+function buildConfirmationLink(responseId: string) {
+  return `${getAppBaseUrl()}/volunteer/confirm/${responseId}`;
 }
 
 async function assertNoVolunteerConflicts(input: {
@@ -186,8 +261,10 @@ async function assertNoVolunteerConflicts(input: {
   });
 
   if (conflicts.length > 0) {
-    const names = conflicts.map((conflict) => conflict.volunteer.user.name).join(", ");
-    throw new AppError(`Double booking detected for ${names}.`, 409);
+    const names = conflicts
+      .map((conflict) => conflict.volunteer.user.name)
+      .join(", ");
+    throw new AppError(`Se detectó doble asignación para ${names}.`, 409);
   }
 }
 
@@ -215,7 +292,9 @@ async function syncResponses(input: {
   }
 
   for (const volunteerId of input.volunteerIds) {
-    const existing = existingResponses.find((response) => response.volunteerId === volunteerId);
+    const existing = existingResponses.find(
+      (response) => response.volunteerId === volunteerId
+    );
 
     if (!existing) {
       await input.tx.assignmentResponse.create({
@@ -297,7 +376,17 @@ export async function createWeeklyAssignment(input: {
   volunteers: Array<{ volunteerId: string; position: VolunteerPosition }>;
   actorUserId: string;
 }) {
-  const uniqueVolunteerIds = [...new Set(input.volunteers.map((volunteer) => volunteer.volunteerId))];
+  const fixedPoint = await getSingletonPreachingPoint();
+
+  await assertPointSupportsSlot({
+    preachingPointId: fixedPoint.id,
+    dayOfWeek: input.dayOfWeek,
+    timeSlot: input.timeSlot
+  });
+
+  const uniqueVolunteerIds = [
+    ...new Set(input.volunteers.map((volunteer) => volunteer.volunteerId))
+  ];
   await assertNoVolunteerConflicts({
     date: input.date,
     timeSlot: input.timeSlot,
@@ -311,7 +400,7 @@ export async function createWeeklyAssignment(input: {
         tx,
         date: input.date,
         timeSlot: input.timeSlot,
-        preachingPointId: input.preachingPointId
+        preachingPointId: fixedPoint.id
       }));
 
     const created = await tx.assignment.create({
@@ -320,7 +409,7 @@ export async function createWeeklyAssignment(input: {
         date: input.date,
         dayOfWeek: input.dayOfWeek,
         timeSlot: input.timeSlot,
-        preachingPointId: input.preachingPointId,
+        preachingPointId: fixedPoint.id,
         pairNumber,
         notes: input.notes,
         status: "SCHEDULED"
@@ -382,15 +471,25 @@ export async function updateAssignment(
     where: { id: assignmentId },
     include: { volunteers: true }
   });
+  const fixedPoint = await getSingletonPreachingPoint();
 
   const nextDate = input.date ?? current.date;
+  const nextDayOfWeek = input.dayOfWeek ?? current.dayOfWeek;
   const nextTimeSlot = input.timeSlot ?? current.timeSlot;
-  const nextPreachingPointId = input.preachingPointId ?? current.preachingPointId;
-  const volunteerIds = input.volunteers?.map((item) => item.volunteerId) ?? current.volunteers.map((item) => item.volunteerId);
+  const nextPreachingPointId = fixedPoint.id;
+  const volunteerIds =
+    input.volunteers?.map((item) => item.volunteerId) ??
+    current.volunteers.map((item) => item.volunteerId);
   const movedToNewSlot =
     !isSameDay(nextDate, current.date) ||
     nextTimeSlot !== current.timeSlot ||
     nextPreachingPointId !== current.preachingPointId;
+
+  await assertPointSupportsSlot({
+    preachingPointId: nextPreachingPointId,
+    dayOfWeek: nextDayOfWeek,
+    timeSlot: nextTimeSlot
+  });
 
   await assertNoVolunteerConflicts({
     assignmentId,
@@ -415,7 +514,7 @@ export async function updateAssignment(
         date: input.date,
         dayOfWeek: input.dayOfWeek,
         timeSlot: input.timeSlot,
-        preachingPointId: input.preachingPointId,
+        preachingPointId: nextPreachingPointId,
         pairNumber,
         notes: input.notes,
         status: input.status
@@ -475,6 +574,22 @@ export async function getAssignmentDetail(assignmentId: string) {
   return mapAssignmentDetail(assignment);
 }
 
+export async function getAssignmentsForScheduleSlot(input: {
+  date: Date;
+  timeSlot: TimeSlot;
+}) {
+  const assignments = await db.assignment.findMany({
+    where: {
+      date: input.date,
+      timeSlot: input.timeSlot
+    },
+    include: assignmentInclude,
+    orderBy: [{ preachingPoint: { name: "asc" } }, { pairNumber: "asc" }]
+  });
+
+  return assignments.map(mapAssignmentDetail);
+}
+
 export async function getWeeklySchedule(input?: {
   weekStart?: Date;
   filters?: {
@@ -483,6 +598,7 @@ export async function getWeeklySchedule(input?: {
     status?: AssignmentStatus;
   };
 }): Promise<WeeklyScheduleMatrix> {
+  const fixedPoint = await getSingletonPreachingPoint();
   const weekStart = input?.weekStart
     ? startOfWeek(input.weekStart, { weekStartsOn: 1 })
     : startOfWeek(new Date(), { weekStartsOn: 1 });
@@ -541,14 +657,16 @@ export async function getWeeklySchedule(input?: {
 
     const groups = day.items[assignment.timeSlot];
     const existingGroup = groups.find(
-      (group) => group.preachingPointId === assignment.preachingPointId
+      (group) => group.preachingPointId === fixedPoint.id
     );
 
     const pair = {
       id: assignment.id,
       pairNumber: assignment.pairNumber,
       status: assignment.status,
-      volunteerNames: assignment.volunteers.map((slot) => slot.volunteer.user.name),
+      volunteerNames: assignment.volunteers.map(
+        (slot) => slot.volunteer.user.name
+      ),
       warnings: calculateWarnings({
         volunteerCount: assignment.volunteers.length,
         hasDecline: assignment.responses.some(
@@ -560,7 +678,9 @@ export async function getWeeklySchedule(input?: {
 
     if (existingGroup) {
       existingGroup.pairs.push(pair);
-      existingGroup.pairs.sort((left, right) => left.pairNumber - right.pairNumber);
+      existingGroup.pairs.sort(
+        (left, right) => left.pairNumber - right.pairNumber
+      );
       continue;
     }
 
@@ -568,19 +688,36 @@ export async function getWeeklySchedule(input?: {
       date: assignment.date,
       dayOfWeek: assignment.dayOfWeek,
       timeSlot: assignment.timeSlot,
-      preachingPointId: assignment.preachingPointId,
-      preachingPointName: assignment.preachingPoint.name,
-      area: assignment.preachingPoint.area,
+      preachingPointId: fixedPoint.id,
+      preachingPointName: FIXED_PREACHING_POINT_NAME,
+      area: fixedPoint.area,
       pairs: [pair]
     });
   }
 
   return {
-    weekLabel: `Week of ${weekStart.toLocaleDateString()}`,
+    weekLabel: `Semana del ${weekStart.toLocaleDateString("es-MX")}`,
     startDate: weekStart,
     endDate: weekEnd,
     days
   };
+}
+
+export async function createScheduleWeek(input: {
+  targetWeekStart: Date;
+  actorUserId: string;
+}) {
+  const weekStart = normalizeWeekStart(input.targetWeekStart);
+  await assertWeekDoesNotExist(weekStart);
+
+  return db.scheduleWeek.create({
+    data: {
+      startDate: weekStart,
+      endDate: addDays(weekStart, 6),
+      label: `Semana del ${weekStart.toLocaleDateString("es-MX")}`,
+      createdById: input.actorUserId
+    }
+  });
 }
 
 export async function duplicateScheduleWeek(input: {
@@ -588,6 +725,9 @@ export async function duplicateScheduleWeek(input: {
   targetWeekStart: Date;
   actorUserId: string;
 }) {
+  const weekStart = normalizeWeekStart(input.targetWeekStart);
+  await assertWeekDoesNotExist(weekStart);
+
   const sourceWeek = await db.scheduleWeek.findUniqueOrThrow({
     where: { id: input.sourceWeekId },
     include: {
@@ -602,15 +742,18 @@ export async function duplicateScheduleWeek(input: {
 
   const targetWeek = await db.scheduleWeek.create({
     data: {
-      startDate: input.targetWeekStart,
-      endDate: addDays(input.targetWeekStart, 6),
-      label: `Week of ${input.targetWeekStart.toLocaleDateString()}`,
+      startDate: weekStart,
+      endDate: addDays(weekStart, 6),
+      label: `Semana del ${weekStart.toLocaleDateString("es-MX")}`,
       createdById: input.actorUserId
     }
   });
 
   for (const assignment of sourceWeek.assignments) {
-    const newDate = addDays(input.targetWeekStart, differenceInCalendarDays(assignment.date, sourceWeek.startDate));
+    const newDate = addDays(
+      weekStart,
+      differenceInCalendarDays(assignment.date, sourceWeek.startDate)
+    );
     await createWeeklyAssignment({
       scheduleWeekId: targetWeek.id,
       date: newDate,
@@ -751,6 +894,44 @@ export async function declineAssignment(input: {
   return mapAssignmentDetail(assignment);
 }
 
+async function getAssignmentResponseContext(responseId: string) {
+  const response = await db.assignmentResponse.findUnique({
+    where: { id: responseId }
+  });
+
+  if (!response) {
+    throw new AppError("No se encontró la solicitud de confirmación.", 404);
+  }
+
+  return response;
+}
+
+export async function confirmAssignmentResponseById(input: {
+  responseId: string;
+  note?: string;
+}) {
+  const response = await getAssignmentResponseContext(input.responseId);
+
+  return confirmAssignment({
+    assignmentId: response.assignmentId,
+    volunteerProfileId: response.volunteerId,
+    note: input.note
+  });
+}
+
+export async function declineAssignmentResponseById(input: {
+  responseId: string;
+  note?: string;
+}) {
+  const response = await getAssignmentResponseContext(input.responseId);
+
+  return declineAssignment({
+    assignmentId: response.assignmentId,
+    volunteerProfileId: response.volunteerId,
+    note: input.note
+  });
+}
+
 export async function getAvailableVolunteersForSlot(input: {
   date: Date;
   dayOfWeek: DayOfWeek;
@@ -827,10 +1008,17 @@ export async function getOpenSlots(): Promise<OpenSlotDto[]> {
 
   const results = await Promise.all(
     assignments
-      .filter((assignment) => assignment.status === "NEEDS_REPLACEMENT" || assignment.volunteers.length < 2)
+      .filter(
+        (assignment) =>
+          assignment.status === "NEEDS_REPLACEMENT" ||
+          assignment.volunteers.length < 2
+      )
       .map(async (assignment) => {
-        const missingPositions = (["FIRST", "SECOND"] as VolunteerPosition[]).filter(
-          (position) => !assignment.volunteers.some((slot) => slot.position === position)
+        const missingPositions = (
+          ["FIRST", "SECOND"] as VolunteerPosition[]
+        ).filter(
+          (position) =>
+            !assignment.volunteers.some((slot) => slot.position === position)
         );
         const declinedPositions = assignment.responses
           .filter((response) => response.responseStatus === "DECLINED")
@@ -842,13 +1030,17 @@ export async function getOpenSlots(): Promise<OpenSlotDto[]> {
           })
           .filter(Boolean) as VolunteerPosition[];
 
-        const positions = [...new Set([...missingPositions, ...declinedPositions])];
+        const positions = [
+          ...new Set([...missingPositions, ...declinedPositions])
+        ];
         const suggestions = await getAvailableVolunteersForSlot({
           date: assignment.date,
           dayOfWeek: assignment.dayOfWeek,
           timeSlot: assignment.timeSlot,
           area: assignment.preachingPoint.area,
-          excludeVolunteerIds: assignment.volunteers.map((item) => item.volunteerId)
+          excludeVolunteerIds: assignment.volunteers.map(
+            (item) => item.volunteerId
+          )
         });
 
         return {
@@ -857,14 +1049,14 @@ export async function getOpenSlots(): Promise<OpenSlotDto[]> {
           dayOfWeek: assignment.dayOfWeek,
           timeSlot: assignment.timeSlot,
           preachingPointId: assignment.preachingPointId,
-          preachingPointName: assignment.preachingPoint.name,
+          preachingPointName: FIXED_PREACHING_POINT_NAME,
           area: assignment.preachingPoint.area,
           status: assignment.status,
           missingPositions: positions.length ? positions : ["SECOND"],
           urgencyLabel:
             differenceInCalendarDays(assignment.date, new Date()) <= 2
-              ? "Urgent"
-              : "Open slot",
+              ? "Urgente"
+              : "Vacante",
           suggestedVolunteers: suggestions,
           notes: assignment.notes
         } satisfies OpenSlotDto;
@@ -898,12 +1090,16 @@ export async function assignReplacementVolunteer(input: {
   const targetPosition =
     input.position ??
     (["FIRST", "SECOND"] as VolunteerPosition[]).find(
-      (position) => !assignment.volunteers.some((slot) => slot.position === position)
+      (position) =>
+        !assignment.volunteers.some((slot) => slot.position === position)
     ) ??
     assignment.volunteers[assignment.volunteers.length - 1]?.position;
 
   if (!targetPosition) {
-    throw new AppError("No available volunteer slot found.", 400);
+    throw new AppError(
+      "No se encontró un puesto disponible para el voluntario.",
+      400
+    );
   }
 
   const result = await db.$transaction(async (tx) => {
@@ -995,11 +1191,15 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
     weekLabel: schedule.weekLabel,
     stats: {
       totalAssignments: assignments.length,
-      confirmedAssignments: assignments.filter((item) => item.status === "CONFIRMED").length,
+      confirmedAssignments: assignments.filter(
+        (item) => item.status === "CONFIRMED"
+      ).length,
       pendingConfirmations: assignments.filter(
         (item) => item.status === "PENDING_CONFIRMATION"
       ).length,
-      declinedAssignments: assignments.filter((item) => item.status === "DECLINED").length,
+      declinedAssignments: assignments.filter(
+        (item) => item.status === "DECLINED"
+      ).length,
       openSlots: openSlots.length
     },
     todaysAssignments: details.filter(
@@ -1008,7 +1208,9 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
     pendingConfirmations: details.filter(
       (assignment) => assignment.status === "PENDING_CONFIRMATION"
     ),
-    urgentReplacements: openSlots.filter((slot) => slot.urgencyLabel === "Urgent")
+    urgentReplacements: openSlots.filter(
+      (slot) => slot.urgencyLabel === "Urgente"
+    )
   };
 }
 
@@ -1033,6 +1235,7 @@ export async function sendAssignmentConfirmationRequests(assignmentId: string) {
     where: { id: assignmentId },
     include: {
       preachingPoint: true,
+      responses: true,
       volunteers: {
         include: {
           volunteer: {
@@ -1043,16 +1246,31 @@ export async function sendAssignmentConfirmationRequests(assignmentId: string) {
     }
   });
 
+  if (!assignment.volunteers.length) {
+    throw new AppError(
+      "No hay voluntarios asignados para solicitar confirmación.",
+      400
+    );
+  }
+
   await Promise.all(
     assignment.volunteers.map(async (slot) => {
+      const response = assignment.responses.find(
+        (item) => item.volunteerId === slot.volunteerId
+      );
+      const confirmationLink = response
+        ? buildConfirmationLink(response.id)
+        : null;
+
       await sendEmailNotification({
         userId: slot.volunteer.userId,
         assignmentId,
         type: "CONFIRMATION_REQUEST",
-        subject: "Please confirm your PPAM assignment",
-        html: `<p>Hello ${slot.volunteer.user.name},</p><p>You are assigned to ${assignment.preachingPoint.name} on ${DAY_LABELS[assignment.dayOfWeek]} at ${TIME_SLOT_DEFINITIONS[assignment.timeSlot].label}.</p>`,
+        subject: "Confirma tu asignación de PPAM",
+        html: `<p>Hola ${slot.volunteer.user.name},</p><p>Tienes asignación en ${FIXED_PREACHING_POINT_NAME} el ${DAY_LABELS[assignment.dayOfWeek]} en el horario ${TIME_SLOT_DEFINITIONS[assignment.timeSlot].label}.</p>${confirmationLink ? `<p><a href="${confirmationLink}">Abrir confirmación directa</a></p>` : ""}`,
         metadata: {
-          pointName: assignment.preachingPoint.name
+          pointName: FIXED_PREACHING_POINT_NAME,
+          confirmationLink
         }
       });
       await db.assignmentActivity.create({
@@ -1060,12 +1278,17 @@ export async function sendAssignmentConfirmationRequests(assignmentId: string) {
           assignmentId,
           actionType: "REMINDER_SENT",
           metadata: {
-            volunteerProfileId: slot.volunteerId
+            volunteerProfileId: slot.volunteerId,
+            deliveryType: "CONFIRMATION_REQUEST"
           }
         }
       });
     })
   );
+
+  return {
+    sentCount: assignment.volunteers.length
+  };
 }
 
 export async function resendAssignmentConfirmation(assignmentId: string) {
@@ -1073,6 +1296,7 @@ export async function resendAssignmentConfirmation(assignmentId: string) {
     where: { id: assignmentId },
     include: {
       preachingPoint: true,
+      responses: true,
       volunteers: {
         include: {
           volunteer: {
@@ -1083,18 +1307,53 @@ export async function resendAssignmentConfirmation(assignmentId: string) {
     }
   });
 
+  const pendingVolunteers = assignment.volunteers.filter((slot) =>
+    assignment.responses.some(
+      (response) =>
+        response.volunteerId === slot.volunteerId &&
+        response.responseStatus === "PENDING"
+    )
+  );
+
+  if (!pendingVolunteers.length) {
+    throw new AppError("No hay confirmaciones pendientes para reenviar.", 400);
+  }
+
   await Promise.all(
-    assignment.volunteers.map((slot) =>
-      resendConfirmationReminder({
+    pendingVolunteers.map(async (slot) => {
+      const response = assignment.responses.find(
+        (item) => item.volunteerId === slot.volunteerId
+      );
+      const confirmationLink = response
+        ? buildConfirmationLink(response.id)
+        : null;
+
+      await resendConfirmationReminder({
         assignmentId,
         volunteerUserId: slot.volunteer.userId,
         volunteerName: slot.volunteer.user.name,
-        pointName: assignment.preachingPoint.name,
+        pointName: FIXED_PREACHING_POINT_NAME,
         dateLabel: DAY_LABELS[assignment.dayOfWeek],
-        timeSlotLabel: TIME_SLOT_DEFINITIONS[assignment.timeSlot].label
-      })
-    )
+        timeSlotLabel: TIME_SLOT_DEFINITIONS[assignment.timeSlot].label,
+        confirmationLink
+      });
+
+      await db.assignmentActivity.create({
+        data: {
+          assignmentId,
+          actionType: "REMINDER_SENT",
+          metadata: {
+            volunteerProfileId: slot.volunteerId,
+            deliveryType: "REMINDER"
+          }
+        }
+      });
+    })
   );
+
+  return {
+    sentCount: pendingVolunteers.length
+  };
 }
 
 export async function getAssignmentHealthSummary() {
@@ -1110,7 +1369,8 @@ export async function getAssignmentHealthSummary() {
   ).length;
   const openSlotAssignments = assignments.filter(
     (assignment) =>
-      assignment.status === "NEEDS_REPLACEMENT" || assignment.volunteers.length < 2
+      assignment.status === "NEEDS_REPLACEMENT" ||
+      assignment.volunteers.length < 2
   ).length;
 
   return {

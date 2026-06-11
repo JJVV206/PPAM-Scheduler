@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PPAM Scheduler - Vista general</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Avenir Next"', '"Segoe UI"', '"Helvetica Neue"', "sans-serif"],
+              mono: ['"SFMono-Regular"', "Menlo", "monospace"],
+            },
+            colors: {
+              night: "#020617",
+              panel: "#0f172a",
+              panelsoft: "#111c33",
+              ember: "#f59e0b",
+              tide: "#14b8a6",
+              mist: "#cbd5e1",
+            },
+            boxShadow: {
+              halo: "0 30px 90px rgba(2, 6, 23, 0.38)",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      @page {
+        size: A4;
+        margin: 12mm;
+      }
+
+      body {
+        background:
+          radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 28%),
+          radial-gradient(circle at bottom right, rgba(20, 184, 166, 0.14), transparent 25%),
+          linear-gradient(180deg, #020617 0%, #071121 100%);
+      }
+
+      @media print {
+        body {
+          background: #020617;
+        }
+      }
+    </style>
+  </head>
+  <body class="min-h-screen bg-night text-slate-100">
+    <div class="mx-auto max-w-7xl px-5 py-6 sm:px-8 lg:px-10">
+      <header class="mb-8 rounded-[2rem] border border-slate-700/80 bg-panel/90 p-8 shadow-halo backdrop-blur">
+        <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div class="max-w-3xl">
+            <p class="mb-3 text-xs font-medium uppercase tracking-[0.28em] text-amber-300">Vista general</p>
+            <h1 class="text-4xl font-bold tracking-tight text-white sm:text-5xl">PPAM Scheduler</h1>
+            <p class="mt-4 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">Resumen progresivo para coordinadores, stakeholders y nuevos desarrolladores que necesitan entender el producto sin empezar por el codigo.</p>
+          </div>
+          <div class="flex flex-col gap-3 lg:items-end">
+            <div class="flex flex-wrap gap-2 lg:justify-end"><span class="rounded-full border border-slate-600 bg-slate-800/80 px-3 py-1 text-xs font-medium text-slate-100">Tipo: Aplicacion full-stack</span><span class="rounded-full border border-slate-600 bg-slate-800/80 px-3 py-1 text-xs font-medium text-slate-100">Estado: Borrador basado en evidencia</span><span class="rounded-full border border-slate-600 bg-slate-800/80 px-3 py-1 text-xs font-medium text-slate-100">Archivos analizados: 163</span><span class="rounded-full border border-slate-600 bg-slate-800/80 px-3 py-1 text-xs font-medium text-slate-100">Generado: 4/6/2026, 2:30:19 p.m.</span></div>
+            <div class="flex flex-wrap gap-3 text-sm font-medium">
+              <a class="rounded-full border border-slate-600 bg-slate-900/70 px-4 py-2 text-slate-100 transition hover:border-slate-500 hover:bg-slate-800" href="technical.html">Abrir guia tecnica</a>
+              <a class="rounded-full border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-amber-200 transition hover:border-amber-400/60 hover:bg-amber-500/15" href="project-context.json">Ver contexto JSON</a>
+            </div>
+          </div>
+        </div>
+        <div class="mt-6 rounded-3xl border border-amber-500/25 bg-amber-500/10 px-5 py-4 text-sm leading-6 text-amber-100">
+          Borrador generado a partir de evidencia del repositorio. Completa los campos narrativos antes de compartirlo fuera del equipo.
+        </div>
+      </header>
+      <main class="space-y-6">
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">1. Que es y para que sirve</h2>
+      <div class="mt-5 space-y-4"><p class="text-base leading-7 text-slate-200">PPAM Scheduler es una aplicacion full-stack en Next.js para coordinar asignaciones semanales de predicacion publica con experiencias separadas para administradores y voluntarios.</p><p class="text-base leading-7 text-slate-200">Sirve para operar una semana real de punta a punta: preparar el calendario, asignar parejas, pedir confirmaciones, seguir respuestas y reaccionar a vacantes o rechazos desde la UI.</p></div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">2. Contexto, origen y evolucion</h2>
+      <div class="mt-5 space-y-4"><p class="text-base leading-7 text-slate-200">La mejor evidencia del contexto funcional sale del README, del schema Prisma y de las rutas protegidas en `app/(protected)/admin` y `app/(protected)/volunteer`. El dominio de predicacion publica y coordinacion semanal se desprende de nombres de modelos, paginas y datos seed.</p><p class="text-base leading-7 text-slate-200">El repo muestra senales de haber pasado de un esqueleto MVP a un flujo operativo mas cerrado: hoy existen duplicacion de semana, enlaces directos de confirmacion, excepciones temporales de disponibilidad, active slots por punto y scripts mas robustos para la base local.</p><p class="text-base leading-7 text-slate-200">Por el lenguaje del dominio, el uso visible parece estar enfocado en coordinadores y voluntarios de predicacion publica. Eso esta fuertemente sugerido por el repo, aunque la politica exacta de uso por congregacion o region no esta documentada.</p></div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">3. Como funciona en lenguaje simple</h2>
+      <div class="mt-5 space-y-4">
+        <p class="text-base leading-7 text-slate-200">Un admin entra al workspace, crea o duplica una semana, arma asignaciones y las sigue desde planner, tablas y modales. Los voluntarios reciben solicitudes, responden desde portal o correo y el sistema recalcula estados, genera vacantes y ofrece candidatos de reemplazo segun disponibilidad y conflictos.</p><p class="text-base leading-7 text-slate-200">Dentro de una organizacion, esta herramienta encaja como sistema operativo semanal para un equipo pequeno que coordina turnos, coberturas y confirmaciones con trazabilidad minima.</p>
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Workspace admin</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Reune dashboard, horario semanal, asignaciones, voluntarios, puntos, vacantes, notificaciones y configuracion.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Portal del voluntario</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Expone inicio, mis asignaciones, vacantes compatibles, disponibilidad, notificaciones y perfil.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Motor operativo de asignaciones</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Concentra reglas de estados, confirmaciones, doble booking, reemplazos y duplicacion de semanas.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Persistencia, notificaciones y setup local</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Usa Prisma sobre PostgreSQL, logs de notificacion y scripts locales para levantar datos demo de forma reproducible.</p>
+        
+      </article>
+    </div>
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Arquitectura</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Aplicacion full-stack con Next.js App Router</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Pruebas</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Vitest</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Entorno</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">.env, .env.example, .env.local</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Deploy</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">No se detectaron artefactos de despliegue visibles.</p>
+        
+      </article>
+    </div>
+      </div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">4. Problemas que resuelve y beneficios</h2>
+      <div class="mt-5 space-y-4">
+        <div class="grid gap-6 xl:grid-cols-2">
+          <div>
+            <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Problemas que ayuda a resolver</h3>
+            <div class="mt-4">
+    <ul class="space-y-3">
+      <li class="text-slate-200 leading-7">• Evita preparar semanas por fuera del sistema o depender de llamadas manuales a endpoints para completar flujos criticos.</li><li class="text-slate-200 leading-7">• Reduce perdida de visibilidad sobre quien ya confirmo, quien rechazo y donde faltan posiciones por cubrir.</li><li class="text-slate-200 leading-7">• Ayuda a proponer reemplazos compatibles usando disponibilidad recurrente, excepciones temporales y ausencia de conflicto horario.</li><li class="text-slate-200 leading-7">• Disminuye errores operativos al concentrar estado, actividad y notificaciones en una sola base de datos.</li>
+    </ul>
+  </div>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Beneficios principales</h3>
+            <div class="mt-4">
+    <ul class="space-y-3">
+      <li class="text-slate-200 leading-7">• Permite operar una semana completa desde la interfaz principal del admin.</li><li class="text-slate-200 leading-7">• Ofrece una experiencia clara para voluntarios con detalle, respuesta y disponibilidad actualizable.</li><li class="text-slate-200 leading-7">• Deja evidencia minima util para QA, demos y handoff mediante timeline de actividad y NotificationLog.</li>
+    </ul>
+  </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">5. Personas, equipos y operacion</h2>
+      <div class="mt-5 space-y-4">
+        <div class="grid gap-6 xl:grid-cols-2">
+          <div>
+            <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Quienes suelen interactuar</h3>
+            <div class="mt-4">
+    <ul class="space-y-3">
+      <li class="text-slate-200 leading-7">• Coordinadores o admins responsables del horario semanal.</li><li class="text-slate-200 leading-7">• Voluntarios que participan en las asignaciones y reemplazos.</li><li class="text-slate-200 leading-7">• Desarrolladores que mantienen UI, reglas de negocio, autenticacion, datos y notificaciones.</li>
+    </ul>
+  </div>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Como se maneja o administra</h3>
+            <div class="mt-4">
+    <ul class="space-y-3">
+      <li class="text-slate-200 leading-7">• El admin administra semanas, puntos, vacantes y confirmaciones desde pantallas protegidas por rol.</li><li class="text-slate-200 leading-7">• El entorno local se levanta con PostgreSQL en Docker, Prisma para schema y seed, y `next dev` para la app.</li><li class="text-slate-200 leading-7">• Las variables `DATABASE_URL`, `NEXTAUTH_SECRET` y la configuracion SMTP controlan persistencia, sesion y envio de correos.</li>
+    </ul>
+  </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">6. Ejemplos, analogias y casos sencillos</h2>
+      <div class="mt-5 space-y-4"><div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Ejemplo 1: rechazo y vacante</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Si un voluntario rechaza, la asignacion cambia a `NEEDS_REPLACEMENT`, aparece en vacantes y el admin puede escoger un reemplazo sugerido.</p>
+        <p class="mt-3 text-sm leading-6 text-slate-400">Como una guardia medica donde el turno sigue existiendo aunque cambie la persona asignada.</p>
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Ejemplo 2: preparar una nueva semana</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">El coordinador puede clonar una semana anterior, navegar al nuevo rango y seguir ajustando parejas o puntos sin rehacer todo desde cero.</p>
+        <p class="mt-3 text-sm leading-6 text-slate-400">Como duplicar un calendario semanal y solo corregir los cambios de esta semana.</p>
+      </article>
+    </div></div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">7. Errores comunes o confusiones</h2>
+      <div class="mt-5 space-y-4">
+    <ul class="space-y-3">
+      <li class="text-slate-200 leading-7">• No es solo un frontend: el mismo repo contiene handlers, servicios y Prisma como backend integrado.</li><li class="text-slate-200 leading-7">• Una semana visible en el planner no equivale automaticamente a un `ScheduleWeek`; primero debe existir el registro de semana para poder asignar.</li><li class="text-slate-200 leading-7">• El enlace directo de correo hoy usa `responseId` y resuelve el MVP, pero no sustituye automaticamente una estrategia de hardening para produccion.</li>
+    </ul>
+  </div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">8. Que debe saber una persona junior</h2>
+      <div class="mt-5 space-y-4">
+        
+    <ul class="space-y-3">
+      <li class="text-slate-200 leading-7">• Empieza por README, luego `prisma/schema.prisma`, `services/assignment.service.ts` y las paginas de admin y volunteer.</li><li class="text-slate-200 leading-7">• Entiende primero los modelos de dominio: semana, asignacion, voluntario, respuesta, punto y notificacion.</li><li class="text-slate-200 leading-7">• Sigue un flujo real de negocio antes de cambiar codigo: crear semana, crear asignacion, confirmar, rechazar y cubrir vacante.</li><li class="text-slate-200 leading-7">• Verifica siempre si una regla vive en UI o en `services/`; la logica importante esta mayormente del lado de servicio.</li><li class="text-slate-200 leading-7">• Levanta la base con `npm run db:start`, `db:push` y `db:seed` antes de sacar conclusiones sobre rutas o datos vacios.</li>
+    </ul>
+  
+        <div class="mt-6">
+          <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Orden sugerido de lectura</h3>
+          <div class="mt-4">
+    <div class="overflow-hidden rounded-3xl border border-slate-700 bg-slate-950/85">
+      <table class="min-w-full text-left text-sm">
+        <thead class="bg-slate-900 text-slate-300">
+          <tr>
+            <th class="px-4 py-3 font-medium">Paso</th><th class="px-4 py-3 font-medium">Archivo</th><th class="px-4 py-3 font-medium">Por que leerlo</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><span class="text-slate-300">1</span></td><td class="px-4 py-3 align-top"><code class="text-xs">README.md</code></td><td class="px-4 py-3 align-top"><span>Da el mejor contexto funcional disponible para una lectura inicial.</span></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><span class="text-slate-300">2</span></td><td class="px-4 py-3 align-top"><code class="text-xs">prisma/schema.prisma</code></td><td class="px-4 py-3 align-top"><span>Expone el lenguaje de dominio real y las relaciones entre semanas, asignaciones, respuestas, vacantes y notificaciones.</span></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><span class="text-slate-300">3</span></td><td class="px-4 py-3 align-top"><code class="text-xs">services/assignment.service.ts</code></td><td class="px-4 py-3 align-top"><span>Concentra duplicacion de semana, estados, confirmaciones, reemplazos y dashboard.</span></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><span class="text-slate-300">4</span></td><td class="px-4 py-3 align-top"><code class="text-xs">app/(protected)/admin/schedule/page.tsx</code></td><td class="px-4 py-3 align-top"><span>Muestra la superficie principal para preparar semanas y conectar planner con asignaciones.</span></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><span class="text-slate-300">5</span></td><td class="px-4 py-3 align-top"><code class="text-xs">app/(protected)/admin/assignments/page.tsx</code></td><td class="px-4 py-3 align-top"><span>Revela el detalle operativo donde hoy se editan, notifican y eliminan asignaciones.</span></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><span class="text-slate-300">6</span></td><td class="px-4 py-3 align-top"><code class="text-xs">app/(protected)/volunteer/availability/page.tsx</code></td><td class="px-4 py-3 align-top"><span>Enseña como el voluntario mantiene disponibilidad recurrente y excepciones temporales.</span></td>
+                </tr>
+              
+                <tr class="border-t border-slate-800 text-slate-200">
+                  <td class="px-4 py-3 align-top"><span class="text-slate-300">7</span></td><td class="px-4 py-3 align-top"><code class="text-xs">components/assignments/confirmation-card.tsx</code></td><td class="px-4 py-3 align-top"><span>Aterriza la experiencia directa de respuesta desde portal o correo.</span></td>
+                </tr>
+              
+        </tbody>
+      </table>
+    </div>
+  </div>
+        </div>
+      </div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">9. Glosario</h2>
+      <div class="mt-5 space-y-4">
+    <div class="grid gap-4 md:grid-cols-2">
+      
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+              <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Punto de predicacion</h3>
+              <p class="mt-3 text-sm leading-6 text-slate-200">Lugar donde se agenda una o mas parejas en dias y franjas concretas.</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+              <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Asignacion</h3>
+              <p class="mt-3 text-sm leading-6 text-slate-200">Registro que combina fecha, horario, punto, numero de pareja, voluntarios y estado operativo.</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+              <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Vacante</h3>
+              <p class="mt-3 text-sm leading-6 text-slate-200">Asignacion incompleta o afectada por un rechazo que requiere reemplazo.</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+              <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Disponibilidad temporal</h3>
+              <p class="mt-3 text-sm leading-6 text-slate-200">Bloque excepcional de fechas donde un voluntario no debe aparecer como sugerencia.</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+              <h3 class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">NotificationLog</h3>
+              <p class="mt-3 text-sm leading-6 text-slate-200">Bitacora donde queda registrado si una solicitud o recordatorio fue enviado o fallo.</p>
+            </article>
+          
+    </div>
+  </div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">10. Prompts visuales</h2>
+      <div class="mt-5 space-y-4">
+        <p class="text-base leading-7 text-slate-300">Estos prompts sirven para generar imagenes o diagramas explicativos en modo oscuro.</p>
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Vista general del proyecto</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Crea una ilustracion dark mode tipo operations dashboard para PPAM Scheduler mostrando cuatro bloques: workspace admin, portal del voluntario, motor operativo de asignaciones y persistencia/notificaciones. Debe verse profesional, moderna y apta para presentar a stakeholders no tecnicos.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Como funciona de extremo a extremo</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Genera un diagrama dark mode limpio que muestre el flujo end-to-end de PPAM Scheduler: crear o duplicar semana, asignar pareja, enviar confirmacion, recibir respuesta, detectar vacante, sugerir reemplazo y registrar NotificationLog. Usa iconografia simple y rotulos en espanol.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Uso dentro de una empresa</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Crea una imagen dark mode estilo mapa organizacional mostrando como coordinadores, voluntarios, desarrolladores y servicios de soporte (PostgreSQL y SMTP) interactuan con PPAM Scheduler. Debe sentirse clara, operativa y util para onboarding.</p>
+        
+      </article>
+    
+      <article class="rounded-3xl border border-slate-700 bg-slate-900/55 p-5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">Historia y evolucion</h3>
+        
+        <p class="mt-3 text-sm leading-6 text-slate-200">Disena una timeline dark mode que explique la evolucion visible de PPAM Scheduler desde un MVP inicial hasta un flujo mas cerrado con duplicacion de semana, active slots, excepciones temporales, respuesta directa por correo, logs de notificacion y setup local idempotente. Estilo sobrio, tecnologico y facil de presentar.</p>
+        
+      </article>
+    </div>
+      </div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">Evidencia observada</h2>
+      <div class="mt-5 space-y-4">
+    <div class="grid gap-4 lg:grid-cols-2">
+      
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Manifest</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">package.json</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Descripcion</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">Production-ready MVP for managing weekly public preaching assignments with role-based admin and volunteer experiences.</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">README.md</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Frameworks</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">Next.js, React</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">UI</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">Componentized UI, HTML templates, Lucide Icons, Radix UI, Tailwind CSS</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">package.json</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Entrypoints</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">app/layout.tsx, app/page.tsx</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">app/layout.tsx</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Superficies visibles</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">(auth) y (protected)</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">app/(auth)/forgot-password/page.tsx</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Archivos de entorno</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">.env, .env.example, .env.local</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">.env</p>
+            </article>
+          
+            <article class="rounded-3xl border border-slate-700 bg-slate-900/60 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-100">Pruebas</h3>
+                
+              </div>
+              <p class="mt-3 text-sm leading-6 text-slate-200">1 archivos de prueba detectados</p>
+              
+              <p class="mt-4 text-xs font-mono text-slate-400">tests</p>
+            </article>
+          
+    </div>
+  </div>
+    </section>
+  
+    <section class="rounded-[1.75rem] border border-slate-700/80 bg-slate-950/88 p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-semibold tracking-tight text-white">Preguntas abiertas</h2>
+      <div class="mt-5 space-y-4">
+    <ul class="space-y-3">
+      <li class="text-slate-200 leading-7">• Confirma si el flujo directo desde correo basado en `responseId` es suficiente para piloto interno o si debe migrarse a links firmados antes de un entorno mas expuesto.</li><li class="text-slate-200 leading-7">• Valida si reportes, scoring automatico y canales extra como SMS o WhatsApp quedan fuera de navegacion principal o forman parte de una siguiente fase.</li><li class="text-slate-200 leading-7">• Confirma si existe algun proceso externo de aprobacion, monitoreo o soporte que no este documentado en el repo.</li>
+    </ul>
+  </div>
+    </section>
+  </main>
+      <footer class="mt-8 border-t border-slate-700/80 py-6 text-sm text-slate-400">Generado por project-onboarding-docs a partir de /Users/josejaredvillatorovargas/Code/clients/jw/PPAM/PPAM_Scheduler.</footer>
+    </div>
+  </body>
+</html>

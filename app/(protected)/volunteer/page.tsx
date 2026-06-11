@@ -19,29 +19,29 @@ export default async function VolunteerDashboardPage() {
     <div className="space-y-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <DashboardStatCard
-          label="Upcoming"
+          label="Próximas"
           value={dashboard.upcomingAssignments.length}
           icon={CalendarDays}
         />
         <DashboardStatCard
-          label="Pending confirmations"
+          label="Confirmaciones pendientes"
           value={dashboard.pendingConfirmations.length}
           icon={AlertTriangle}
         />
         <DashboardStatCard
-          label="Open slots for you"
+          label="Vacantes para ti"
           value={dashboard.openSlots.length}
           icon={Sparkles}
         />
         <DashboardStatCard
-          label="Reliability"
+          label="Confiabilidad"
           value={`${Math.round(dashboard.volunteer.reliabilityScore)}%`}
           icon={CheckCircle2}
         />
       </section>
       <Card className="surface-panel">
         <CardHeader>
-          <CardTitle>Upcoming Assignments</CardTitle>
+          <CardTitle>Próximas asignaciones</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 lg:grid-cols-2">
           {dashboard.upcomingAssignments.length ? (
@@ -50,8 +50,8 @@ export default async function VolunteerDashboardPage() {
             ))
           ) : (
             <EmptyState
-              title="Nothing scheduled"
-              description="You do not have upcoming assignments right now."
+              title="Nada programado"
+              description="No tienes próximas asignaciones por ahora."
               className="lg:col-span-2"
             />
           )}

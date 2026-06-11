@@ -1,22 +1,19 @@
 import { ReactNode } from "react";
 
 import { AppSidebar } from "@/components/layout/app-sidebar";
-import { TopNavbar } from "@/components/layout/top-navbar";
 import type { UserRole } from "@/types/domain";
 
 type PageShellProps = {
   role: UserRole;
-  userName: string;
   children: ReactNode;
 };
 
-export function PageShell({ role, userName, children }: PageShellProps) {
+export function PageShell({ role, children }: PageShellProps) {
   return (
-    <div className="min-h-screen px-4 py-4">
-      <div className="mx-auto flex max-w-[1760px] gap-4">
+    <div className="h-dvh overflow-hidden px-2.5 py-2.5 sm:px-3 sm:py-3">
+      <div className="mx-auto flex h-full max-w-[1840px] flex-col gap-3 lg:flex-row lg:gap-3">
         <AppSidebar role={role} />
-        <main className="min-w-0 flex-1 space-y-4">
-          <TopNavbar role={role} userName={userName} />
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           {children}
         </main>
       </div>
