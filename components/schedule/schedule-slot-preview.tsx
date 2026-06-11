@@ -130,7 +130,7 @@ export function ScheduleSlotPreview({
     return (
       <div
         className={cn(
-          "flex h-full min-h-0 flex-col overflow-hidden rounded-[16px] border p-2.5",
+          "flex h-full min-h-0 flex-col overflow-hidden rounded-[16px] border p-3",
           primaryPair
             ? "border-primary/10 bg-white/[0.05]"
             : "border-white/8 bg-white/[0.04]"
@@ -155,7 +155,7 @@ export function ScheduleSlotPreview({
             <div className="flex min-h-0 flex-1 items-end">
               <span
                 className={cn(
-                  "inline-flex rounded-full border px-2 py-1 text-[9px] font-semibold leading-none",
+                  "inline-flex min-h-8 max-w-full items-center overflow-hidden rounded-full border px-3.5 py-1.5 text-[11px] font-bold leading-none tracking-[0.01em] text-ellipsis shadow-[0_10px_30px_rgba(5,10,24,0.18)] ring-1 ring-white/5 whitespace-nowrap",
                   compactSummary.className
                 )}
               >

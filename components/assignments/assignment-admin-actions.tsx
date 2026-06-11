@@ -104,16 +104,18 @@ export function AssignmentAdminActions({
     [preachingPoints, selectedDayOfWeek, timeSlot]
   );
 
-  const hasSinglePoint = preachingPoints.length <= 1;
+  const selectablePoints = compatiblePoints.length
+    ? compatiblePoints
+    : preachingPoints;
 
   useEffect(() => {
     if (
-      compatiblePoints.length &&
-      !compatiblePoints.some((point) => point.id === preachingPointId)
+      selectablePoints.length &&
+      !selectablePoints.some((point) => point.id === preachingPointId)
     ) {
-      setPreachingPointId(compatiblePoints[0].id);
+      setPreachingPointId(selectablePoints[0].id);
     }
-  }, [compatiblePoints, preachingPointId]);
+  }, [selectablePoints, preachingPointId]);
 
   async function handleSave() {
     setLoading("save");
@@ -189,9 +191,7 @@ export function AssignmentAdminActions({
         <div>
           <p className="font-semibold">Editar asignación</p>
           <p className={compact ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>
-            Ajusta fecha, horario
-            {hasSinglePoint ? "" : ", punto"}
-            {" o pareja sin salir del seguimiento."}
+            Ajusta fecha, horario o pareja sin salir del seguimiento.
           </p>
         </div>
       ) : null}
@@ -235,24 +235,6 @@ export function AssignmentAdminActions({
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
-        {!hasSinglePoint ? (
-          <div className="grid gap-2 md:col-span-3">
-            <label className="text-sm font-medium">Punto de predicación</label>
-            <Select value={preachingPointId} onValueChange={setPreachingPointId}>
-              <SelectTrigger className={compact ? "h-10" : undefined}>
-                <SelectValue placeholder="Selecciona un punto" />
-              </SelectTrigger>
-              <SelectContent>
-                {compatiblePoints.map((point) => (
-                  <SelectItem key={point.id} value={point.id}>
-                    {point.name} • {point.area}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-
         <div className="grid gap-2">
           <label className="text-sm font-medium">Voluntario 1</label>
           <Select value={volunteerOneId} onValueChange={setVolunteerOneId}>

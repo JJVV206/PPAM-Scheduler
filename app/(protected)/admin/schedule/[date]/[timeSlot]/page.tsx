@@ -60,9 +60,7 @@ export default async function AdminScheduleSlotPage({
   const attentionCount = assignments.filter(
     (assignment) => assignment.warnings.length > 0
   ).length;
-  const pointCount = new Set(
-    assignments.map((assignment) => assignment.preachingPoint.id)
-  ).size;
+  const pointCount = preachingPoints.length;
   const formattedPoints = preachingPoints.map((point) => ({
     id: point.id,
     name: point.name,

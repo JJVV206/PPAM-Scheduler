@@ -257,7 +257,7 @@ export function AppSidebar({ role }: AppSidebarProps) {
         </DialogContent>
       </Dialog>
 
-      <aside className="surface-panel hidden h-full w-[268px] min-w-[268px] shrink-0 flex-col justify-between p-4 xl:w-[284px] xl:min-w-[284px] xl:p-5 lg:flex">
+      <aside className="surface-panel hidden h-full w-[244px] min-w-[244px] shrink-0 flex-col justify-between p-4 xl:w-[256px] xl:min-w-[256px] 2xl:w-[280px] 2xl:min-w-[280px] 2xl:p-5 lg:flex">
         <div className="space-y-7">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-glow">

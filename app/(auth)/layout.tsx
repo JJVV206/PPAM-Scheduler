@@ -18,7 +18,7 @@ export default function AuthLayout({
               Horarios semanales, confirmaciones y reemplazos en un solo centro de control.
             </h1>
             <p className="max-w-lg text-lg leading-8 text-muted-foreground">
-              Coordina puntos de predicación, detecta vacantes a tiempo y mantén a los voluntarios avanzando con un flujo de confirmación más claro.
+              Coordina el punto de predicación, detecta vacantes a tiempo y mantén a los voluntarios avanzando con un flujo de confirmación más claro.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">

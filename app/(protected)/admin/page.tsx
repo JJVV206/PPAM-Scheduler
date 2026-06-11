@@ -20,7 +20,7 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         <DashboardStatCard
           label="Asignaciones semanales"
           value={dashboard.stats.totalAssignments}
@@ -48,7 +48,7 @@ export default async function AdminDashboardPage() {
         />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.3fr,1fr]">
+      <section className="grid gap-6 2xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.9fr)]">
         <Card className="surface-panel">
           <CardHeader>
             <CardTitle>Horario de hoy</CardTitle>
@@ -89,7 +89,7 @@ export default async function AdminDashboardPage() {
             <CardHeader>
               <CardTitle>Confirmaciones pendientes</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="grid gap-4 md:grid-cols-2 2xl:grid-cols-1">
               {dashboard.pendingConfirmations.slice(0, 3).map((assignment) => (
                 <AssignmentCard key={assignment.id} assignment={assignment} />
               ))}
@@ -99,7 +99,7 @@ export default async function AdminDashboardPage() {
             <CardHeader>
               <CardTitle>Reemplazos urgentes</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="grid gap-4 md:grid-cols-2 2xl:grid-cols-1">
               {dashboard.urgentReplacements.length ? (
                 dashboard.urgentReplacements.slice(0, 3).map((openSlot) => (
                   <div key={openSlot.assignmentId} className="rounded-2xl bg-white/[0.03] p-4">

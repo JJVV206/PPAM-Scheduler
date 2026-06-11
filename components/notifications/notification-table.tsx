@@ -12,6 +12,7 @@ import {
   NOTIFICATION_STATUS_LABELS,
   NOTIFICATION_TYPE_LABELS
 } from "@/lib/constants/domain";
+import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import { humanizeErrorMessage } from "@/lib/utils/error-message";
 import { formatDisplayDate } from "@/lib/utils";
 
@@ -73,7 +74,7 @@ export function NotificationTable({ notifications }: NotificationTableProps) {
               </Badge>
             </TableCell>
             <TableCell>
-              {notification.assignment?.preachingPoint.name ?? "General"}
+              {notification.assignment ? FIXED_PREACHING_POINT_NAME : "General"}
             </TableCell>
             <TableCell
               className={

@@ -1,6 +1,7 @@
 import { db } from "@/lib/db/prisma";
 import type { ReportSummaryDto } from "@/types/domain";
 import { safePercentage } from "@/lib/utils";
+import { getPreachingPoints } from "@/services/point.service";
 
 export async function getReportSummary(): Promise<ReportSummaryDto> {
   const [assignments, points, volunteerParticipation] = await Promise.all([
@@ -15,9 +16,7 @@ export async function getReportSummary(): Promise<ReportSummaryDto> {
         }
       }
     }),
-    db.preachingPoint.findMany({
-      include: { assignments: true }
-    }),
+    getPreachingPoints(),
     db.assignmentVolunteer.groupBy({
       by: ["volunteerId"],
       _count: {
@@ -37,7 +36,7 @@ export async function getReportSummary(): Promise<ReportSummaryDto> {
     (assignment) =>
       assignment.status === "NEEDS_REPLACEMENT" || assignment.volunteers.length < 2
   ).length;
-  const coveredPoints = points.filter((point) => point.assignments.length > 0).length;
+  const coveredPoints = totalAssignments > 0 ? 1 : 0;
 
   const names = await db.volunteerProfile.findMany({
     where: {

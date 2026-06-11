@@ -104,7 +104,7 @@ async function main() {
         userId: julia.id,
         notes: "Comfortable with early morning assignments.",
         transportationNotes: "Has car.",
-        preferredAreas: ["Downtown", "Transit Hub"],
+        preferredAreas: ["Hospital"],
         confirmationCount: 18,
         declineCount: 1,
         noResponseCount: 0,
@@ -116,7 +116,7 @@ async function main() {
         userId: marco.id,
         notes: "Prefers weekend afternoons.",
         transportationNotes: "Needs partner with car for distant areas.",
-        preferredAreas: ["Riverside", "Campus"],
+        preferredAreas: ["Hospital"],
         confirmationCount: 12,
         declineCount: 2,
         noResponseCount: 1,
@@ -128,7 +128,7 @@ async function main() {
         userId: elena.id,
         notes: "Available on weekdays.",
         transportationNotes: "Public transit only.",
-        preferredAreas: ["Downtown"],
+        preferredAreas: ["Hospital"],
         confirmationCount: 16,
         declineCount: 0,
         noResponseCount: 0,
@@ -137,52 +137,11 @@ async function main() {
     })
   ]);
 
-  const pointA = await prisma.preachingPoint.create({
+  const point = await prisma.preachingPoint.create({
     data: {
-      name: "Central Plaza Station",
-      area: "Downtown",
-      notes: "High foot traffic near the station entrance.",
-      activeSlots: {
-        createMany: {
-          data: [
-            { dayOfWeek: DayOfWeek.MONDAY, timeSlot: TimeSlot.SLOT_09_11 },
-            { dayOfWeek: DayOfWeek.TUESDAY, timeSlot: TimeSlot.SLOT_09_11 },
-            { dayOfWeek: DayOfWeek.WEDNESDAY, timeSlot: TimeSlot.SLOT_11_13 }
-          ]
-        }
-      }
-    }
-  });
-
-  const pointB = await prisma.preachingPoint.create({
-    data: {
-      name: "Riverside Walk",
-      area: "Riverside",
-      notes: "Steady afternoon visibility near the boardwalk.",
-      activeSlots: {
-        createMany: {
-          data: [
-            { dayOfWeek: DayOfWeek.THURSDAY, timeSlot: TimeSlot.SLOT_13_15 },
-            { dayOfWeek: DayOfWeek.SATURDAY, timeSlot: TimeSlot.SLOT_11_13 }
-          ]
-        }
-      }
-    }
-  });
-
-  const pointC = await prisma.preachingPoint.create({
-    data: {
-      name: "University Campus",
-      area: "Campus",
-      notes: "Best coverage before lunch.",
-      activeSlots: {
-        createMany: {
-          data: [
-            { dayOfWeek: DayOfWeek.FRIDAY, timeSlot: TimeSlot.SLOT_11_13 },
-            { dayOfWeek: DayOfWeek.SUNDAY, timeSlot: TimeSlot.SLOT_09_11 }
-          ]
-        }
-      }
+      name: "Hospital Dr José G. Parres",
+      area: "Hospital",
+      notes: "Punto fijo de predicación para toda la operación."
     }
   });
 
@@ -204,7 +163,7 @@ async function main() {
       date: addDays(currentWeekStart, 1),
       dayOfWeek: DayOfWeek.TUESDAY,
       timeSlot: TimeSlot.SLOT_09_11,
-      preachingPointId: pointA.id,
+      preachingPointId: point.id,
       status: AssignmentStatus.PENDING_CONFIRMATION,
       notes: "Bring literature cart."
     }
@@ -216,7 +175,7 @@ async function main() {
       date: addDays(currentWeekStart, 3),
       dayOfWeek: DayOfWeek.THURSDAY,
       timeSlot: TimeSlot.SLOT_13_15,
-      preachingPointId: pointB.id,
+      preachingPointId: point.id,
       status: AssignmentStatus.NEEDS_REPLACEMENT
     }
   });
@@ -227,7 +186,7 @@ async function main() {
       date: addDays(currentWeekStart, 4),
       dayOfWeek: DayOfWeek.FRIDAY,
       timeSlot: TimeSlot.SLOT_11_13,
-      preachingPointId: pointC.id,
+      preachingPointId: point.id,
       status: AssignmentStatus.CONFIRMED
     }
   });
@@ -325,25 +284,25 @@ async function main() {
         volunteerId: juliaProfile.id,
         dayOfWeek: DayOfWeek.TUESDAY,
         timeSlot: TimeSlot.SLOT_09_11,
-        areaPreference: "Downtown"
+        areaPreference: "Hospital"
       },
       {
         volunteerId: juliaProfile.id,
         dayOfWeek: DayOfWeek.FRIDAY,
         timeSlot: TimeSlot.SLOT_11_13,
-        areaPreference: "Campus"
+        areaPreference: "Hospital"
       },
       {
         volunteerId: marcoProfile.id,
         dayOfWeek: DayOfWeek.TUESDAY,
         timeSlot: TimeSlot.SLOT_09_11,
-        areaPreference: "Downtown"
+        areaPreference: "Hospital"
       },
       {
         volunteerId: elenaProfile.id,
         dayOfWeek: DayOfWeek.THURSDAY,
         timeSlot: TimeSlot.SLOT_13_15,
-        areaPreference: "Riverside"
+        areaPreference: "Hospital"
       }
     ]
   });

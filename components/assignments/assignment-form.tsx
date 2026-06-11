@@ -40,6 +40,7 @@ import {
   TIME_SLOT_DEFINITIONS,
   TIME_SLOTS
 } from "@/lib/constants/domain";
+import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import { TimeSlotOptionButton } from "@/components/assignments/time-slot-option-button";
 import { cn } from "@/lib/utils";
 import type {
@@ -193,8 +194,6 @@ export function AssignmentForm({
 
     return matches.length ? matches : preachingPoints;
   }, [preachingPoints, selectedDayOfWeek, selectedTimeSlot]);
-
-  const hasSinglePoint = preachingPoints.length <= 1;
 
   useEffect(() => {
     const currentPointId = form.getValues("preachingPointId");
@@ -391,47 +390,12 @@ export function AssignmentForm({
                       {DAY_LABELS[selectedDayOfWeek]}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {compatiblePoints.length} punto
-                      {compatiblePoints.length === 1 ? "" : "s"} compatible
-                      {compatiblePoints.length === 1 ? "" : "s"} en este horario.
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Los puntos sin slots activos siguen disponibles en cualquier
-                      franja.
+                      Este horario se registrará en {FIXED_PREACHING_POINT_NAME}.
                     </p>
                   </div>
                 </div>
               </>
             )}
-
-            {!hasSinglePoint ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="preachingPointId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Punto de predicación</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="h-10">
-                            <SelectValue placeholder="Selecciona un punto" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {compatiblePoints.map((point) => (
-                            <SelectItem key={point.id} value={point.id}>
-                              {point.name} • {point.area}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            ) : null}
 
             <div className="grid gap-4 md:grid-cols-2">
               <FormField

@@ -21,6 +21,7 @@ import {
   TIME_SLOT_DEFINITIONS,
   TIME_SLOTS
 } from "@/lib/constants/domain";
+import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import type {
   AdminDashboardStats,
   AssignmentDetailDto,
@@ -39,6 +40,7 @@ import {
 import { getAppBaseUrl } from "@/lib/env/config";
 import { safePercentage } from "@/lib/utils";
 import { determineAssignmentStatus } from "@/services/assignment-engine";
+import { getSingletonPreachingPoint } from "@/services/point.service";
 
 const assignmentInclude = {
   scheduleWeek: true,
@@ -151,7 +153,7 @@ function mapAssignmentDetail(
     notes: assignment.notes,
     preachingPoint: {
       id: assignment.preachingPoint.id,
-      name: assignment.preachingPoint.name,
+      name: FIXED_PREACHING_POINT_NAME,
       area: assignment.preachingPoint.area,
       notes: assignment.preachingPoint.notes,
       active: assignment.preachingPoint.active,
@@ -224,7 +226,7 @@ async function assertPointSupportsSlot(input: {
 
   if (!isAllowed) {
     throw new AppError(
-      `El punto ${point.name} no está habilitado para ${DAY_LABELS[input.dayOfWeek]} en ${TIME_SLOT_DEFINITIONS[input.timeSlot].label}.`,
+      `El punto ${FIXED_PREACHING_POINT_NAME} no está habilitado para ${DAY_LABELS[input.dayOfWeek]} en ${TIME_SLOT_DEFINITIONS[input.timeSlot].label}.`,
       409
     );
   }
@@ -374,8 +376,10 @@ export async function createWeeklyAssignment(input: {
   volunteers: Array<{ volunteerId: string; position: VolunteerPosition }>;
   actorUserId: string;
 }) {
+  const fixedPoint = await getSingletonPreachingPoint();
+
   await assertPointSupportsSlot({
-    preachingPointId: input.preachingPointId,
+    preachingPointId: fixedPoint.id,
     dayOfWeek: input.dayOfWeek,
     timeSlot: input.timeSlot
   });
@@ -396,7 +400,7 @@ export async function createWeeklyAssignment(input: {
         tx,
         date: input.date,
         timeSlot: input.timeSlot,
-        preachingPointId: input.preachingPointId
+        preachingPointId: fixedPoint.id
       }));
 
     const created = await tx.assignment.create({
@@ -405,7 +409,7 @@ export async function createWeeklyAssignment(input: {
         date: input.date,
         dayOfWeek: input.dayOfWeek,
         timeSlot: input.timeSlot,
-        preachingPointId: input.preachingPointId,
+        preachingPointId: fixedPoint.id,
         pairNumber,
         notes: input.notes,
         status: "SCHEDULED"
@@ -467,12 +471,12 @@ export async function updateAssignment(
     where: { id: assignmentId },
     include: { volunteers: true }
   });
+  const fixedPoint = await getSingletonPreachingPoint();
 
   const nextDate = input.date ?? current.date;
   const nextDayOfWeek = input.dayOfWeek ?? current.dayOfWeek;
   const nextTimeSlot = input.timeSlot ?? current.timeSlot;
-  const nextPreachingPointId =
-    input.preachingPointId ?? current.preachingPointId;
+  const nextPreachingPointId = fixedPoint.id;
   const volunteerIds =
     input.volunteers?.map((item) => item.volunteerId) ??
     current.volunteers.map((item) => item.volunteerId);
@@ -510,7 +514,7 @@ export async function updateAssignment(
         date: input.date,
         dayOfWeek: input.dayOfWeek,
         timeSlot: input.timeSlot,
-        preachingPointId: input.preachingPointId,
+        preachingPointId: nextPreachingPointId,
         pairNumber,
         notes: input.notes,
         status: input.status
@@ -594,6 +598,7 @@ export async function getWeeklySchedule(input?: {
     status?: AssignmentStatus;
   };
 }): Promise<WeeklyScheduleMatrix> {
+  const fixedPoint = await getSingletonPreachingPoint();
   const weekStart = input?.weekStart
     ? startOfWeek(input.weekStart, { weekStartsOn: 1 })
     : startOfWeek(new Date(), { weekStartsOn: 1 });
@@ -652,7 +657,7 @@ export async function getWeeklySchedule(input?: {
 
     const groups = day.items[assignment.timeSlot];
     const existingGroup = groups.find(
-      (group) => group.preachingPointId === assignment.preachingPointId
+      (group) => group.preachingPointId === fixedPoint.id
     );
 
     const pair = {
@@ -683,9 +688,9 @@ export async function getWeeklySchedule(input?: {
       date: assignment.date,
       dayOfWeek: assignment.dayOfWeek,
       timeSlot: assignment.timeSlot,
-      preachingPointId: assignment.preachingPointId,
-      preachingPointName: assignment.preachingPoint.name,
-      area: assignment.preachingPoint.area,
+      preachingPointId: fixedPoint.id,
+      preachingPointName: FIXED_PREACHING_POINT_NAME,
+      area: fixedPoint.area,
       pairs: [pair]
     });
   }
@@ -1044,7 +1049,7 @@ export async function getOpenSlots(): Promise<OpenSlotDto[]> {
           dayOfWeek: assignment.dayOfWeek,
           timeSlot: assignment.timeSlot,
           preachingPointId: assignment.preachingPointId,
-          preachingPointName: assignment.preachingPoint.name,
+          preachingPointName: FIXED_PREACHING_POINT_NAME,
           area: assignment.preachingPoint.area,
           status: assignment.status,
           missingPositions: positions.length ? positions : ["SECOND"],
@@ -1262,9 +1267,9 @@ export async function sendAssignmentConfirmationRequests(assignmentId: string) {
         assignmentId,
         type: "CONFIRMATION_REQUEST",
         subject: "Confirma tu asignación de PPAM",
-        html: `<p>Hola ${slot.volunteer.user.name},</p><p>Tienes asignación en ${assignment.preachingPoint.name} el ${DAY_LABELS[assignment.dayOfWeek]} en el horario ${TIME_SLOT_DEFINITIONS[assignment.timeSlot].label}.</p>${confirmationLink ? `<p><a href="${confirmationLink}">Abrir confirmación directa</a></p>` : ""}`,
+        html: `<p>Hola ${slot.volunteer.user.name},</p><p>Tienes asignación en ${FIXED_PREACHING_POINT_NAME} el ${DAY_LABELS[assignment.dayOfWeek]} en el horario ${TIME_SLOT_DEFINITIONS[assignment.timeSlot].label}.</p>${confirmationLink ? `<p><a href="${confirmationLink}">Abrir confirmación directa</a></p>` : ""}`,
         metadata: {
-          pointName: assignment.preachingPoint.name,
+          pointName: FIXED_PREACHING_POINT_NAME,
           confirmationLink
         }
       });
@@ -1327,7 +1332,7 @@ export async function resendAssignmentConfirmation(assignmentId: string) {
         assignmentId,
         volunteerUserId: slot.volunteer.userId,
         volunteerName: slot.volunteer.user.name,
-        pointName: assignment.preachingPoint.name,
+        pointName: FIXED_PREACHING_POINT_NAME,
         dateLabel: DAY_LABELS[assignment.dayOfWeek],
         timeSlotLabel: TIME_SLOT_DEFINITIONS[assignment.timeSlot].label,
         confirmationLink
