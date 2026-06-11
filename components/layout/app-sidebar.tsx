@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useState } from "react";
 import {
   Bell,
   CalendarDays,
@@ -71,6 +71,7 @@ type AppSidebarProps = {
 type NavigationContentProps = {
   items: NavItem[];
   onNavigate?: () => void;
+  onPreload?: (href: string) => void;
   pathname: string;
 };
 
@@ -96,6 +97,7 @@ function getCurrentSectionLabel(pathname: string, items: NavItem[]) {
 function NavigationContent({
   items,
   onNavigate,
+  onPreload,
   pathname
 }: NavigationContentProps) {
   return (
@@ -108,7 +110,10 @@ function NavigationContent({
           <Link
             key={item.href}
             href={item.href}
+            prefetch={false}
             onClick={onNavigate}
+            onFocus={() => onPreload?.(item.href)}
+            onPointerEnter={() => onPreload?.(item.href)}
             className={cn(
               "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-muted-foreground transition hover:bg-white/5 hover:text-foreground",
               active &&
@@ -126,11 +131,18 @@ function NavigationContent({
 
 export function AppSidebar({ role }: AppSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const items = getNavItems(role);
   const currentSectionLabel = getCurrentSectionLabel(pathname, items);
   const notificationsHref =
     role === "ADMIN" ? "/admin/notifications" : "/volunteer/notifications";
+  const preloadRoute = useCallback(
+    (href: string) => {
+      router.prefetch(href);
+    },
+    [router]
+  );
 
   return (
     <>
@@ -227,6 +239,7 @@ export function AppSidebar({ role }: AppSidebarProps) {
                 <NavigationContent
                   items={items}
                   pathname={pathname}
+                  onPreload={preloadRoute}
                   onNavigate={() => setMobileNavOpen(false)}
                 />
               </div>
@@ -271,7 +284,11 @@ export function AppSidebar({ role }: AppSidebarProps) {
             </div>
           </div>
 
-          <NavigationContent items={items} pathname={pathname} />
+          <NavigationContent
+            items={items}
+            pathname={pathname}
+            onPreload={preloadRoute}
+          />
         </div>
 
         <div className="space-y-3 border-t border-border/60 pt-5">

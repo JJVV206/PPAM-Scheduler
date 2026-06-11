@@ -3,6 +3,7 @@ import {
   differenceInCalendarDays,
   endOfWeek,
   isSameDay,
+  startOfDay,
   startOfWeek
 } from "date-fns";
 import {
@@ -993,10 +994,17 @@ export async function getAvailableVolunteersForSlot(input: {
 export async function getOpenSlots(): Promise<OpenSlotDto[]> {
   const assignments = await db.assignment.findMany({
     where: {
-      OR: [{ status: "NEEDS_REPLACEMENT" }, { volunteers: { some: {} } }],
-      NOT: {
-        status: "CANCELLED"
-      }
+      date: {
+        gte: startOfDay(new Date())
+      },
+      status: {
+        notIn: ["CANCELLED", "COMPLETED"]
+      },
+      OR: [
+        { status: { in: ["NEEDS_REPLACEMENT", "DECLINED"] } },
+        { volunteers: { none: { position: "FIRST" } } },
+        { volunteers: { none: { position: "SECOND" } } }
+      ]
     },
     include: {
       preachingPoint: true,
@@ -1170,13 +1178,14 @@ export async function assignReplacementVolunteer(input: {
 }
 
 export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
-  const schedule = await getWeeklySchedule();
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
   const [assignments, openSlots] = await Promise.all([
     db.assignment.findMany({
       where: {
         date: {
-          gte: schedule.startDate,
-          lte: schedule.endDate
+          gte: weekStart,
+          lte: weekEnd
         }
       },
       include: assignmentInclude
@@ -1188,7 +1197,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
   const today = new Date();
 
   return {
-    weekLabel: schedule.weekLabel,
+    weekLabel: `Semana del ${weekStart.toLocaleDateString("es-MX")}`,
     stats: {
       totalAssignments: assignments.length,
       confirmedAssignments: assignments.filter(
