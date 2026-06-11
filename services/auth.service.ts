@@ -33,7 +33,7 @@ export async function requestPasswordReset(email: string) {
     subject: "Restablece tu contraseña de PPAM Planificador",
     html: `<p>Hola ${user.name},</p><p>Usa este enlace para restablecer tu contraseña:</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
     metadata: {
-      token
+      resetRequestedAt: new Date().toISOString()
     }
   });
 }

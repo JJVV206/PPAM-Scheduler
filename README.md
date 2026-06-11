@@ -48,6 +48,7 @@ Seeded users are created by `prisma/seed.ts`.
 Before deploying, configure these environment variables with real production values:
 
 - `DATABASE_URL`
+- `DIRECT_URL`
 - `NEXTAUTH_SECRET`
 - `NEXTAUTH_URL`
 - `SMTP_HOST`
@@ -60,11 +61,17 @@ Recommended release flow:
 
 1. Run `npm run ready:prod`
 2. Apply schema changes with `npm run db:migrate:deploy`
-3. Start the app with `npm run start` or deploy the included `Dockerfile`
-4. Verify `GET /api/health` returns `200 OK`
+3. Create the first production admin with `npm run prod:create-admin`
+4. Start the app with `npm run start` or deploy to Vercel
+5. Verify `GET /api/health` returns `200 OK`
+6. Verify full readiness with `GET /api/health?scope=readiness`
+7. Run `npm run qa:smoke` against the deployed URL
 
 Notes:
 
 - Production no longer relies on `prisma db push`; use migrations instead.
+- `/api/health` reports core app/database health. Use `?scope=readiness` when email must be part of the release gate.
 - If SMTP is missing or invalid in production, password reset and assignment emails will fail explicitly instead of being marked as sent.
 - The app is configured with `output: "standalone"` to support container deployment.
+- Vercel + Neon deployment steps are documented in `docs/deploy-vercel.md`.
+- The production checklist is documented in `docs/production-checklist.md`.

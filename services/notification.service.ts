@@ -21,6 +21,49 @@ type NotificationPayload = {
   metadata?: Record<string, unknown>;
 };
 
+const SENSITIVE_METADATA_KEYS = new Set([
+  "password",
+  "passwordHash",
+  "resetToken",
+  "token"
+]);
+
+function sanitizeMetadataValue(key: string, value: unknown): unknown {
+  if (SENSITIVE_METADATA_KEYS.has(key)) {
+    return undefined;
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => sanitizeMetadataValue("", item))
+      .filter((item) => item !== undefined);
+  }
+
+  if (value && typeof value === "object") {
+    return sanitizeNotificationMetadata(value as Record<string, unknown>);
+  }
+
+  return value;
+}
+
+export function sanitizeNotificationMetadata(
+  metadata?: Record<string, unknown>
+): Record<string, unknown> | undefined {
+  if (!metadata) {
+    return undefined;
+  }
+
+  const sanitizedEntries = Object.entries(metadata)
+    .map(([key, value]) => [key, sanitizeMetadataValue(key, value)] as const)
+    .filter(([, value]) => value !== undefined);
+
+  if (!sanitizedEntries.length) {
+    return undefined;
+  }
+
+  return Object.fromEntries(sanitizedEntries);
+}
+
 function createTransport() {
   const smtpConfig = getSmtpConfig();
 
@@ -54,7 +97,9 @@ export async function logNotification(payload: {
       status: payload.status,
       errorMessage: payload.errorMessage,
       sentAt: payload.status === "SENT" ? new Date() : null,
-      metadata: payload.metadata as Prisma.InputJsonValue | undefined
+      metadata: sanitizeNotificationMetadata(payload.metadata) as
+        | Prisma.InputJsonValue
+        | undefined
     }
   });
 }
