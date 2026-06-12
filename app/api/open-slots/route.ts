@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/auth/guards";
+import { revalidateAssignmentViews } from "@/lib/cache/revalidate-assignment-views";
 import { replacementAssignmentSchema } from "@/lib/validations/assignment";
 import { assignReplacementVolunteer, getOpenSlots } from "@/services/assignment.service";
 import { AppError } from "@/services/errors";
@@ -38,6 +39,12 @@ export async function POST(request: Request) {
       volunteerId,
       actorUserId: auth.session.user.id,
       position: body.position
+    });
+
+    revalidateAssignmentViews({
+      assignmentId: result.id,
+      date: result.date,
+      timeSlot: result.timeSlot
     });
 
     return ok(result);

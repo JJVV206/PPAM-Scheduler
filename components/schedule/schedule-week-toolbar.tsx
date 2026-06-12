@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { addDays, format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
+  CalendarDays,
   CalendarPlus2,
   CopyPlus,
   ChevronLeft,
@@ -32,6 +33,7 @@ import {
 } from "@/components/ui/select";
 
 type ScheduleWeekToolbarProps = {
+  currentWeekStart: string;
   selectedWeekStart: string;
   availableWeeks: Array<{
     id: string;
@@ -47,6 +49,7 @@ function toIsoWeekStart(value: string) {
 }
 
 export function ScheduleWeekToolbar({
+  currentWeekStart,
   selectedWeekStart,
   availableWeeks
 }: ScheduleWeekToolbarProps) {
@@ -72,6 +75,8 @@ export function ScheduleWeekToolbar({
       setSourceWeekId(availableWeeks[0].id);
     }
   }, [availableWeeks, sourceWeekId]);
+
+  const viewingCurrentWeek = selectedWeekStart === currentWeekStart;
 
   function navigateToWeek(value: string) {
     router.push(`/admin/schedule?weekStart=${value}`);
@@ -114,9 +119,7 @@ export function ScheduleWeekToolbar({
     setFeedback({
       tone: "success",
       text:
-        mode === "EMPTY"
-          ? "Semana creada."
-          : "Semana duplicada correctamente."
+        mode === "EMPTY" ? "Semana creada." : "Semana duplicada correctamente."
     });
     setSubmitting(false);
     setOpen(false);
@@ -125,8 +128,8 @@ export function ScheduleWeekToolbar({
   }
 
   return (
-    <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
-      <div className="grid w-full gap-2 sm:flex sm:flex-wrap sm:items-center lg:w-auto">
+    <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
+      <div className="grid w-full gap-2 sm:flex sm:flex-wrap sm:items-center lg:w-auto xl:flex-nowrap">
         <Button
           type="button"
           variant="secondary"
@@ -146,6 +149,16 @@ export function ScheduleWeekToolbar({
         <Button
           type="button"
           variant="secondary"
+          aria-current={viewingCurrentWeek ? "date" : undefined}
+          className="w-full sm:w-auto xl:whitespace-nowrap"
+          onClick={() => navigateToWeek(currentWeekStart)}
+        >
+          <CalendarDays className="h-4 w-4" />
+          Esta semana
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
           className="w-full sm:w-auto"
           onClick={() =>
             navigateToWeek(
@@ -161,9 +174,9 @@ export function ScheduleWeekToolbar({
         </Button>
       </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button className="w-full sm:w-auto">
+          <Button className="w-full sm:w-auto xl:whitespace-nowrap">
             <CalendarPlus2 className="h-4 w-4" />
             Crear o duplicar semana
           </Button>

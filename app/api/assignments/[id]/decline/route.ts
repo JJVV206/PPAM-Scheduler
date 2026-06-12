@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/auth/guards";
+import { revalidateAssignmentViews } from "@/lib/cache/revalidate-assignment-views";
 import { declineAssignmentSchema } from "@/lib/validations/assignment";
 import { declineAssignment } from "@/services/assignment.service";
 import { AppError } from "@/services/errors";
@@ -24,6 +25,11 @@ export async function POST(
       assignmentId: id,
       volunteerProfileId: auth.session.user.volunteerProfileId,
       note: body.note
+    });
+    revalidateAssignmentViews({
+      assignmentId: result.id,
+      date: result.date,
+      timeSlot: result.timeSlot
     });
     return ok(result);
   } catch (error) {

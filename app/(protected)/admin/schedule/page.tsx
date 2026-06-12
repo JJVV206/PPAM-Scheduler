@@ -1,8 +1,11 @@
+import { format, isSameMonth, isSameYear, startOfWeek } from "date-fns";
+import { es } from "date-fns/locale";
+
 import { EmptyState } from "@/components/forms/empty-state";
 import { AssignmentForm } from "@/components/assignments/assignment-form";
 import { WeeklyScheduleGrid } from "@/components/schedule/weekly-schedule-grid";
 import { ScheduleWeekToolbar } from "@/components/schedule/schedule-week-toolbar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { getWeeklySchedule } from "@/services/assignment.service";
 import { getPreachingPoints } from "@/services/point.service";
 import { getVolunteers } from "@/services/volunteer.service";
@@ -14,6 +17,26 @@ type AdminSchedulePageProps = {
   }>;
 };
 
+function formatSchedulePeriod(startDate: Date, endDate: Date) {
+  if (isSameMonth(startDate, endDate) && isSameYear(startDate, endDate)) {
+    return `Del ${format(startDate, "d", { locale: es })} al ${format(
+      endDate,
+      "d 'de' MMMM 'de' yyyy",
+      { locale: es }
+    )}`;
+  }
+
+  if (isSameYear(startDate, endDate)) {
+    return `Del ${format(startDate, "d 'de' MMMM", {
+      locale: es
+    })} al ${format(endDate, "d 'de' MMMM 'de' yyyy", { locale: es })}`;
+  }
+
+  return `Del ${format(startDate, "d 'de' MMMM 'de' yyyy", {
+    locale: es
+  })} al ${format(endDate, "d 'de' MMMM 'de' yyyy", { locale: es })}`;
+}
+
 export default async function AdminSchedulePage({
   searchParams
 }: AdminSchedulePageProps) {
@@ -24,6 +47,14 @@ export default async function AdminSchedulePage({
   const schedule = await getWeeklySchedule({
     weekStart: selectedWeekStart
   });
+  const currentWeekStart = format(
+    startOfWeek(new Date(), { weekStartsOn: 1 }),
+    "yyyy-MM-dd"
+  );
+  const schedulePeriodLabel = formatSchedulePeriod(
+    schedule.startDate,
+    schedule.endDate
+  );
 
   const [preachingPoints, volunteers, currentWeek, availableWeeks] =
     await Promise.all([
@@ -52,24 +83,6 @@ export default async function AdminSchedulePage({
       timeSlot: slot.timeSlot
     }))
   }));
-  const occupiedSlotCount = schedule.days.reduce(
-    (total, day) =>
-      total +
-      Object.values(day.items).filter((items) => items.length > 0).length,
-    0
-  );
-  const totalPairCount = schedule.days.reduce(
-    (total, day) =>
-      total +
-      Object.values(day.items).reduce(
-        (slotTotal, items) =>
-          slotTotal +
-          items.reduce((pairTotal, item) => pairTotal + item.pairs.length, 0),
-        0
-      ),
-    0
-  );
-
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <section className="surface-panel shrink-0 px-4 py-4 sm:px-5 sm:py-5">
@@ -79,13 +92,14 @@ export default async function AdminSchedulePage({
               Horario semanal
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {schedule.weekLabel}
+              {schedulePeriodLabel}
             </p>
           </div>
 
-          <div className="flex w-full flex-col gap-2.5 xl:w-auto xl:items-end">
+          <div className="flex w-full flex-col gap-2.5 xl:w-auto xl:flex-row xl:items-center xl:justify-end">
             <ScheduleWeekToolbar
               selectedWeekStart={schedule.startDate.toISOString().slice(0, 10)}
+              currentWeekStart={currentWeekStart}
               availableWeeks={availableWeeks.map((week) => ({
                 id: week.id,
                 label: week.label,
@@ -94,10 +108,10 @@ export default async function AdminSchedulePage({
             />
 
             {currentWeek ? (
-              <div className="w-full xl:w-auto">
+              <div className="w-full xl:w-auto xl:shrink-0">
                 <AssignmentForm
                   scheduleWeekId={currentWeek.id}
-                  triggerClassName="xl:self-end"
+                  triggerClassName="xl:whitespace-nowrap"
                   triggerLabel="Agregar pareja"
                   triggerSize="default"
                   weekStartDate={schedule.startDate.toISOString()}
@@ -116,23 +130,7 @@ export default async function AdminSchedulePage({
       </section>
 
       <Card className="surface-panel min-h-0 flex-1 overflow-hidden">
-        <CardHeader className="shrink-0 px-4 pb-2 pt-4 sm:px-5 sm:pt-5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <CardTitle>Planeador</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Entra a cada horario para ver todas las parejas y abrir su ficha
-                completa.
-              </p>
-            </div>
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-              {occupiedSlotCount} horario{occupiedSlotCount === 1 ? "" : "s"} con
-              actividad • {totalPairCount} pareja
-              {totalPairCount === 1 ? "" : "s"}
-            </p>
-          </div>
-        </CardHeader>
-        <CardContent className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 pb-3 pt-0 sm:px-4 xl:px-5">
+        <CardContent className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 xl:p-5">
           {schedule.days.some((day) =>
             Object.values(day.items).some((items) => items.length > 0)
           ) ? (

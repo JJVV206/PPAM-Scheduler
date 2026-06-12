@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 
 import { requireRole } from "@/lib/auth/guards";
 import { hashPassword } from "@/lib/auth/password";
+import { revalidateVolunteerViews } from "@/lib/cache/revalidate-volunteer-views";
 import { createVolunteerSchema } from "@/lib/validations/volunteer";
 import { createVolunteer, getVolunteers } from "@/services/volunteer.service";
 import { handleRouteError, ok } from "@/lib/utils/api";
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
       preferredAreas: body.preferredAreas ?? [],
       passwordHash
     });
+    revalidateVolunteerViews(result.volunteerProfile?.id ?? undefined);
 
     let warning: string | undefined;
 

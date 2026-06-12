@@ -1,4 +1,5 @@
 import { requireSession, requireRole } from "@/lib/auth/guards";
+import { revalidateAssignmentViews } from "@/lib/cache/revalidate-assignment-views";
 import { updateAssignmentSchema } from "@/lib/validations/assignment";
 import { deleteAssignment, getAssignmentDetail, updateAssignment } from "@/services/assignment.service";
 import { AppError } from "@/services/errors";
@@ -50,6 +51,12 @@ export async function PATCH(request: Request, { params }: AssignmentRouteContext
       actorUserId: auth.session.user.id
     });
 
+    revalidateAssignmentViews({
+      assignmentId: assignment.id,
+      date: assignment.date,
+      timeSlot: assignment.timeSlot
+    });
+
     return ok(assignment);
   } catch (error) {
     return handleRouteError(error);
@@ -61,7 +68,13 @@ export async function DELETE(_: Request, { params }: AssignmentRouteContext) {
     const auth = await requireRole(["ADMIN"]);
     if ("error" in auth) return auth.error;
     const { id } = await params;
+    const assignment = await getAssignmentDetail(id);
     await deleteAssignment(id);
+    revalidateAssignmentViews({
+      assignmentId: id,
+      date: assignment.date,
+      timeSlot: assignment.timeSlot
+    });
     return ok({ success: true });
   } catch (error) {
     return handleRouteError(error);

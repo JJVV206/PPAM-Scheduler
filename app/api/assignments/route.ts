@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/auth/guards";
+import { revalidateAssignmentViews } from "@/lib/cache/revalidate-assignment-views";
 import { createAssignmentSchema, assignmentFiltersSchema } from "@/lib/validations/assignment";
 import { createWeeklyAssignment, getAssignments } from "@/services/assignment.service";
 import { handleRouteError, ok } from "@/lib/utils/api";
@@ -39,6 +40,12 @@ export async function POST(request: Request) {
       notes: body.notes,
       volunteers: body.volunteers,
       actorUserId: auth.session.user.id
+    });
+
+    revalidateAssignmentViews({
+      assignmentId: assignment.id,
+      date: assignment.date,
+      timeSlot: assignment.timeSlot
     });
 
     return ok(assignment, { status: 201 });

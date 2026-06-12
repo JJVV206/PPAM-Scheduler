@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -21,12 +22,17 @@ import { createVolunteerSchema } from "@/lib/validations/volunteer";
 
 type VolunteerFormValues = z.infer<typeof createVolunteerSchema>;
 
+const SUCCESS_CLOSE_DELAY_MS = 900;
+
 export function CreateVolunteerForm() {
+  const router = useRouter();
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error" | "warning";
     text: string;
   } | null>(null);
   const [open, setOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const closeTimeoutRef = useRef<number | null>(null);
   const form = useForm<VolunteerFormValues>({
     resolver: zodResolver(createVolunteerSchema),
     defaultValues: {
@@ -41,7 +47,29 @@ export function CreateVolunteerForm() {
     }
   });
 
+  function clearCloseTimeout() {
+    if (!closeTimeoutRef.current) return;
+    window.clearTimeout(closeTimeoutRef.current);
+    closeTimeoutRef.current = null;
+  }
+
+  useEffect(() => {
+    return () => clearCloseTimeout();
+  }, []);
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
+      clearCloseTimeout();
+      form.reset();
+      form.clearErrors();
+      setFeedback(null);
+    }
+
+    setOpen(nextOpen);
+  }
+
   async function onSubmit(values: VolunteerFormValues) {
+    setSubmitting(true);
     setFeedback(null);
     form.clearErrors();
 
@@ -54,15 +82,20 @@ export function CreateVolunteerForm() {
 
     if (response.ok) {
       form.reset();
-      if (result.warning) {
-        setFeedback({
-          tone: "warning",
-          text: result.warning
-        });
-      } else {
-        setFeedback(null);
+      router.refresh();
+      setFeedback({
+        tone: result.warning ? "warning" : "success",
+        text: result.warning
+          ? `${result.warning} Cerrando ventana...`
+          : "Voluntario creado. Cerrando ventana..."
+      });
+      clearCloseTimeout();
+      closeTimeoutRef.current = window.setTimeout(() => {
         setOpen(false);
-      }
+        setFeedback(null);
+        closeTimeoutRef.current = null;
+      }, SUCCESS_CLOSE_DELAY_MS);
+      setSubmitting(false);
       return;
     }
 
@@ -71,6 +104,7 @@ export function CreateVolunteerForm() {
         type: "server",
         message: result.error ?? "Ese correo ya está registrado."
       });
+      setSubmitting(false);
       return;
     }
 
@@ -78,19 +112,13 @@ export function CreateVolunteerForm() {
       tone: "error",
       text: result.error ?? "No se pudo guardar el voluntario."
     });
+    setSubmitting(false);
   }
 
   return (
     <Dialog
       open={open}
-      onOpenChange={(nextOpen) => {
-        setOpen(nextOpen);
-        if (!nextOpen) {
-          form.reset();
-          form.clearErrors();
-          setFeedback(null);
-        }
-      }}
+      onOpenChange={handleOpenChange}
     >
       <DialogTrigger asChild>
         <Button>Agregar voluntario</Button>
@@ -156,8 +184,8 @@ export function CreateVolunteerForm() {
               message={feedback?.text}
               tone={feedback?.tone}
             />
-            <Button type="submit" className="w-full">
-              Guardar voluntario
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? "Guardando..." : "Guardar voluntario"}
             </Button>
           </form>
         </Form>

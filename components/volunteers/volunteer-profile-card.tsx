@@ -30,11 +30,11 @@ type VolunteerProfileCardProps = {
 
 export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
   return (
-    <Card className="surface-panel h-fit min-w-0 self-start xl:sticky xl:top-4">
-      <CardHeader className="p-6 pb-4">
+    <Card className="surface-panel h-fit min-w-0 self-start">
+      <CardHeader className="p-5 pb-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 space-y-1.5">
-            <CardTitle className="text-2xl">{volunteer.name}</CardTitle>
+          <div className="min-w-0 space-y-1">
+            <CardTitle className="text-xl">{volunteer.name}</CardTitle>
             <p className="text-sm text-muted-foreground">
               Perfil operativo del voluntario
             </p>
@@ -49,30 +49,30 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3 p-6 pt-0">
-        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+      <CardContent className="grid gap-3 p-5 pt-0 md:grid-cols-2 xl:grid-cols-6">
+        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2 xl:col-span-3">
+          <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
             Contacto
           </p>
-          <div className="mt-3 space-y-3">
-            <div className="flex min-w-0 items-start gap-3">
+          <div className="mt-3 grid gap-3">
+            <div className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-start gap-3">
               <Mail className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div className="min-w-0">
-                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                   Correo
                 </p>
-                <p className="mt-1 break-all text-sm text-foreground">
+                <p className="mt-1 break-words text-sm leading-snug text-foreground [overflow-wrap:anywhere]">
                   {volunteer.email}
                 </p>
               </div>
             </div>
-            <div className="flex min-w-0 items-start gap-3">
+            <div className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-start gap-3">
               <Phone className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div className="min-w-0">
-                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                   Teléfono
                 </p>
-                <p className="mt-1 break-words text-sm text-foreground">
+                <p className="mt-1 break-words text-sm leading-snug text-foreground">
                   {volunteer.phone ?? "Sin teléfono registrado"}
                 </p>
               </div>
@@ -80,9 +80,9 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
-            <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+        <div className="grid gap-3 sm:grid-cols-2 md:col-span-2 xl:col-span-3 xl:grid-cols-2">
+          <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
               Confiabilidad
             </p>
             <p className="mt-2 flex items-center gap-2 text-lg font-semibold text-foreground">
@@ -90,11 +90,11 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
               {Math.round(volunteer.reliabilityScore)}%
             </p>
           </div>
-          <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
-            <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+          <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
               Transporte
             </p>
-            <div className="mt-2 flex items-start gap-2 text-sm text-muted-foreground">
+            <div className="mt-2 flex items-start gap-2 text-sm leading-snug text-muted-foreground">
               <CarFront className="mt-0.5 h-4 w-4 shrink-0" />
               <p className="break-words">
                 {volunteer.transportationNotes ?? "Sin notas registradas"}
@@ -103,49 +103,49 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2 xl:col-span-3">
+          <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
             Seguimiento
           </p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-success/15 bg-success/10 p-3">
-              <p className="text-[11px] uppercase tracking-[0.16em] text-success/80">
+          <div className="mt-3 grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(104px,1fr))]">
+            <div className="min-w-0 rounded-2xl border border-success/15 bg-success/10 p-2.5">
+              <p className="text-[10px] uppercase leading-tight tracking-[0.06em] text-success/80">
                 Confirm.
               </p>
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-1.5 flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
-                <p className="text-2xl font-semibold text-foreground">
+                <p className="text-xl font-semibold text-foreground">
                   {volunteer.confirmationCount}
                 </p>
               </div>
             </div>
-            <div className="rounded-2xl border border-danger/15 bg-danger/10 p-3">
-              <p className="text-[11px] uppercase tracking-[0.16em] text-danger/80">
+            <div className="min-w-0 rounded-2xl border border-danger/15 bg-danger/10 p-2.5">
+              <p className="text-[10px] uppercase leading-tight tracking-[0.06em] text-danger/80">
                 Rechazos
               </p>
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-1.5 flex items-center gap-2">
                 <XCircle className="h-4 w-4 shrink-0 text-danger" />
-                <p className="text-2xl font-semibold text-foreground">
+                <p className="text-xl font-semibold text-foreground">
                   {volunteer.declineCount}
                 </p>
               </div>
             </div>
-            <div className="rounded-2xl border border-warning/15 bg-warning/10 p-3">
-              <p className="text-[11px] uppercase tracking-[0.16em] text-warning/80">
+            <div className="min-w-0 rounded-2xl border border-warning/15 bg-warning/10 p-2.5">
+              <p className="text-[10px] uppercase leading-tight tracking-[0.06em] text-warning/80">
                 Sin resp.
               </p>
-              <p className="mt-2 text-2xl font-semibold text-foreground">
+              <p className="mt-1.5 text-xl font-semibold text-foreground">
                 {volunteer.noResponseCount}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2 xl:col-span-3">
+          <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
             Áreas preferidas
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-2.5 flex flex-wrap gap-2">
             {volunteer.preferredAreas.length ? (
               volunteer.preferredAreas.map((area) => (
                 <Badge key={area} variant="secondary" className="tracking-normal">
@@ -160,11 +160,11 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2 xl:col-span-6">
+          <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
             Notas
           </p>
-          <p className="mt-2 flex items-start gap-2 break-words text-sm text-muted-foreground">
+          <p className="mt-2 flex items-start gap-2 break-words text-sm leading-snug text-muted-foreground">
             <NotebookPen className="mt-0.5 h-4 w-4 shrink-0" />
             {volunteer.notes?.trim() || "Sin notas registradas."}
           </p>
