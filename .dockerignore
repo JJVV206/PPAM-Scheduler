@@ -8,3 +8,11 @@ README.md
 docs
 prisma/dev.db
 *.tsbuildinfo
+.env
+.env.*
+!.env.example
+!.env.production.example
+.vercel
+.DS_Store
+Dockerfile
+compose.yaml
