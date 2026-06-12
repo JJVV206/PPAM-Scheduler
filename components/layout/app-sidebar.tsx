@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Bell,
   CalendarDays,
@@ -11,6 +11,8 @@ import {
   LifeBuoy,
   LogOut,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   Sparkles,
   UserCircle2,
@@ -36,6 +38,8 @@ type NavItem = {
   label: string;
   icon: typeof Home;
 };
+
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "ppam-sidebar-collapsed";
 
 const adminItems: NavItem[] = [
   { href: "/admin", label: "Inicio", icon: Home },
@@ -69,6 +73,7 @@ type AppSidebarProps = {
 };
 
 type NavigationContentProps = {
+  collapsed?: boolean;
   items: NavItem[];
   onNavigate?: () => void;
   onPreload?: (href: string) => void;
@@ -95,6 +100,7 @@ function getCurrentSectionLabel(pathname: string, items: NavItem[]) {
 }
 
 function NavigationContent({
+  collapsed = false,
   items,
   onNavigate,
   onPreload,
@@ -114,14 +120,20 @@ function NavigationContent({
             onClick={onNavigate}
             onFocus={() => onPreload?.(item.href)}
             onPointerEnter={() => onPreload?.(item.href)}
+            title={collapsed ? item.label : undefined}
             className={cn(
-              "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-muted-foreground transition hover:bg-white/5 hover:text-foreground",
+              "flex items-center rounded-2xl text-sm font-medium text-muted-foreground transition hover:bg-white/5 hover:text-foreground",
+              collapsed ? "h-11 justify-center px-0" : "gap-3 px-4 py-3",
               active &&
                 "bg-primary/15 text-primary shadow-[inset_0_0_0_1px_rgba(133,168,255,0.2)]"
             )}
           >
-            <Icon className="h-4 w-4" />
-            {item.label}
+            <Icon className="h-4 w-4 shrink-0" />
+            {collapsed ? (
+              <span className="sr-only">{item.label}</span>
+            ) : (
+              <span className="truncate">{item.label}</span>
+            )}
           </Link>
         );
       })}
@@ -132,6 +144,7 @@ function NavigationContent({
 export function AppSidebar({ role }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const items = getNavItems(role);
   const currentSectionLabel = getCurrentSectionLabel(pathname, items);
@@ -143,6 +156,32 @@ export function AppSidebar({ role }: AppSidebarProps) {
     },
     [router]
   );
+  const toggleDesktopSidebar = useCallback(() => {
+    setDesktopCollapsed((current) => {
+      const next = !current;
+
+      try {
+        window.localStorage.setItem(
+          SIDEBAR_COLLAPSED_STORAGE_KEY,
+          String(next)
+        );
+      } catch {
+        // The sidebar still works if browser storage is unavailable.
+      }
+
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    try {
+      setDesktopCollapsed(
+        window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true"
+      );
+    } catch {
+      setDesktopCollapsed(false);
+    }
+  }, []);
 
   return (
     <>
@@ -172,7 +211,7 @@ export function AppSidebar({ role }: AppSidebarProps) {
 
         <DialogContent
           hideCloseButton
-          className="left-auto right-3 top-3 h-[calc(100dvh-1.5rem)] max-h-none w-[min(22rem,calc(100vw-1.5rem))] max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-[32px] border border-primary/20 bg-[linear-gradient(180deg,rgba(28,40,66,0.98),rgba(19,30,53,0.98))] p-0 shadow-[0_24px_80px_rgba(3,10,26,0.6)] ease-out data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=closed]:slide-out-to-right-full data-[state=open]:animate-in data-[state=open]:duration-300 data-[state=open]:slide-in-from-right-full lg:hidden"
+          className="left-auto right-3 top-3 h-[calc(100dvh-1.5rem)] max-h-none w-[min(22rem,calc(100vw-1.5rem))] max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-[32px] border border-primary/20 bg-[linear-gradient(180deg,rgba(28,40,66,0.98),rgba(19,30,53,0.98))] p-0 shadow-[0_24px_80px_rgba(3,10,26,0.6)] ease-out data-[state=closed]:duration-200 data-[state=open]:duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full lg:hidden"
         >
           <DialogHeader className="sr-only">
             <DialogTitle>Navegación</DialogTitle>
@@ -180,11 +219,11 @@ export function AppSidebar({ role }: AppSidebarProps) {
           </DialogHeader>
 
           <div className="flex h-full min-h-0 flex-col">
-            <div className="border-b border-white/6 bg-gradient-to-b from-primary/10 to-transparent px-5 pb-4 pt-5">
+            <div className="border-white/6 border-b bg-gradient-to-b from-primary/10 to-transparent px-5 pb-4 pt-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/20 bg-primary/12 text-primary shadow-[0_10px_24px_rgba(102,145,255,0.18)]">
+                    <div className="bg-primary/12 flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/20 text-primary shadow-[0_10px_24px_rgba(102,145,255,0.18)]">
                       <Sparkles className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
@@ -244,7 +283,7 @@ export function AppSidebar({ role }: AppSidebarProps) {
                 />
               </div>
 
-              <div className="mt-5 space-y-3 border-t border-white/6 pt-5">
+              <div className="border-white/6 mt-5 space-y-3 border-t pt-5">
                 <button
                   type="button"
                   className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm text-muted-foreground transition hover:bg-white/[0.04] hover:text-foreground"
@@ -270,39 +309,122 @@ export function AppSidebar({ role }: AppSidebarProps) {
         </DialogContent>
       </Dialog>
 
-      <aside className="surface-panel hidden h-full w-[244px] min-w-[244px] shrink-0 flex-col justify-between p-4 xl:w-[256px] xl:min-w-[256px] 2xl:w-[280px] 2xl:min-w-[280px] 2xl:p-5 lg:flex">
-        <div className="space-y-7">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-glow">
-              <Sparkles className="h-6 w-6" />
+      <aside
+        className={cn(
+          "surface-panel hidden h-full shrink-0 flex-col justify-between transition-[width,min-width,padding] duration-200 ease-out lg:flex",
+          desktopCollapsed
+            ? "w-[76px] min-w-[76px] p-3"
+            : "w-[244px] min-w-[244px] p-4 xl:w-[256px] xl:min-w-[256px] 2xl:w-[280px] 2xl:min-w-[280px] 2xl:p-5"
+        )}
+      >
+        <div className={cn("space-y-7", desktopCollapsed && "space-y-5")}>
+          <div
+            className={cn(
+              "flex gap-3",
+              desktopCollapsed
+                ? "flex-col items-center"
+                : "items-center justify-between"
+            )}
+          >
+            <div
+              className={cn(
+                "flex min-w-0 items-center gap-3",
+                desktopCollapsed && "justify-center"
+              )}
+            >
+              <div
+                className={cn(
+                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-glow",
+                  desktopCollapsed && "h-11 w-11"
+                )}
+              >
+                <Sparkles className="h-6 w-6" />
+              </div>
+              {!desktopCollapsed ? (
+                <div className="min-w-0">
+                  <p className="truncate font-heading text-xl font-semibold">
+                    PPAM
+                  </p>
+                  <p className="truncate text-xs uppercase tracking-[0.28em] text-muted-foreground">
+                    Planificador
+                  </p>
+                </div>
+              ) : null}
             </div>
-            <div>
-              <p className="font-heading text-xl font-semibold">PPAM</p>
-              <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">
-                Planificador
-              </p>
-            </div>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-expanded={!desktopCollapsed}
+              aria-label={
+                desktopCollapsed
+                  ? "Expandir navegación"
+                  : "Minimizar navegación"
+              }
+              title={
+                desktopCollapsed
+                  ? "Expandir navegación"
+                  : "Minimizar navegación"
+              }
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+              onClick={toggleDesktopSidebar}
+            >
+              {desktopCollapsed ? (
+                <PanelLeftOpen className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
+            </Button>
           </div>
 
           <NavigationContent
+            collapsed={desktopCollapsed}
             items={items}
             pathname={pathname}
             onPreload={preloadRoute}
           />
         </div>
 
-        <div className="space-y-3 border-t border-border/60 pt-5">
-          <button className="flex items-center gap-3 px-4 py-2 text-sm text-muted-foreground transition hover:text-foreground">
-            <LifeBuoy className="h-4 w-4" />
-            Soporte
+        <div
+          className={cn(
+            "space-y-3 border-t border-border/60 pt-5",
+            desktopCollapsed && "flex flex-col items-center"
+          )}
+        >
+          <button
+            type="button"
+            title="Soporte"
+            className={cn(
+              "flex items-center text-sm text-muted-foreground transition hover:text-foreground",
+              desktopCollapsed
+                ? "h-10 w-10 justify-center rounded-2xl px-0 py-0 hover:bg-white/5"
+                : "gap-3 px-4 py-2"
+            )}
+          >
+            <LifeBuoy className="h-4 w-4 shrink-0" />
+            {desktopCollapsed ? (
+              <span className="sr-only">Soporte</span>
+            ) : (
+              "Soporte"
+            )}
           </button>
           <Button
             variant="ghost"
-            className="w-full justify-start px-4"
+            title="Cerrar sesión"
+            className={cn(
+              desktopCollapsed
+                ? "h-10 w-10 justify-center px-0"
+                : "w-full justify-start px-4"
+            )}
             onClick={() => void signOut({ callbackUrl: "/login" })}
           >
-            <LogOut className="h-4 w-4" />
-            Cerrar sesión
+            <LogOut className="h-4 w-4 shrink-0" />
+            {desktopCollapsed ? (
+              <span className="sr-only">Cerrar sesión</span>
+            ) : (
+              "Cerrar sesión"
+            )}
           </Button>
         </div>
       </aside>

@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/auth/guards";
+import { revalidateVolunteerViews } from "@/lib/cache/revalidate-volunteer-views";
 import { updateVolunteerSchema } from "@/lib/validations/volunteer";
 import { deactivateVolunteer, getVolunteer, updateVolunteer } from "@/services/volunteer.service";
 import { handleRouteError, ok } from "@/lib/utils/api";
@@ -26,6 +27,7 @@ export async function PATCH(request: Request, { params }: VolunteerRouteContext)
     const { id } = await params;
     const body = updateVolunteerSchema.parse(await request.json());
     const result = await updateVolunteer(id, body);
+    revalidateVolunteerViews(id);
     return ok(result);
   } catch (error) {
     return handleRouteError(error);
@@ -38,6 +40,7 @@ export async function DELETE(_: Request, { params }: VolunteerRouteContext) {
     if ("error" in auth) return auth.error;
     const { id } = await params;
     await deactivateVolunteer(id);
+    revalidateVolunteerViews(id);
     return ok({ success: true });
   } catch (error) {
     return handleRouteError(error);
