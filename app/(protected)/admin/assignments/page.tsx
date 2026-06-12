@@ -17,7 +17,10 @@ import {
 import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
 import { db } from "@/lib/db/prisma";
 import { formatDisplayDate } from "@/lib/utils";
-import { getAssignments, getWeeklySchedule } from "@/services/assignment.service";
+import {
+  getAssignments,
+  getWeeklySchedule
+} from "@/services/assignment.service";
 import { getPreachingPoints } from "@/services/point.service";
 import { getVolunteers } from "@/services/volunteer.service";
 
@@ -64,16 +67,17 @@ function getVolunteerNames(assignment: AssignmentRow) {
 export default async function AdminAssignmentsPage() {
   const schedule = await getWeeklySchedule();
 
-  const [assignments, preachingPoints, volunteers, currentWeek] = await Promise.all([
-    getAssignments(),
-    getPreachingPoints(),
-    getVolunteers(),
-    db.scheduleWeek.findFirst({
-      where: {
-        startDate: schedule.startDate
-      }
-    })
-  ]);
+  const [assignments, preachingPoints, volunteers, currentWeek] =
+    await Promise.all([
+      getAssignments(),
+      getPreachingPoints(),
+      getVolunteers(),
+      db.scheduleWeek.findFirst({
+        where: {
+          startDate: schedule.startDate
+        }
+      })
+    ]);
 
   const mappedPreachingPoints = preachingPoints.map((point) => ({
     id: point.id,
@@ -98,7 +102,7 @@ export default async function AdminAssignmentsPage() {
           <AssignmentForm
             closeOnSuccess
             scheduleWeekId={currentWeek.id}
-            weekStartDate={schedule.startDate.toISOString()}
+            weekStartDate={schedule.startDate.toISOString().slice(0, 10)}
             preachingPoints={mappedPreachingPoints}
             volunteers={volunteers}
           />
@@ -116,17 +120,19 @@ export default async function AdminAssignmentsPage() {
               ["CONFIRMED", "COMPLETED"].includes(assignment.status)
             ).length;
             const attentionCount = group.assignments.filter((assignment) =>
-              ["PENDING_CONFIRMATION", "NEEDS_REPLACEMENT", "DECLINED"].includes(
-                assignment.status
-              )
+              [
+                "PENDING_CONFIRMATION",
+                "NEEDS_REPLACEMENT",
+                "DECLINED"
+              ].includes(assignment.status)
             ).length;
 
             return (
               <section
                 key={formatDisplayDate(group.date, "yyyy-MM-dd")}
-                className="overflow-hidden rounded-[24px] border border-white/6 bg-white/[0.025]"
+                className="border-white/6 overflow-hidden rounded-[24px] border bg-white/[0.025]"
               >
-                <div className="flex flex-col gap-3 border-b border-white/6 bg-white/[0.025] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="border-white/6 flex flex-col gap-3 border-b bg-white/[0.025] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <h2 className="font-heading text-lg font-semibold capitalize text-foreground">
                       {formatDisplayDate(group.date, "EEEE d 'de' MMMM")}
@@ -167,7 +173,9 @@ export default async function AdminAssignmentsPage() {
                           <TableCell className="whitespace-nowrap">
                             {TIME_SLOT_DEFINITIONS[assignment.timeSlot].label}
                           </TableCell>
-                          <TableCell>{assignment.preachingPoint.name}</TableCell>
+                          <TableCell>
+                            {assignment.preachingPoint.name}
+                          </TableCell>
                           <TableCell>
                             <div className="space-y-1">
                               <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
@@ -196,7 +204,7 @@ export default async function AdminAssignmentsPage() {
                   {group.assignments.map((assignment) => (
                     <article
                       key={assignment.id}
-                      className="rounded-[20px] border border-white/6 bg-background/25 p-4"
+                      className="border-white/6 rounded-[20px] border bg-background/25 p-4"
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0 space-y-2">

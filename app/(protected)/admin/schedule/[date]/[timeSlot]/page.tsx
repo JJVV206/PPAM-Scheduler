@@ -118,7 +118,9 @@ export default async function AdminScheduleSlotPage({
                     presetTimeSlot={timeSlot}
                     scheduleWeekId={scheduleWeek.id}
                     triggerLabel="Agregar pareja a este horario"
-                    weekStartDate={scheduleWeek.startDate.toISOString()}
+                    weekStartDate={scheduleWeek.startDate
+                      .toISOString()
+                      .slice(0, 10)}
                     preachingPoints={formattedPoints}
                     volunteers={volunteers}
                   />

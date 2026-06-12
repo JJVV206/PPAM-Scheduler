@@ -114,7 +114,7 @@ export default async function AdminSchedulePage({
                   triggerClassName="xl:whitespace-nowrap"
                   triggerLabel="Agregar pareja"
                   triggerSize="default"
-                  weekStartDate={schedule.startDate.toISOString()}
+                  weekStartDate={schedule.startDate.toISOString().slice(0, 10)}
                   preachingPoints={formattedPoints}
                   volunteers={volunteers}
                 />
