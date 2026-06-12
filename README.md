@@ -14,6 +14,19 @@ Production-ready MVP for managing weekly public preaching assignments with role-
 
 ## Getting Started
 
+### With Docker
+
+1. Start the full stack with `npm run docker:dev`.
+2. Seed demo data with `npm run docker:seed` if you want the default local users.
+3. Open `http://localhost:3000`.
+4. Inspect local emails at `http://localhost:8025`.
+
+Docker details are documented in `docs/docker.md`.
+
+If local ports are already in use, start Docker with `APP_PORT=3002 NEXTAUTH_URL=http://localhost:3002 POSTGRES_HOST_PORT=5433 npm run docker:dev`.
+
+### Without Docker
+
 1. Copy `.env.example` to `.env`.
 2. Install dependencies with `npm install`.
 3. Start PostgreSQL with `npm run db:start`.
@@ -26,9 +39,11 @@ Production-ready MVP for managing weekly public preaching assignments with role-
 This repo includes a local PostgreSQL service in `compose.yaml`.
 
 - Start DB: `npm run db:start`
+- Start full Docker app stack: `npm run docker:dev`
 - Check DB status: `npm run db:status`
 - Stop DB: `npm run db:stop`
 - First-time setup: `npm run db:prepare`
+- Seed Docker demo data: `npm run docker:seed`
 
 If `docker compose` cannot connect, Docker Desktop is not running yet. Start Docker Desktop first, then rerun `npm run db:start`.
 

@@ -1,10 +1,9 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: ppam-scheduler-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: ppam_scheduler
       POSTGRES_USER: postgres
@@ -17,5 +16,73 @@ services:
       timeout: 5s
       retries: 10
 
+  migrate:
+    build:
+      context: .
+      target: dev
+    restart: "no"
+    environment: &app_environment
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ppam_scheduler?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@postgres:5432/ppam_scheduler?schema=public
+      NEXTAUTH_SECRET: ppam-scheduler-docker-local-secret-change-in-production
+      NEXTAUTH_URL: http://localhost:3000
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_SECURE: "false"
+      SMTP_FROM: PPAM Scheduler <no-reply@ppam.local>
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: npm run db:migrate:deploy
+
+  app:
+    build:
+      context: .
+      target: dev
+    restart: unless-stopped
+    environment:
+      <<: *app_environment
+      NODE_ENV: development
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - .:/app
+      - ppam_scheduler_node_modules:/app/node_modules
+      - ppam_scheduler_next:/app/.next
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+    command: npm run dev:docker
+
+  seed:
+    build:
+      context: .
+      target: dev
+    restart: "no"
+    profiles:
+      - tools
+    environment:
+      <<: *app_environment
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command: npm run db:seed
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
 volumes:
   ppam_scheduler_postgres_data:
+  ppam_scheduler_node_modules:
+  ppam_scheduler_next:
