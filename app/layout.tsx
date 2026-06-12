@@ -8,7 +8,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: APP_NAME,
   description:
-    "Gestiona asignaciones semanales de predicación pública, confirmaciones y reemplazos."
+    "Gestiona asignaciones semanales de predicación pública, confirmaciones y reemplazos.",
+  icons: {
+    icon: "/favicon.png",
+    apple: "/apple-touch-icon.png"
+  }
 };
 
 export default function RootLayout({

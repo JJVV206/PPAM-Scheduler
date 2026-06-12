@@ -1,12 +1,4 @@
-import {
-  CarFront,
-  CheckCircle2,
-  Mail,
-  NotebookPen,
-  Phone,
-  ShieldCheck,
-  XCircle
-} from "lucide-react";
+import { CheckCircle2, Mail, NotebookPen, Phone, XCircle } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,13 +10,10 @@ type VolunteerProfileCardProps = {
     phone?: string | null;
     active: boolean;
     temporaryUnavailable: boolean;
-    reliabilityScore: number;
     confirmationCount: number;
     declineCount: number;
     noResponseCount: number;
     notes?: string | null;
-    transportationNotes?: string | null;
-    preferredAreas: string[];
   };
 };
 
@@ -49,12 +38,12 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-3 p-5 pt-0 md:grid-cols-2 xl:grid-cols-6">
-        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2 xl:col-span-3">
+      <CardContent className="grid gap-3 p-5 pt-0 md:grid-cols-2">
+        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2">
           <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
             Contacto
           </p>
-          <div className="mt-3 grid gap-3">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-start gap-3">
               <Mail className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div className="min-w-0">
@@ -80,30 +69,7 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 md:col-span-2 xl:col-span-3 xl:grid-cols-2">
-          <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-              Confiabilidad
-            </p>
-            <p className="mt-2 flex items-center gap-2 text-lg font-semibold text-foreground">
-              <ShieldCheck className="h-4 w-4 text-primary" />
-              {Math.round(volunteer.reliabilityScore)}%
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-              Transporte
-            </p>
-            <div className="mt-2 flex items-start gap-2 text-sm leading-snug text-muted-foreground">
-              <CarFront className="mt-0.5 h-4 w-4 shrink-0" />
-              <p className="break-words">
-                {volunteer.transportationNotes ?? "Sin notas registradas"}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2 xl:col-span-3">
+        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2">
           <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
             Seguimiento
           </p>
@@ -141,26 +107,7 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2 xl:col-span-3">
-          <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-            Áreas preferidas
-          </p>
-          <div className="mt-2.5 flex flex-wrap gap-2">
-            {volunteer.preferredAreas.length ? (
-              volunteer.preferredAreas.map((area) => (
-                <Badge key={area} variant="secondary" className="tracking-normal">
-                  {area}
-                </Badge>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Sin preferencias registradas.
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2 xl:col-span-6">
+        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2">
           <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
             Notas
           </p>

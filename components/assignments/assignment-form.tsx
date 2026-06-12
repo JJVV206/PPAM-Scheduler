@@ -100,13 +100,21 @@ const DAY_ORDER: DayOfWeek[] = [
 ];
 const SUCCESS_CLOSE_DELAY_MS = 900;
 
+function getDatePart(value: string) {
+  return value.slice(0, 10);
+}
+
+function parseLocalDateOnly(value: string) {
+  return new Date(`${getDatePart(value)}T12:00:00`);
+}
+
 function getDayOfWeekFromDate(value: string): DayOfWeek {
-  const date = new Date(`${value}T12:00:00`);
+  const date = parseLocalDateOnly(value);
   return DAY_ORDER[date.getDay()];
 }
 
 function toAssignmentIsoDate(value: string) {
-  return new Date(`${value}T12:00:00`).toISOString();
+  return parseLocalDateOnly(value).toISOString();
 }
 
 export function AssignmentForm({
@@ -139,18 +147,18 @@ export function AssignmentForm({
     closeTimeoutRef.current = null;
   }
 
-  const weekDateOptions = useMemo(
-    () =>
-      Array.from({ length: 7 }).map((_, index) => {
-        const date = addDays(new Date(weekStartDate), index);
-        return {
-          value: format(date, "yyyy-MM-dd"),
-          label: format(date, "EEEE d 'de' MMM", { locale: es }),
-          shortLabel: format(date, "EEE d", { locale: es })
-        };
-      }),
-    [weekStartDate]
-  );
+  const weekDateOptions = useMemo(() => {
+    const weekStart = parseLocalDateOnly(weekStartDate);
+
+    return Array.from({ length: 7 }).map((_, index) => {
+      const date = addDays(weekStart, index);
+      return {
+        value: format(date, "yyyy-MM-dd"),
+        label: format(date, "EEEE d 'de' MMM", { locale: es }),
+        shortLabel: format(date, "EEE d", { locale: es })
+      };
+    });
+  }, [weekStartDate]);
 
   const defaultValues = useMemo<AssignmentFormValues>(
     () => ({
@@ -165,7 +173,13 @@ export function AssignmentForm({
       volunteerOneId: "",
       volunteerTwoId: ""
     }),
-    [preachingPoints, presetAssignmentDate, presetTimeSlot, scheduleWeekId, weekDateOptions]
+    [
+      preachingPoints,
+      presetAssignmentDate,
+      presetTimeSlot,
+      scheduleWeekId,
+      weekDateOptions
+    ]
   );
 
   const form = useForm<AssignmentFormValues>({
@@ -198,7 +212,7 @@ export function AssignmentForm({
   );
   const selectedDateLabel = useMemo(
     () =>
-      format(new Date(`${selectedDate}T12:00:00`), "EEEE d 'de' MMM", {
+      format(parseLocalDateOnly(selectedDate), "EEEE d 'de' MMM", {
         locale: es
       }),
     [selectedDate]
@@ -315,7 +329,7 @@ export function AssignmentForm({
                   Horario seleccionado
                 </p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-white/6 bg-background/25 px-3 py-2.5">
+                  <div className="border-white/6 rounded-2xl border bg-background/25 px-3 py-2.5">
                     <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
                       Día
                     </p>
@@ -323,7 +337,7 @@ export function AssignmentForm({
                       {DAY_LABELS[selectedDayOfWeek]}
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-white/6 bg-background/25 px-3 py-2.5">
+                  <div className="border-white/6 rounded-2xl border bg-background/25 px-3 py-2.5">
                     <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
                       Fecha
                     </p>
@@ -331,7 +345,7 @@ export function AssignmentForm({
                       {selectedDateLabel}
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-white/6 bg-background/25 px-3 py-2.5">
+                  <div className="border-white/6 rounded-2xl border bg-background/25 px-3 py-2.5">
                     <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
                       Franja
                     </p>
@@ -421,7 +435,8 @@ export function AssignmentForm({
                       {DAY_LABELS[selectedDayOfWeek]}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Este horario se registrará en {FIXED_PREACHING_POINT_NAME}.
+                      Este horario se registrará en {FIXED_PREACHING_POINT_NAME}
+                      .
                     </p>
                   </div>
                 </div>
@@ -498,10 +513,7 @@ export function AssignmentForm({
               )}
             />
 
-            <FeedbackMessage
-              message={feedback?.text}
-              tone={feedback?.tone}
-            />
+            <FeedbackMessage message={feedback?.text} tone={feedback?.tone} />
 
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button
