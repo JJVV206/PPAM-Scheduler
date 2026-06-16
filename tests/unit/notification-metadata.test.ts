@@ -7,6 +7,8 @@ describe("sanitizeNotificationMetadata", () => {
     expect(
       sanitizeNotificationMetadata({
         token: "secret-token",
+        invitationToken: "invitation-secret",
+        confirmationToken: "confirmation-secret",
         resetToken: "reset-secret",
         password: "plain-text",
         passwordHash: "hash",

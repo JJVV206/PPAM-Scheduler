@@ -42,6 +42,7 @@ const prisma = new PrismaClient();
 async function main() {
   await prisma.notificationLog.deleteMany();
   await prisma.assignmentActivity.deleteMany();
+  await prisma.assignmentInvitation.deleteMany();
   await prisma.assignmentResponse.deleteMany();
   await prisma.assignmentVolunteer.deleteMany();
   await prisma.assignment.deleteMany();

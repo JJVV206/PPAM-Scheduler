@@ -41,6 +41,8 @@ export const NOTIFICATION_CHANNELS = ["EMAIL", "SMS", "WHATSAPP", "IN_APP"] as c
 export const NOTIFICATION_STATUSES = ["PENDING", "SENT", "FAILED"] as const;
 export const ASSIGNMENT_ACTIVITY_TYPES = [
   "ASSIGNED",
+  "INVITATION_SENT",
+  "INVITATION_FAILED",
   "REMINDER_SENT",
   "RESPONSE_RECEIVED",
   "REPLACEMENT_ASSIGNED",
@@ -135,6 +137,8 @@ export const NOTIFICATION_STATUS_LABELS = {
 
 export const ASSIGNMENT_ACTIVITY_LABELS = {
   ASSIGNED: "Asignado",
+  INVITATION_SENT: "Invitación enviada",
+  INVITATION_FAILED: "Invitación fallida",
   REMINDER_SENT: "Recordatorio enviado",
   RESPONSE_RECEIVED: "Respuesta recibida",
   REPLACEMENT_ASSIGNED: "Reemplazo asignado",

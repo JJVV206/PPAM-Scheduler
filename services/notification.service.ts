@@ -22,6 +22,8 @@ type NotificationPayload = {
 };
 
 const SENSITIVE_METADATA_KEYS = new Set([
+  "confirmationToken",
+  "invitationToken",
   "password",
   "passwordHash",
   "resetToken",
@@ -108,7 +110,7 @@ export async function sendEmailNotification(payload: NotificationPayload) {
   const user = await db.user.findUnique({ where: { id: payload.userId } });
 
   if (!user?.email) {
-    await logNotification({
+    return logNotification({
       userId: payload.userId,
       assignmentId: payload.assignmentId,
       type: payload.type,
@@ -117,7 +119,6 @@ export async function sendEmailNotification(payload: NotificationPayload) {
       errorMessage: "No se encontró un correo para el destinatario",
       metadata: payload.metadata
     });
-    return;
   }
 
   try {
@@ -131,7 +132,7 @@ export async function sendEmailNotification(payload: NotificationPayload) {
         type: payload.type
       });
 
-      await logNotification({
+      return logNotification({
         userId: payload.userId,
         assignmentId: payload.assignmentId,
         type: payload.type,
@@ -142,7 +143,6 @@ export async function sendEmailNotification(payload: NotificationPayload) {
           simulated: true
         }
       });
-      return;
     } else {
       await transport.sendMail({
         from: smtpConfig?.from,
@@ -152,7 +152,7 @@ export async function sendEmailNotification(payload: NotificationPayload) {
       });
     }
 
-    await logNotification({
+    return logNotification({
       userId: payload.userId,
       assignmentId: payload.assignmentId,
       type: payload.type,

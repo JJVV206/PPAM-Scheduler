@@ -36,9 +36,12 @@ import type {
 import { AppError } from "@/services/errors";
 import { getAppSettings } from "@/services/setting.service";
 import {
-  resendConfirmationReminder,
-  sendEmailNotification
+  resendConfirmationReminder
 } from "@/services/notification.service";
+import {
+  createPendingPrimaryInvitationsForAssignment,
+  sendPendingPrimaryInvitationsForAssignment
+} from "@/services/assignment-invitation.service";
 import { getAppBaseUrl } from "@/lib/env/config";
 import { safePercentage } from "@/lib/utils";
 import { determineAssignmentStatus } from "@/services/assignment-engine";
@@ -432,6 +435,14 @@ export async function createWeeklyAssignment(input: {
         assignmentId: created.id,
         volunteerIds: uniqueVolunteerIds
       });
+
+      await createPendingPrimaryInvitationsForAssignment({
+        tx,
+        assignmentId: created.id,
+        volunteerIds: uniqueVolunteerIds,
+        actorUserId: input.actorUserId,
+        source: "assignment_created"
+      });
     }
 
     await tx.assignmentActivity.create({
@@ -453,7 +464,17 @@ export async function createWeeklyAssignment(input: {
     });
   });
 
-  return mapAssignmentDetail(assignment);
+  await sendPendingPrimaryInvitationsForAssignment({
+    assignmentId: assignment.id,
+    actorUserId: input.actorUserId
+  });
+
+  const refreshedAssignment = await db.assignment.findUniqueOrThrow({
+    where: { id: assignment.id },
+    include: assignmentInclude
+  });
+
+  return mapAssignmentDetail(refreshedAssignment);
 }
 
 export async function updateAssignment(
@@ -1243,19 +1264,14 @@ export async function getVolunteerHistory(volunteerProfileId: string) {
   return assignments.map(mapAssignmentDetail);
 }
 
-export async function sendAssignmentConfirmationRequests(assignmentId: string) {
+export async function sendAssignmentConfirmationRequests(input: {
+  assignmentId: string;
+  actorUserId?: string;
+}) {
   const assignment = await db.assignment.findUniqueOrThrow({
-    where: { id: assignmentId },
+    where: { id: input.assignmentId },
     include: {
-      preachingPoint: true,
-      responses: true,
-      volunteers: {
-        include: {
-          volunteer: {
-            include: { user: true }
-          }
-        }
-      }
+      volunteers: true
     }
   });
 
@@ -1266,42 +1282,17 @@ export async function sendAssignmentConfirmationRequests(assignmentId: string) {
     );
   }
 
-  await Promise.all(
-    assignment.volunteers.map(async (slot) => {
-      const response = assignment.responses.find(
-        (item) => item.volunteerId === slot.volunteerId
-      );
-      const confirmationLink = response
-        ? buildConfirmationLink(response.id)
-        : null;
+  await createPendingPrimaryInvitationsForAssignment({
+    assignmentId: input.assignmentId,
+    volunteerIds: assignment.volunteers.map((slot) => slot.volunteerId),
+    actorUserId: input.actorUserId,
+    source: "manual_confirmation_request"
+  });
 
-      await sendEmailNotification({
-        userId: slot.volunteer.userId,
-        assignmentId,
-        type: "CONFIRMATION_REQUEST",
-        subject: "Confirma tu asignación de PPAM",
-        html: `<p>Hola ${slot.volunteer.user.name},</p><p>Tienes asignación en ${FIXED_PREACHING_POINT_NAME} el ${DAY_LABELS[assignment.dayOfWeek]} en el horario ${TIME_SLOT_DEFINITIONS[assignment.timeSlot].label}.</p>${confirmationLink ? `<p><a href="${confirmationLink}">Abrir confirmación directa</a></p>` : ""}`,
-        metadata: {
-          pointName: FIXED_PREACHING_POINT_NAME,
-          confirmationLink
-        }
-      });
-      await db.assignmentActivity.create({
-        data: {
-          assignmentId,
-          actionType: "REMINDER_SENT",
-          metadata: {
-            volunteerProfileId: slot.volunteerId,
-            deliveryType: "CONFIRMATION_REQUEST"
-          }
-        }
-      });
-    })
-  );
-
-  return {
-    sentCount: assignment.volunteers.length
-  };
+  return sendPendingPrimaryInvitationsForAssignment({
+    assignmentId: input.assignmentId,
+    actorUserId: input.actorUserId
+  });
 }
 
 export async function resendAssignmentConfirmation(assignmentId: string) {
