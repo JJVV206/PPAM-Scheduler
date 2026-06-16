@@ -16,6 +16,7 @@ import {
   PanelLeftOpen,
   Settings,
   UserCircle2,
+  UserCheck,
   Users
 } from "lucide-react";
 import { signOut } from "next-auth/react";
@@ -44,6 +45,7 @@ const SIDEBAR_COLLAPSED_STORAGE_KEY = "ppam-sidebar-collapsed";
 const adminItems: NavItem[] = [
   { href: "/admin", label: "Inicio", icon: Home },
   { href: "/admin/schedule", label: "Horario semanal", icon: CalendarDays },
+  { href: "/admin/replacements", label: "Suplentes", icon: UserCheck },
   { href: "/admin/assignments", label: "Asignaciones", icon: ClipboardList },
   { href: "/admin/volunteers", label: "Voluntarios", icon: Users },
   { href: "/admin/notifications", label: "Notificaciones", icon: Bell },

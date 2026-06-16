@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const tx = {
+    appNotification: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
+      updateMany: vi.fn()
+    },
     replacementCensus: {
       create: vi.fn(),
       update: vi.fn()
@@ -10,6 +15,10 @@ const mocks = vi.hoisted(() => {
       create: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn()
+    },
+    replacementWeeklyAvailability: {
+      createMany: vi.fn(),
+      deleteMany: vi.fn()
     },
     scheduleWeek: {
       findUniqueOrThrow: vi.fn()
@@ -23,6 +32,7 @@ const mocks = vi.hoisted(() => {
       callback(tx)
     ),
     replacementCensusResponse: {
+      findUnique: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn()
     }
@@ -50,7 +60,8 @@ vi.mock("@/services/setting.service", () => ({
 import {
   buildReplacementCensusResponseUrl,
   openReplacementCensusForWeek,
-  sendPendingReplacementCensusInvitations
+  sendPendingReplacementCensusInvitations,
+  submitReplacementCensusResponse
 } from "@/services/replacement-census.service";
 
 const week = {
@@ -106,6 +117,8 @@ beforeEach(() => {
   mocks.getAssignmentAutomationSettings.mockResolvedValue({
     censusResponseTimeoutHours: 72
   });
+  mocks.tx.appNotification.findFirst.mockResolvedValue(null);
+  mocks.tx.appNotification.create.mockResolvedValue({ id: "app-notification-1" });
 });
 
 describe("replacement census preparation", () => {
@@ -133,8 +146,8 @@ describe("replacement census preparation", () => {
       updatedAt: new Date("2026-06-16T12:00:00.000Z")
     });
     mocks.tx.volunteerProfile.findMany.mockResolvedValue([
-      { id: "volunteer-1" },
-      { id: "volunteer-2" }
+      { id: "volunteer-1", userId: "user-1" },
+      { id: "volunteer-2", userId: "user-2" }
     ]);
     mocks.tx.replacementCensusResponse.findMany.mockResolvedValue([
       { volunteerId: "volunteer-2" }
@@ -171,6 +184,15 @@ describe("replacement census preparation", () => {
           censusId: "census-1",
           volunteerId: "volunteer-1",
           expiresAt: closesAt
+        })
+      })
+    );
+    expect(mocks.tx.appNotification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "user-1",
+          censusId: "census-1",
+          type: "CENSUS_PENDING"
         })
       })
     );
@@ -223,6 +245,118 @@ describe("replacement census preparation", () => {
         data: expect.objectContaining({
           status: "SENT"
         })
+      })
+    );
+  });
+
+  it("stores weekly availability from a token response", async () => {
+    mocks.db.replacementCensusResponse.findUnique.mockResolvedValue({
+      id: "response-1",
+      censusId: "census-1",
+      volunteerId: "volunteer-1",
+      status: "SENT",
+      expiresAt: new Date("2026-06-18T12:00:00.000Z"),
+      respondedAt: null,
+      metadata: {},
+      census: {
+        scheduleWeekId: "week-1"
+      }
+    });
+    mocks.tx.replacementWeeklyAvailability.deleteMany.mockResolvedValue({
+      count: 0
+    });
+    mocks.tx.replacementWeeklyAvailability.createMany.mockResolvedValue({
+      count: 8
+    });
+    mocks.tx.replacementCensusResponse.update.mockResolvedValue({
+      id: "response-1"
+    });
+    mocks.tx.appNotification.updateMany.mockResolvedValue({
+      count: 1
+    });
+
+    const result = await submitReplacementCensusResponse({
+      token: "token-1",
+      days: [
+        {
+          date: new Date("2026-06-15T12:00:00.000Z"),
+          dayOfWeek: "MONDAY",
+          available: true,
+          timeSlots: ["SLOT_09_11", "SLOT_11_13"],
+          notes: "Preferencia por la mañana"
+        },
+        {
+          date: new Date("2026-06-16T12:00:00.000Z"),
+          dayOfWeek: "TUESDAY",
+          available: true
+        },
+        {
+          date: new Date("2026-06-17T12:00:00.000Z"),
+          dayOfWeek: "WEDNESDAY",
+          available: false
+        },
+        {
+          date: new Date("2026-06-18T12:00:00.000Z"),
+          dayOfWeek: "THURSDAY",
+          available: false
+        },
+        {
+          date: new Date("2026-06-19T12:00:00.000Z"),
+          dayOfWeek: "FRIDAY",
+          available: false
+        },
+        {
+          date: new Date("2026-06-20T12:00:00.000Z"),
+          dayOfWeek: "SATURDAY",
+          available: false
+        },
+        {
+          date: new Date("2026-06-21T12:00:00.000Z"),
+          dayOfWeek: "SUNDAY",
+          available: false
+        }
+      ]
+    });
+
+    expect(result).toEqual({
+      responseId: "response-1",
+      status: "SUBMITTED",
+      savedAvailabilityCount: 8
+    });
+    expect(mocks.tx.replacementWeeklyAvailability.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            dayOfWeek: "MONDAY",
+            timeSlot: "SLOT_09_11",
+            available: true
+          }),
+          expect.objectContaining({
+            dayOfWeek: "TUESDAY",
+            timeSlot: null,
+            available: true
+          }),
+          expect.objectContaining({
+            dayOfWeek: "WEDNESDAY",
+            timeSlot: null,
+            available: false
+          })
+        ])
+      })
+    );
+    expect(mocks.tx.replacementCensusResponse.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "response-1" },
+        data: expect.objectContaining({
+          status: "SUBMITTED"
+        })
+      })
+    );
+    expect(mocks.tx.appNotification.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          readAt: expect.any(Date)
+        }
       })
     );
   });
