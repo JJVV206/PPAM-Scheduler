@@ -2,11 +2,11 @@ import { redirect } from "next/navigation";
 
 import { getServerAuthSession } from "@/lib/auth/auth";
 import { getAuthRuntimeStatus } from "@/lib/env/runtime";
-import { LoginForm } from "@/features/auth/login-form";
+import { RegisterForm } from "@/features/auth/register-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
+export default async function RegisterPage() {
   const session = await getServerAuthSession();
 
   if (session?.user) {
@@ -16,7 +16,7 @@ export default async function LoginPage() {
   const status = await getAuthRuntimeStatus();
 
   return (
-    <LoginForm
+    <RegisterForm
       authReady={status.ready}
       environmentMessage={status.message}
     />

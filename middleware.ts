@@ -33,15 +33,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/admin", request.url));
   }
 
-  if (pathname === "/login") {
-    return NextResponse.redirect(
-      new URL(token.role === "ADMIN" ? "/admin" : "/volunteer", request.url)
-    );
-  }
-
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/volunteer/:path*", "/login"]
+  matcher: ["/admin/:path*", "/volunteer/:path*"]
 };

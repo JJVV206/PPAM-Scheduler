@@ -116,6 +116,12 @@ export function LoginForm({
             Olvidé mi contraseña
           </Link>
         </div>
+        <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
+          <span>¿No tienes cuenta?</span>
+          <Link href="/register" className="text-primary">
+            Crear cuenta
+          </Link>
+        </div>
       </CardContent>
     </Card>
   );
