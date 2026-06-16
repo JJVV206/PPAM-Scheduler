@@ -6,7 +6,7 @@ import { CheckCircle2, CircleOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FeedbackMessage } from "@/components/ui/feedback-message";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
 import { formatDisplayDate } from "@/lib/utils";
 
@@ -60,7 +60,9 @@ export function ConfirmationCard({
     setFeedback({
       tone: response.ok ? "success" : "error",
       text: response.ok
-        ? `Respuesta guardada: ${intent === "confirm" ? "confirmada" : "rechazada"}.`
+        ? intent === "confirm"
+          ? "Respuesta guardada: sí podrás asistir."
+          : "Respuesta guardada: no podrás asistir."
         : result.error
     });
     setCompleted(response.ok);
@@ -89,11 +91,17 @@ export function ConfirmationCard({
           <p>{TIME_SLOT_DEFINITIONS[timeSlot].label}</p>
           <p>{pointName}</p>
         </div>
-        <Input
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          placeholder="Nota opcional"
-        />
+        <div className="grid gap-2">
+          <label className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Nota opcional
+          </label>
+          <Textarea
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            rows={3}
+            placeholder="Agrega una nota breve si hace falta."
+          />
+        </div>
         <div className="space-y-3">
           <Button
             className="w-full"

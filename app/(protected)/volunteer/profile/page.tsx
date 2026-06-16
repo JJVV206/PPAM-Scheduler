@@ -1,4 +1,4 @@
-import { VolunteerProfileCard } from "@/components/volunteers/volunteer-profile-card";
+import { VolunteerSelfProfileCard } from "@/components/volunteer/volunteer-self-profile-card";
 import { getServerAuthSession } from "@/lib/auth/auth";
 import { getVolunteer } from "@/services/volunteer.service";
 
@@ -12,8 +12,14 @@ export default async function VolunteerProfilePage() {
   const volunteer = await getVolunteer(session.user.volunteerProfileId);
 
   return (
-    <div className="max-w-3xl">
-      <VolunteerProfileCard volunteer={volunteer} />
+    <div className="max-w-4xl space-y-6">
+      <div>
+        <h1 className="font-heading text-4xl font-semibold">Perfil</h1>
+        <p className="text-sm text-muted-foreground">
+          Revisa tu contacto, preferencias y disponibilidad general.
+        </p>
+      </div>
+      <VolunteerSelfProfileCard volunteer={volunteer} />
     </div>
   );
 }

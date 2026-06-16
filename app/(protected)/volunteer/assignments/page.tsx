@@ -1,8 +1,12 @@
-import { EmptyState } from "@/components/forms/empty-state";
 import { VolunteerAssignmentCard } from "@/components/volunteer/volunteer-assignment-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getServerAuthSession } from "@/lib/auth/auth";
+import { getVolunteerAssignmentRoleLabel } from "@/lib/volunteer-assignment";
 import { getVolunteerDashboardData } from "@/services/dashboard.service";
+
+type VolunteerAssignmentList = Awaited<
+  ReturnType<typeof getVolunteerDashboardData>
+>["pendingConfirmations"];
 
 export default async function VolunteerAssignmentsPage() {
   const session = await getServerAuthSession();
@@ -13,19 +17,16 @@ export default async function VolunteerAssignmentsPage() {
 
   const volunteerProfileId = session.user.volunteerProfileId;
   const dashboard = await getVolunteerDashboardData(volunteerProfileId);
-
-  if (
-    !dashboard.pendingConfirmations.length &&
-    !dashboard.confirmedAssignments.length &&
-    !dashboard.assignmentHistory.length
-  ) {
-    return (
-      <EmptyState
-        title="Sin asignaciones todavía"
-        description="Tus asignaciones pendientes, confirmadas e históricas aparecerán aquí."
-      />
-    );
-  }
+  const primaryAssignments = dashboard.upcomingAssignments.filter(
+    (assignment) =>
+      getVolunteerAssignmentRoleLabel(assignment, volunteerProfileId) ===
+      "Titular"
+  );
+  const replacementAssignments = dashboard.upcomingAssignments.filter(
+    (assignment) =>
+      getVolunteerAssignmentRoleLabel(assignment, volunteerProfileId) ===
+      "Suplente"
+  );
 
   return (
     <div className="space-y-6">
@@ -44,6 +45,24 @@ export default async function VolunteerAssignmentsPage() {
         remindersByAssignmentId={dashboard.remindersByAssignmentId}
         emptyText="No hay asignaciones confirmadas próximas."
       />
+      <section className="grid gap-6 xl:grid-cols-2">
+        <AssignmentSection
+          title="Como titular"
+          assignments={primaryAssignments}
+          volunteerProfileId={volunteerProfileId}
+          remindersByAssignmentId={dashboard.remindersByAssignmentId}
+          emptyText="No tienes turnos próximos como titular."
+          compact
+        />
+        <AssignmentSection
+          title="Como suplente"
+          assignments={replacementAssignments}
+          volunteerProfileId={volunteerProfileId}
+          remindersByAssignmentId={dashboard.remindersByAssignmentId}
+          emptyText="No tienes turnos próximos como suplente."
+          compact
+        />
+      </section>
       <AssignmentSection
         title="Historial"
         assignments={dashboard.assignmentHistory}
@@ -66,9 +85,7 @@ function AssignmentSection({
   emptyText
 }: {
   title: string;
-  assignments: Awaited<
-    ReturnType<typeof getVolunteerDashboardData>
-  >["pendingConfirmations"];
+  assignments: VolunteerAssignmentList;
   volunteerProfileId: string;
   remindersByAssignmentId: Awaited<
     ReturnType<typeof getVolunteerDashboardData>
