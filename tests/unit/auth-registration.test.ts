@@ -81,6 +81,11 @@ describe("auth registration", () => {
       role: "ADMIN",
       volunteerProfileId: null
     });
+    expect(mocks.tx.user.count).toHaveBeenCalledWith({
+      where: {
+        active: true
+      }
+    });
     expect(mocks.tx.user.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -116,6 +121,11 @@ describe("auth registration", () => {
       id: "user-2",
       role: "VOLUNTEER",
       volunteerProfileId: "volunteer-1"
+    });
+    expect(mocks.tx.user.count).toHaveBeenCalledWith({
+      where: {
+        active: true
+      }
     });
     expect(mocks.tx.user.create).toHaveBeenCalledWith(
       expect.objectContaining({

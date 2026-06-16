@@ -22,7 +22,11 @@ if (process.env.VERCEL_ENV !== "production") {
 
 const prisma = new PrismaClient();
 
-try {
+function getArchivedEmail(userId) {
+  return `archived-${Date.now()}-${userId}@ppam.deleted.local`;
+}
+
+async function main() {
   const user = await prisma.user.findUnique({
     where: { email },
     include: {
@@ -51,17 +55,70 @@ try {
         2
       )
     );
-    process.exit(0);
+    return;
   }
 
   if (user._count.createdWeeks > 0 || user._count.createdCensuses > 0) {
-    throw new Error(
-      [
-        `Refusing to delete ${email} because it owns production records.`,
-        `createdWeeks=${user._count.createdWeeks}`,
-        `createdCensuses=${user._count.createdCensuses}`
-      ].join(" ")
+    const archivedEmail = getArchivedEmail(user.id);
+
+    await prisma.$transaction([
+      prisma.session.deleteMany({
+        where: {
+          userId: user.id
+        }
+      }),
+      prisma.account.deleteMany({
+        where: {
+          userId: user.id
+        }
+      }),
+      prisma.passwordResetToken.deleteMany({
+        where: {
+          userId: user.id
+        }
+      }),
+      ...(user.volunteerProfile
+        ? [
+            prisma.volunteerProfile.update({
+              where: {
+                id: user.volunteerProfile.id
+              },
+              data: {
+                active: false,
+                canServeAsReplacement: false,
+                temporaryUnavailable: true
+              }
+            })
+          ]
+        : []),
+      prisma.user.update({
+        where: {
+          id: user.id
+        },
+        data: {
+          active: false,
+          email: archivedEmail
+        }
+      })
+    ]);
+
+    console.log(
+      JSON.stringify(
+        {
+          archivedEmail,
+          archivedUserId: user.id,
+          createdCensuses: user._count.createdCensuses,
+          createdWeeks: user._count.createdWeeks,
+          releasedEmail: email,
+          role: user.role,
+          status: "archived-email-released",
+          volunteerProfileId: user.volunteerProfile?.id ?? null
+        },
+        null,
+        2
+      )
     );
+    return;
   }
 
   await prisma.user.delete({
@@ -83,6 +140,13 @@ try {
       2
     )
   );
-} finally {
-  await prisma.$disconnect();
 }
+
+main()
+  .catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

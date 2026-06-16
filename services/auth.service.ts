@@ -39,8 +39,12 @@ export async function registerAccount(input: {
 
   try {
     return await db.$transaction(async (tx) => {
-      const userCount = await tx.user.count();
-      const role = userCount === 0 ? "ADMIN" : "VOLUNTEER";
+      const activeUserCount = await tx.user.count({
+        where: {
+          active: true
+        }
+      });
+      const role = activeUserCount === 0 ? "ADMIN" : "VOLUNTEER";
       const user = await tx.user.create({
         data: {
           name: input.name.trim(),
