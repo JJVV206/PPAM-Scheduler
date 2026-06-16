@@ -15,7 +15,10 @@ export async function POST(
     if ("error" in auth) return auth.error;
 
     const { id } = await params;
-    const result = await sendAssignmentConfirmationRequests(id);
+    const result = await sendAssignmentConfirmationRequests({
+      assignmentId: id,
+      actorUserId: auth.session.user.id
+    });
     return ok(result);
   } catch (error) {
     return handleRouteError(error);

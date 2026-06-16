@@ -29,18 +29,44 @@ export const ASSIGNMENT_STATUSES = [
 ] as const;
 export const RESPONSE_STATUSES = ["PENDING", "CONFIRMED", "DECLINED"] as const;
 export const VOLUNTEER_POSITIONS = ["FIRST", "SECOND"] as const;
+export const ASSIGNMENT_INVITATION_TYPES = ["PRIMARY", "REPLACEMENT"] as const;
+export const ASSIGNMENT_INVITATION_STATUSES = [
+  "PENDING",
+  "SENT",
+  "ACCEPTED",
+  "DECLINED",
+  "EXPIRED",
+  "FAILED"
+] as const;
 export const NOTIFICATION_TYPES = [
   "CONFIRMATION_REQUEST",
+  "CENSUS_REQUEST",
+  "CENSUS_REMINDER",
   "REMINDER",
   "REPLACEMENT_OPPORTUNITY",
   "FINAL_REMINDER",
   "RESET_PASSWORD",
   "ASSIGNMENT_UPDATE"
 ] as const;
-export const NOTIFICATION_CHANNELS = ["EMAIL", "SMS", "WHATSAPP", "IN_APP"] as const;
+export const NOTIFICATION_CHANNELS = [
+  "EMAIL",
+  "SMS",
+  "WHATSAPP",
+  "IN_APP"
+] as const;
 export const NOTIFICATION_STATUSES = ["PENDING", "SENT", "FAILED"] as const;
 export const ASSIGNMENT_ACTIVITY_TYPES = [
   "ASSIGNED",
+  "INVITATION_CREATED",
+  "INVITATION_SENT",
+  "INVITATION_FAILED",
+  "INVITATION_ACCEPTED",
+  "INVITATION_DECLINED",
+  "INVITATION_EXPIRED",
+  "REPLACEMENT_REQUIRED",
+  "REPLACEMENT_SELECTED",
+  "NO_REPLACEMENT_AVAILABLE",
+  "ADMIN_ALERTED",
   "REMINDER_SENT",
   "RESPONSE_RECEIVED",
   "REPLACEMENT_ASSIGNED",
@@ -111,8 +137,24 @@ export const VOLUNTEER_POSITION_LABELS = {
   SECOND: "Puesto 2"
 } as const;
 
+export const ASSIGNMENT_INVITATION_TYPE_LABELS = {
+  PRIMARY: "Titular",
+  REPLACEMENT: "Suplente"
+} as const;
+
+export const ASSIGNMENT_INVITATION_STATUS_LABELS = {
+  PENDING: "Invitación pendiente",
+  SENT: "Email enviado",
+  ACCEPTED: "Confirmado",
+  DECLINED: "Rechazado",
+  EXPIRED: "Expirado",
+  FAILED: "Requiere intervención"
+} as const;
+
 export const NOTIFICATION_TYPE_LABELS = {
   CONFIRMATION_REQUEST: "Solicitud de confirmación",
+  CENSUS_REQUEST: "Censo de suplentes",
+  CENSUS_REMINDER: "Recordatorio de censo",
   REMINDER: "Recordatorio",
   REPLACEMENT_OPPORTUNITY: "Oportunidad de reemplazo",
   FINAL_REMINDER: "Recordatorio final",
@@ -135,6 +177,16 @@ export const NOTIFICATION_STATUS_LABELS = {
 
 export const ASSIGNMENT_ACTIVITY_LABELS = {
   ASSIGNED: "Asignado",
+  INVITATION_CREATED: "Invitación creada",
+  INVITATION_SENT: "Invitación enviada",
+  INVITATION_FAILED: "Invitación fallida",
+  INVITATION_ACCEPTED: "Invitación aceptada",
+  INVITATION_DECLINED: "Invitación rechazada",
+  INVITATION_EXPIRED: "Invitación expirada",
+  REPLACEMENT_REQUIRED: "Reemplazo requerido",
+  REPLACEMENT_SELECTED: "Suplente seleccionado",
+  NO_REPLACEMENT_AVAILABLE: "Sin suplente disponible",
+  ADMIN_ALERTED: "Administrador alertado",
   REMINDER_SENT: "Recordatorio enviado",
   RESPONSE_RECEIVED: "Respuesta recibida",
   REPLACEMENT_ASSIGNED: "Reemplazo asignado",

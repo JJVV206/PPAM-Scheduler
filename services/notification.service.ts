@@ -7,9 +7,11 @@ import {
 } from "@prisma/client";
 
 import { db } from "@/lib/db/prisma";
-import { getSmtpConfig } from "@/lib/env/config";
+import { getAppBaseUrl, getSmtpConfig } from "@/lib/env/config";
 import { humanizeErrorMessage } from "@/lib/utils/error-message";
+import { safeJsonMetadata } from "@/lib/utils/safe-metadata";
 import { AppError } from "@/services/errors";
+import { buildAssignmentReminderEmail } from "@/services/email-template.service";
 
 type NotificationPayload = {
   userId: string;
@@ -18,50 +20,14 @@ type NotificationPayload = {
   channel?: NotificationChannel;
   subject: string;
   html: string;
+  text?: string;
   metadata?: Record<string, unknown>;
 };
-
-const SENSITIVE_METADATA_KEYS = new Set([
-  "password",
-  "passwordHash",
-  "resetToken",
-  "token"
-]);
-
-function sanitizeMetadataValue(key: string, value: unknown): unknown {
-  if (SENSITIVE_METADATA_KEYS.has(key)) {
-    return undefined;
-  }
-
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => sanitizeMetadataValue("", item))
-      .filter((item) => item !== undefined);
-  }
-
-  if (value && typeof value === "object") {
-    return sanitizeNotificationMetadata(value as Record<string, unknown>);
-  }
-
-  return value;
-}
 
 export function sanitizeNotificationMetadata(
   metadata?: Record<string, unknown>
 ): Record<string, unknown> | undefined {
-  if (!metadata) {
-    return undefined;
-  }
-
-  const sanitizedEntries = Object.entries(metadata)
-    .map(([key, value]) => [key, sanitizeMetadataValue(key, value)] as const)
-    .filter(([, value]) => value !== undefined);
-
-  if (!sanitizedEntries.length) {
-    return undefined;
-  }
-
-  return Object.fromEntries(sanitizedEntries);
+  return safeJsonMetadata(metadata) as Record<string, unknown> | undefined;
 }
 
 function createTransport() {
@@ -108,7 +74,7 @@ export async function sendEmailNotification(payload: NotificationPayload) {
   const user = await db.user.findUnique({ where: { id: payload.userId } });
 
   if (!user?.email) {
-    await logNotification({
+    return logNotification({
       userId: payload.userId,
       assignmentId: payload.assignmentId,
       type: payload.type,
@@ -117,7 +83,6 @@ export async function sendEmailNotification(payload: NotificationPayload) {
       errorMessage: "No se encontró un correo para el destinatario",
       metadata: payload.metadata
     });
-    return;
   }
 
   try {
@@ -131,7 +96,7 @@ export async function sendEmailNotification(payload: NotificationPayload) {
         type: payload.type
       });
 
-      await logNotification({
+      return logNotification({
         userId: payload.userId,
         assignmentId: payload.assignmentId,
         type: payload.type,
@@ -142,17 +107,17 @@ export async function sendEmailNotification(payload: NotificationPayload) {
           simulated: true
         }
       });
-      return;
     } else {
       await transport.sendMail({
         from: smtpConfig?.from,
         to: user.email,
         subject: payload.subject,
-        html: payload.html
+        html: payload.html,
+        text: payload.text
       });
     }
 
-    await logNotification({
+    return logNotification({
       userId: payload.userId,
       assignmentId: payload.assignmentId,
       type: payload.type,
@@ -193,12 +158,27 @@ export async function resendConfirmationReminder(input: {
   timeSlotLabel: string;
   confirmationLink?: string | null;
 }) {
+  const responseUrl =
+    input.confirmationLink ??
+    `${getAppBaseUrl()}/volunteer/assignments/${encodeURIComponent(
+      input.assignmentId
+    )}`;
+  const email = buildAssignmentReminderEmail({
+    kind: "PENDING_CONFIRMATION",
+    volunteerName: input.volunteerName,
+    pointName: input.pointName,
+    dateLabel: input.dateLabel,
+    timeSlotLabel: input.timeSlotLabel,
+    responseUrl
+  });
+
   return sendEmailNotification({
     userId: input.volunteerUserId,
     assignmentId: input.assignmentId,
     type: "REMINDER",
-    subject: "Recordatorio: confirma tu asignación de PPAM",
-    html: `<p>Hola ${input.volunteerName},</p><p>Confirma tu asignación de PPAM para ${input.dateLabel} a las ${input.timeSlotLabel} en ${input.pointName}.</p>${input.confirmationLink ? `<p><a href="${input.confirmationLink}">Abrir confirmación directa</a></p>` : ""}`,
+    subject: email.subject,
+    html: email.html,
+    text: email.text,
     metadata: {
       pointName: input.pointName,
       confirmationLink: input.confirmationLink

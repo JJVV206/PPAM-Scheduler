@@ -22,6 +22,7 @@ Add these variables in Vercel Project Settings -> Environment Variables for Prod
 - `DIRECT_URL`
 - `NEXTAUTH_SECRET`
 - `NEXTAUTH_URL`
+- `CRON_SECRET`
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_SECURE`
@@ -34,6 +35,11 @@ Generate `NEXTAUTH_SECRET` with:
 ```bash
 openssl rand -base64 32
 ```
+
+Generate `CRON_SECRET` the same way. Vercel will call `/api/cron/assignment-automation`
+every 30 minutes and must send `Authorization: Bearer $CRON_SECRET`.
+The cron response intentionally exposes only an operational summary, not step
+details, email metadata, tokens, or internal error messages.
 
 Set `NEXTAUTH_URL` to the final production URL, for example:
 

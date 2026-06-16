@@ -9,6 +9,7 @@ Use this checklist before promoting a build to real PPAM production traffic.
 - Confirm `DIRECT_URL` uses the direct Neon URL.
 - Confirm `NEXTAUTH_SECRET` is a strong random value.
 - Confirm `NEXTAUTH_URL` matches the final Vercel/custom domain.
+- Confirm `CRON_SECRET` is a strong random value.
 - Confirm SMTP variables are configured when email readiness is required.
 - Run:
 
@@ -42,6 +43,20 @@ curl -i https://YOUR_PRODUCTION_URL/api/health
 
 ```bash
 curl -i "https://YOUR_PRODUCTION_URL/api/health?scope=readiness"
+```
+
+- Verify the automation cron rejects unauthenticated requests:
+
+```bash
+curl -i https://YOUR_PRODUCTION_URL/api/cron/assignment-automation
+```
+
+- Verify the automation cron accepts the configured secret and returns only a
+  short operational summary:
+
+```bash
+curl -i -H "Authorization: Bearer $CRON_SECRET" \
+  https://YOUR_PRODUCTION_URL/api/cron/assignment-automation
 ```
 
 ## Smoke QA

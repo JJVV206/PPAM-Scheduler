@@ -53,8 +53,40 @@ enum VolunteerPosition {
   SECOND
 }
 
+enum AssignmentInvitationType {
+  PRIMARY
+  REPLACEMENT
+}
+
+enum AssignmentInvitationStatus {
+  PENDING
+  SENT
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  FAILED
+}
+
+enum ReplacementCensusStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  CANCELLED
+}
+
+enum ReplacementCensusResponseStatus {
+  PENDING
+  SENT
+  SUBMITTED
+  DECLINED
+  EXPIRED
+  FAILED
+}
+
 enum NotificationType {
   CONFIRMATION_REQUEST
+  CENSUS_REQUEST
+  CENSUS_REMINDER
   REMINDER
   REPLACEMENT_OPPORTUNITY
   FINAL_REMINDER
@@ -75,8 +107,34 @@ enum NotificationStatus {
   FAILED
 }
 
+enum AppNotificationType {
+  CENSUS_PENDING
+  ASSIGNMENT_PENDING
+  ASSIGNMENT_CONFIRMED
+  REPLACEMENT_NEEDED
+  ADMIN_ATTENTION_REQUIRED
+  EMAIL_FAILED
+}
+
+enum AppNotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
 enum AssignmentActivityType {
   ASSIGNED
+  INVITATION_CREATED
+  INVITATION_SENT
+  INVITATION_FAILED
+  INVITATION_ACCEPTED
+  INVITATION_DECLINED
+  INVITATION_EXPIRED
+  REPLACEMENT_REQUIRED
+  REPLACEMENT_SELECTED
+  NO_REPLACEMENT_AVAILABLE
+  ADMIN_ALERTED
   REMINDER_SENT
   RESPONSE_RECEIVED
   REPLACEMENT_ASSIGNED
@@ -100,28 +158,34 @@ model User {
   accounts         Account[]
   sessions         Session[]
   notifications    NotificationLog[]
+  appNotifications AppNotification[]
   activities       AssignmentActivity[]
   createdWeeks     ScheduleWeek[]
+  createdCensuses  ReplacementCensus[]
   passwordResets   PasswordResetToken[]
 }
 
 model VolunteerProfile {
-  id                   String                  @id @default(cuid())
-  userId               String                  @unique
-  notes                String?
-  transportationNotes  String?
-  preferredAreas       String[]
-  reliabilityScore     Float                   @default(100)
-  confirmationCount    Int                     @default(0)
-  declineCount         Int                     @default(0)
-  noResponseCount      Int                     @default(0)
-  active               Boolean                 @default(true)
-  temporaryUnavailable Boolean                 @default(false)
-  user                 User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assignments          AssignmentVolunteer[]
-  responses            AssignmentResponse[]
-  availability         VolunteerAvailability[]
-  availabilityBlocks   AvailabilityException[]
+  id                    String                          @id @default(cuid())
+  userId                String                          @unique
+  notes                 String?
+  transportationNotes   String?
+  preferredAreas        String[]
+  reliabilityScore      Float                           @default(100)
+  confirmationCount     Int                             @default(0)
+  declineCount          Int                             @default(0)
+  noResponseCount       Int                             @default(0)
+  active                Boolean                         @default(true)
+  temporaryUnavailable  Boolean                         @default(false)
+  canServeAsReplacement Boolean                         @default(true)
+  user                  User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignments           AssignmentVolunteer[]
+  responses             AssignmentResponse[]
+  invitations           AssignmentInvitation[]
+  availability          VolunteerAvailability[]
+  censusResponses       ReplacementCensusResponse[]
+  weeklyAvailability    ReplacementWeeklyAvailability[]
+  availabilityBlocks    AvailabilityException[]
 }
 
 model PreachingPoint {
@@ -147,37 +211,41 @@ model PreachingPointActiveSlot {
 }
 
 model ScheduleWeek {
-  id          String       @id @default(cuid())
-  startDate   DateTime
-  endDate     DateTime
-  label       String
-  createdById String
-  createdAt   DateTime     @default(now())
-  createdBy   User         @relation(fields: [createdById], references: [id])
-  assignments Assignment[]
+  id           String                          @id @default(cuid())
+  startDate    DateTime
+  endDate      DateTime
+  label        String
+  createdById  String
+  createdAt    DateTime                        @default(now())
+  createdBy    User                            @relation(fields: [createdById], references: [id])
+  assignments  Assignment[]
+  census       ReplacementCensus?
+  availability ReplacementWeeklyAvailability[]
 
   @@unique([startDate, endDate])
 }
 
 model Assignment {
-  id               String                @id @default(cuid())
+  id               String                 @id @default(cuid())
   scheduleWeekId   String
   date             DateTime
   dayOfWeek        DayOfWeek
   timeSlot         TimeSlot
   preachingPointId String
-  pairNumber       Int                   @default(1)
-  status           AssignmentStatus      @default(SCHEDULED)
+  pairNumber       Int                    @default(1)
+  status           AssignmentStatus       @default(SCHEDULED)
   notes            String?
   completedAt      DateTime?
   cancelledAt      DateTime?
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
-  scheduleWeek     ScheduleWeek          @relation(fields: [scheduleWeekId], references: [id], onDelete: Cascade)
-  preachingPoint   PreachingPoint        @relation(fields: [preachingPointId], references: [id])
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  scheduleWeek     ScheduleWeek           @relation(fields: [scheduleWeekId], references: [id], onDelete: Cascade)
+  preachingPoint   PreachingPoint         @relation(fields: [preachingPointId], references: [id])
   volunteers       AssignmentVolunteer[]
   responses        AssignmentResponse[]
+  invitations      AssignmentInvitation[]
   notifications    NotificationLog[]
+  appNotifications AppNotification[]
   activities       AssignmentActivity[]
 
   @@unique([date, timeSlot, preachingPointId, pairNumber])
@@ -212,6 +280,90 @@ model AssignmentResponse {
 
   @@unique([assignmentId, volunteerId])
   @@index([volunteerId, responseStatus])
+}
+
+model AssignmentInvitation {
+  id            String                     @id @default(cuid())
+  assignmentId  String
+  volunteerId   String
+  type          AssignmentInvitationType
+  status        AssignmentInvitationStatus @default(PENDING)
+  token         String                     @unique
+  sentAt        DateTime?
+  respondedAt   DateTime?
+  expiresAt     DateTime
+  emailAttempts Int                        @default(0)
+  metadata      Json?
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+  assignment    Assignment                 @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  volunteer     VolunteerProfile           @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+
+  @@index([assignmentId, status])
+  @@index([volunteerId, status])
+  @@index([expiresAt, status])
+  @@index([assignmentId, volunteerId, type, status])
+}
+
+model ReplacementCensus {
+  id               String                      @id @default(cuid())
+  scheduleWeekId   String                      @unique
+  status           ReplacementCensusStatus     @default(DRAFT)
+  sentAt           DateTime?
+  closesAt         DateTime
+  createdById      String
+  metadata         Json?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  scheduleWeek     ScheduleWeek                @relation(fields: [scheduleWeekId], references: [id], onDelete: Cascade)
+  createdBy        User                        @relation(fields: [createdById], references: [id])
+  responses        ReplacementCensusResponse[]
+  appNotifications AppNotification[]
+
+  @@index([status, closesAt])
+}
+
+model ReplacementCensusResponse {
+  id            String                          @id @default(cuid())
+  censusId      String
+  volunteerId   String
+  status        ReplacementCensusResponseStatus @default(PENDING)
+  token         String                          @unique
+  sentAt        DateTime?
+  respondedAt   DateTime?
+  expiresAt     DateTime
+  emailAttempts Int                             @default(0)
+  metadata      Json?
+  createdAt     DateTime                        @default(now())
+  updatedAt     DateTime                        @updatedAt
+  census        ReplacementCensus               @relation(fields: [censusId], references: [id], onDelete: Cascade)
+  volunteer     VolunteerProfile                @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+  availability  ReplacementWeeklyAvailability[]
+
+  @@unique([censusId, volunteerId])
+  @@index([volunteerId, status])
+  @@index([expiresAt, status])
+}
+
+model ReplacementWeeklyAvailability {
+  id               String                    @id @default(cuid())
+  censusResponseId String
+  volunteerId      String
+  scheduleWeekId   String
+  date             DateTime
+  dayOfWeek        DayOfWeek
+  timeSlot         TimeSlot?
+  available        Boolean                   @default(true)
+  notes            String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  censusResponse   ReplacementCensusResponse @relation(fields: [censusResponseId], references: [id], onDelete: Cascade)
+  volunteer        VolunteerProfile          @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+  scheduleWeek     ScheduleWeek              @relation(fields: [scheduleWeekId], references: [id], onDelete: Cascade)
+
+  @@unique([censusResponseId, date, timeSlot])
+  @@index([scheduleWeekId, date, timeSlot, available])
+  @@index([volunteerId, scheduleWeekId])
 }
 
 model VolunteerAvailability {
@@ -253,6 +405,28 @@ model NotificationLog {
   assignment   Assignment?         @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
 
   @@index([userId, sentAt])
+  @@index([assignmentId, userId, type, status])
+}
+
+model AppNotification {
+  id           String                  @id @default(cuid())
+  userId       String
+  assignmentId String?
+  censusId     String?
+  type         AppNotificationType
+  priority     AppNotificationPriority @default(NORMAL)
+  title        String
+  body         String
+  readAt       DateTime?
+  metadata     Json?
+  createdAt    DateTime                @default(now())
+  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignment   Assignment?             @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  census       ReplacementCensus?      @relation(fields: [censusId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt, createdAt])
+  @@index([assignmentId, type])
+  @@index([censusId, type])
 }
 
 model AssignmentActivity {
@@ -274,6 +448,32 @@ model AppSetting {
   value     Json
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
+}
+
+model AutomationAuditLog {
+  id               String   @id @default(cuid())
+  eventType        String
+  eventCategory    String
+  status           String?
+  assignmentId     String?
+  scheduleWeekId   String?
+  censusId         String?
+  censusResponseId String?
+  invitationId     String?
+  notificationLogId String?
+  appNotificationId String?
+  actorUserId      String?
+  automationRunId  String?
+  metadata         Json?
+  createdAt        DateTime @default(now())
+
+  @@index([eventType, createdAt])
+  @@index([automationRunId, createdAt])
+  @@index([assignmentId, createdAt])
+  @@index([scheduleWeekId, createdAt])
+  @@index([censusId, createdAt])
+  @@index([censusResponseId, createdAt])
+  @@index([invitationId, createdAt])
 }
 
 model PasswordResetToken {

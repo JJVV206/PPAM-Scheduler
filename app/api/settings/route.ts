@@ -19,7 +19,9 @@ export async function PATCH(request: Request) {
     const auth = await requireRole(["ADMIN"]);
     if ("error" in auth) return auth.error;
     const body = updateSettingsSchema.parse(await request.json());
-    const settings = await updateSettings(body);
+    const settings = await updateSettings(body, {
+      actorUserId: auth.session.user.id
+    });
     return ok(settings);
   } catch (error) {
     return handleRouteError(error);

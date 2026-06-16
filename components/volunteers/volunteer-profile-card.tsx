@@ -1,7 +1,20 @@
-import { CheckCircle2, Mail, NotebookPen, Phone, XCircle } from "lucide-react";
+import {
+  CalendarClock,
+  CheckCircle2,
+  Mail,
+  NotebookPen,
+  Phone,
+  XCircle
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DAYS_OF_WEEK,
+  DAY_LABELS,
+  TIME_SLOT_DEFINITIONS
+} from "@/lib/constants/domain";
+import type { DayOfWeek, TimeSlot } from "@/types/domain";
 
 type VolunteerProfileCardProps = {
   volunteer: {
@@ -10,14 +23,32 @@ type VolunteerProfileCardProps = {
     phone?: string | null;
     active: boolean;
     temporaryUnavailable: boolean;
+    canServeAsReplacement: boolean;
     confirmationCount: number;
     declineCount: number;
     noResponseCount: number;
     notes?: string | null;
+    availability?: Array<{
+      dayOfWeek: DayOfWeek;
+      timeSlot: TimeSlot;
+      available?: boolean;
+    }>;
   };
 };
 
 export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
+  const availabilityByDay =
+    volunteer.availability
+      ?.filter((item) => item.available !== false)
+      .reduce<Partial<Record<DayOfWeek, TimeSlot[]>>>((accumulator, item) => {
+        accumulator[item.dayOfWeek] ??= [];
+        accumulator[item.dayOfWeek]?.push(item.timeSlot);
+        return accumulator;
+      }, {}) ?? {};
+  const availabilityDays = DAYS_OF_WEEK.map(
+    (day) => [day, availabilityByDay[day] ?? []] as [DayOfWeek, TimeSlot[]]
+  ).filter(([, slots]) => slots.length > 0);
+
   return (
     <Card className="surface-panel h-fit min-w-0 self-start">
       <CardHeader className="p-5 pb-3">
@@ -35,6 +66,11 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
             {volunteer.temporaryUnavailable ? (
               <Badge variant="warning">No disponible</Badge>
             ) : null}
+            <Badge
+              variant={volunteer.canServeAsReplacement ? "success" : "outline"}
+            >
+              {volunteer.canServeAsReplacement ? "Suplente" : "No suplente"}
+            </Badge>
           </div>
         </div>
       </CardHeader>
@@ -67,6 +103,39 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2">
+          <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+            Disponibilidad
+          </p>
+          {availabilityDays.length ? (
+            <div className="mt-3 space-y-2">
+              {availabilityDays.map(([dayOfWeek, slots]) => (
+                <div
+                  key={dayOfWeek}
+                  className="rounded-2xl border border-white/5 bg-background/30 px-3 py-2"
+                >
+                  <p className="flex items-center gap-2 text-sm font-medium">
+                    <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                    {DAY_LABELS[dayOfWeek]}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {slots.map((slot) => (
+                      <Badge key={slot} variant="secondary">
+                        {TIME_SLOT_DEFINITIONS[slot].shortLabel}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 flex items-start gap-2 text-sm text-muted-foreground">
+              <CalendarClock className="mt-0.5 h-4 w-4 shrink-0" />
+              Sin disponibilidad recurrente registrada.
+            </p>
+          )}
         </div>
 
         <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2">

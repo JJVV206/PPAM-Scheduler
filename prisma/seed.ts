@@ -42,6 +42,7 @@ const prisma = new PrismaClient();
 async function main() {
   await prisma.notificationLog.deleteMany();
   await prisma.assignmentActivity.deleteMany();
+  await prisma.assignmentInvitation.deleteMany();
   await prisma.assignmentResponse.deleteMany();
   await prisma.assignmentVolunteer.deleteMany();
   await prisma.assignment.deleteMany();
@@ -315,7 +316,59 @@ async function main() {
       },
       {
         key: "reminderTimingDays",
-        value: [8, 3, 1]
+        value: [5, 1]
+      },
+      {
+        key: "finalReminderHours",
+        value: 3
+      },
+      {
+        key: "primaryResponseTimeoutHours",
+        value: 48
+      },
+      {
+        key: "primaryReminderOffsetsHours",
+        value: [12, 24, 40]
+      },
+      {
+        key: "urgentPrimaryResponseTimeoutHours",
+        value: 12
+      },
+      {
+        key: "urgentPrimaryReminderOffsetsHours",
+        value: [4, 8]
+      },
+      {
+        key: "urgentThresholdHours",
+        value: 72
+      },
+      {
+        key: "replacementResponseTimeoutHours",
+        value: 12
+      },
+      {
+        key: "replacementReminderOffsetsHours",
+        value: [4, 8]
+      },
+      {
+        key: "urgentReplacementResponseTimeoutHours",
+        value: 4
+      },
+      {
+        key: "urgentReplacementReminderOffsetsHours",
+        value: [2]
+      },
+      {
+        key: "censusResponseTimeoutHours",
+        value: 72
+      },
+      {
+        key: "censusReminderOffsetsHours",
+        value: [24, 48]
+      },
+      {
+        key: "adminAlertEmail",
+        value: "admin@ppam.local"
       },
       {
         key: "notificationChannels",

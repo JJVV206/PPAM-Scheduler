@@ -24,7 +24,7 @@ export function isProductionRuntime() {
 
 export function getRequiredAppEnvKeys() {
   return isProductionRuntime()
-    ? ["DATABASE_URL", "NEXTAUTH_SECRET", "NEXTAUTH_URL"] as const
+    ? ["DATABASE_URL", "NEXTAUTH_SECRET", "NEXTAUTH_URL", "CRON_SECRET"] as const
     : ["DATABASE_URL"] as const;
 }
 

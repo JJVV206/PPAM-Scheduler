@@ -1,7 +1,27 @@
+import { startOfDay } from "date-fns";
+
 import { db } from "@/lib/db/prisma";
-import type { VolunteerDashboardData, VolunteerSummary } from "@/types/domain";
-import { getOpenSlots, getVolunteerHistory } from "@/services/assignment.service";
+import type {
+  VolunteerAssignmentReminderDto,
+  VolunteerDashboardData,
+  VolunteerSummary
+} from "@/types/domain";
+import {
+  getOpenSlots,
+  getVolunteerHistory
+} from "@/services/assignment.service";
 import { AppError } from "@/services/errors";
+import {
+  isVolunteerAssignmentConfirmed,
+  isVolunteerAssignmentPendingResponse
+} from "@/lib/volunteer-assignment";
+import { mergeJsonMetadata } from "@/lib/utils/safe-metadata";
+import { recordAssignmentAuditActivity } from "@/services/assignment-audit.service";
+
+const ACTIVE_INVITATION_STATUSES = ["PENDING", "SENT"] as const;
+const TERMINAL_ASSIGNMENT_STATUSES = ["CANCELLED", "COMPLETED"] as const;
+const VOLUNTEER_DELETED_RESPONSE_NOTE =
+  "Voluntario eliminado por administrador.";
 
 function mapVolunteer(record: {
   id: string;
@@ -15,6 +35,7 @@ function mapVolunteer(record: {
   noResponseCount: number;
   active: boolean;
   temporaryUnavailable: boolean;
+  canServeAsReplacement: boolean;
   user: {
     id: string;
     name: string;
@@ -36,12 +57,21 @@ function mapVolunteer(record: {
     confirmationCount: record.confirmationCount,
     declineCount: record.declineCount,
     noResponseCount: record.noResponseCount,
-    temporaryUnavailable: record.temporaryUnavailable
+    temporaryUnavailable: record.temporaryUnavailable,
+    canServeAsReplacement: record.canServeAsReplacement
   };
 }
 
-export async function getVolunteers() {
+export async function getVolunteers(input?: { activeOnly?: boolean }) {
   const volunteers = await db.volunteerProfile.findMany({
+    where: input?.activeOnly
+      ? {
+          active: true,
+          user: {
+            active: true
+          }
+        }
+      : undefined,
     include: { user: true, availability: true },
     orderBy: { user: { name: "asc" } }
   });
@@ -183,21 +213,132 @@ export async function updateVolunteer(
   });
 }
 
-export async function deactivateVolunteer(volunteerId: string) {
+export async function deactivateVolunteer(
+  volunteerId: string,
+  input?: { actorUserId?: string }
+) {
   const volunteer = await db.volunteerProfile.findUniqueOrThrow({
-    where: { id: volunteerId }
+    where: { id: volunteerId },
+    include: { user: true }
   });
+  const now = new Date();
+  const activeFromToday = startOfDay(now);
 
-  await db.$transaction([
-    db.volunteerProfile.update({
+  return db.$transaction(async (tx) => {
+    await tx.volunteerProfile.update({
       where: { id: volunteerId },
       data: { active: false }
-    }),
-    db.user.update({
+    });
+    await tx.user.update({
       where: { id: volunteer.userId },
       data: { active: false }
-    })
-  ]);
+    });
+
+    const activeInvitations = await tx.assignmentInvitation.findMany({
+      where: {
+        volunteerId,
+        status: {
+          in: [...ACTIVE_INVITATION_STATUSES]
+        }
+      },
+      select: {
+        id: true,
+        metadata: true
+      }
+    });
+
+    for (const invitation of activeInvitations) {
+      await tx.assignmentInvitation.update({
+        where: { id: invitation.id },
+        data: {
+          status: "EXPIRED",
+          metadata: mergeJsonMetadata(invitation.metadata, {
+            expiredBy: "ADMIN_VOLUNTEER_DELETION",
+            expiredAt: now.toISOString(),
+            actorUserId: input?.actorUserId
+          })
+        }
+      });
+    }
+
+    const affectedAssignments = await tx.assignment.findMany({
+      where: {
+        date: {
+          gte: activeFromToday
+        },
+        status: {
+          notIn: [...TERMINAL_ASSIGNMENT_STATUSES]
+        },
+        volunteers: {
+          some: {
+            volunteerId
+          }
+        }
+      },
+      include: {
+        volunteers: {
+          where: {
+            volunteerId
+          }
+        }
+      }
+    });
+
+    for (const assignment of affectedAssignments) {
+      const assignedSlot = assignment.volunteers[0];
+      const dedupeKey = `volunteer-deleted:${assignment.id}:${volunteerId}`;
+
+      await tx.assignmentResponse.upsert({
+        where: {
+          assignmentId_volunteerId: {
+            assignmentId: assignment.id,
+            volunteerId
+          }
+        },
+        update: {
+          responseStatus: "DECLINED",
+          note: VOLUNTEER_DELETED_RESPONSE_NOTE,
+          respondedAt: now
+        },
+        create: {
+          assignmentId: assignment.id,
+          volunteerId,
+          responseStatus: "DECLINED",
+          note: VOLUNTEER_DELETED_RESPONSE_NOTE,
+          respondedAt: now
+        }
+      });
+
+      if (assignment.status !== "NEEDS_REPLACEMENT") {
+        await tx.assignment.update({
+          where: { id: assignment.id },
+          data: { status: "NEEDS_REPLACEMENT" }
+        });
+      }
+
+      await recordAssignmentAuditActivity({
+        client: tx,
+        assignmentId: assignment.id,
+        actorUserId: input?.actorUserId,
+        event: "REPLACEMENT_REQUIRED",
+        dedupeKey,
+        metadata: {
+          reason: "volunteer_deleted",
+          volunteerProfileId: volunteerId,
+          volunteerUserId: volunteer.userId,
+          position: assignedSlot?.position,
+          previousStatus: assignment.status,
+          markedAt: now
+        }
+      });
+    }
+
+    return {
+      success: true,
+      affectedAssignmentCount: affectedAssignments.length,
+      expiredInvitationCount: activeInvitations.length
+    };
+  });
 }
 
 export async function getVolunteerDashboardData(
@@ -208,22 +349,39 @@ export async function getVolunteerDashboardData(
     getVolunteerHistory(volunteerProfileId),
     getOpenSlots()
   ]);
+  const now = new Date();
+  const futureAssignments = assignments.filter(
+    (assignment) => assignment.date >= now
+  );
+  const remindersByAssignmentId = await getVolunteerAssignmentRemindersById({
+    userId: volunteer.userId,
+    assignmentIds: assignments.map((assignment) => assignment.id)
+  });
 
   return {
     volunteer,
-    upcomingAssignments: assignments.filter(
-      (assignment) => assignment.date >= new Date()
+    upcomingAssignments: futureAssignments,
+    pendingConfirmations: futureAssignments.filter((assignment) =>
+      isVolunteerAssignmentPendingResponse(assignment, volunteerProfileId)
     ),
-    pendingConfirmations: assignments.filter(
-      (assignment) => assignment.status === "PENDING_CONFIRMATION"
+    confirmedAssignments: futureAssignments.filter((assignment) =>
+      isVolunteerAssignmentConfirmed(assignment, volunteerProfileId)
     ),
+    assignmentHistory: assignments.filter(
+      (assignment) => assignment.date < now
+    ),
+    remindersByAssignmentId,
     openSlots: openSlots.filter((slot) =>
-      slot.suggestedVolunteers.some((candidate) => candidate.id === volunteerProfileId)
+      slot.suggestedVolunteers.some(
+        (candidate) => candidate.id === volunteerProfileId
+      )
     ),
     weeklyAvailabilitySummary: volunteer.availability.reduce<
       VolunteerDashboardData["weeklyAvailabilitySummary"]
     >((accumulator, item) => {
-      const existing = accumulator.find((entry) => entry.dayOfWeek === item.dayOfWeek);
+      const existing = accumulator.find(
+        (entry) => entry.dayOfWeek === item.dayOfWeek
+      );
       if (existing) {
         existing.slots.push(item.timeSlot);
       } else {
@@ -235,4 +393,48 @@ export async function getVolunteerDashboardData(
       return accumulator;
     }, [])
   };
+}
+
+export async function getVolunteerAssignmentRemindersById(input: {
+  userId: string;
+  assignmentIds: string[];
+}): Promise<Record<string, VolunteerAssignmentReminderDto[]>> {
+  if (!input.assignmentIds.length) {
+    return {};
+  }
+
+  const reminders = await db.notificationLog.findMany({
+    where: {
+      userId: input.userId,
+      assignmentId: {
+        in: input.assignmentIds
+      },
+      type: {
+        in: ["REMINDER", "FINAL_REMINDER"]
+      },
+      status: "SENT"
+    },
+    orderBy: {
+      createdAt: "desc"
+    }
+  });
+
+  return reminders.reduce<Record<string, VolunteerAssignmentReminderDto[]>>(
+    (accumulator, reminder) => {
+      if (!reminder.assignmentId) return accumulator;
+
+      accumulator[reminder.assignmentId] ??= [];
+      accumulator[reminder.assignmentId].push({
+        id: reminder.id,
+        assignmentId: reminder.assignmentId,
+        type: reminder.type as VolunteerAssignmentReminderDto["type"],
+        status: reminder.status,
+        sentAt: reminder.sentAt,
+        createdAt: reminder.createdAt
+      });
+
+      return accumulator;
+    },
+    {}
+  );
 }

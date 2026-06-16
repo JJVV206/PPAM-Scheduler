@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
+  AlertTriangle,
   Bell,
   CalendarDays,
   ClipboardList,
@@ -14,8 +16,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
-  Sparkles,
   UserCircle2,
+  UserCheck,
   Users
 } from "lucide-react";
 import { signOut } from "next-auth/react";
@@ -44,10 +46,14 @@ const SIDEBAR_COLLAPSED_STORAGE_KEY = "ppam-sidebar-collapsed";
 const adminItems: NavItem[] = [
   { href: "/admin", label: "Inicio", icon: Home },
   { href: "/admin/schedule", label: "Horario semanal", icon: CalendarDays },
+  {
+    href: "/admin/attention",
+    label: "Atención requerida",
+    icon: AlertTriangle
+  },
+  { href: "/admin/replacements", label: "Suplentes", icon: UserCheck },
   { href: "/admin/assignments", label: "Asignaciones", icon: ClipboardList },
   { href: "/admin/volunteers", label: "Voluntarios", icon: Users },
-  { href: "/admin/open-slots", label: "Vacantes", icon: Sparkles },
-  { href: "/admin/notifications", label: "Notificaciones", icon: Bell },
   { href: "/admin/settings", label: "Configuración", icon: Settings }
 ];
 
@@ -58,7 +64,6 @@ const volunteerItems: NavItem[] = [
     label: "Mis asignaciones",
     icon: CalendarDays
   },
-  { href: "/volunteer/open-slots", label: "Vacantes", icon: Sparkles },
   {
     href: "/volunteer/availability",
     label: "Disponibilidad",
@@ -70,6 +75,7 @@ const volunteerItems: NavItem[] = [
 
 type AppSidebarProps = {
   role: UserRole;
+  unreadNotificationCount?: number;
 };
 
 type NavigationContentProps = {
@@ -78,6 +84,8 @@ type NavigationContentProps = {
   onNavigate?: () => void;
   onPreload?: (href: string) => void;
   pathname: string;
+  notificationsHref: string;
+  unreadNotificationCount: number;
 };
 
 function isActiveRoute(pathname: string, href: string) {
@@ -102,15 +110,19 @@ function getCurrentSectionLabel(pathname: string, items: NavItem[]) {
 function NavigationContent({
   collapsed = false,
   items,
+  notificationsHref,
   onNavigate,
   onPreload,
-  pathname
+  pathname,
+  unreadNotificationCount
 }: NavigationContentProps) {
   return (
     <nav className="space-y-2">
       {items.map((item) => {
         const active = isActiveRoute(pathname, item.href);
         const Icon = item.icon;
+        const showNotificationCount =
+          item.href === notificationsHref && unreadNotificationCount > 0;
 
         return (
           <Link
@@ -128,11 +140,27 @@ function NavigationContent({
                 "bg-primary/15 text-primary shadow-[inset_0_0_0_1px_rgba(133,168,255,0.2)]"
             )}
           >
-            <Icon className="h-4 w-4 shrink-0" />
+            <span className="relative inline-flex shrink-0">
+              <Icon className="h-4 w-4 shrink-0" />
+              {collapsed && showNotificationCount ? (
+                <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-danger-foreground">
+                  {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                </span>
+              ) : null}
+            </span>
             {collapsed ? (
               <span className="sr-only">{item.label}</span>
             ) : (
-              <span className="truncate">{item.label}</span>
+              <>
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                {showNotificationCount ? (
+                  <span className="ml-auto rounded-full bg-danger/15 px-2 py-0.5 text-[11px] font-semibold leading-none text-danger">
+                    {unreadNotificationCount > 99
+                      ? "99+"
+                      : unreadNotificationCount}
+                  </span>
+                ) : null}
+              </>
             )}
           </Link>
         );
@@ -141,7 +169,10 @@ function NavigationContent({
   );
 }
 
-export function AppSidebar({ role }: AppSidebarProps) {
+export function AppSidebar({
+  role,
+  unreadNotificationCount = 0
+}: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
@@ -149,7 +180,7 @@ export function AppSidebar({ role }: AppSidebarProps) {
   const items = getNavItems(role);
   const currentSectionLabel = getCurrentSectionLabel(pathname, items);
   const notificationsHref =
-    role === "ADMIN" ? "/admin/notifications" : "/volunteer/notifications";
+    role === "ADMIN" ? "/admin/attention" : "/volunteer/notifications";
   const preloadRoute = useCallback(
     (href: string) => {
       router.prefetch(href);
@@ -195,8 +226,23 @@ export function AppSidebar({ role }: AppSidebarProps) {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" asChild>
-              <Link href={notificationsHref}>
+              <Link
+                href={notificationsHref}
+                className="relative"
+                aria-label={
+                  unreadNotificationCount > 0
+                    ? `Ir a notificaciones, ${unreadNotificationCount} sin leer`
+                    : "Ir a notificaciones"
+                }
+              >
                 <Bell className="h-4 w-4" />
+                {unreadNotificationCount > 0 ? (
+                  <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-danger-foreground">
+                    {unreadNotificationCount > 9
+                      ? "9+"
+                      : unreadNotificationCount}
+                  </span>
+                ) : null}
                 <span className="sr-only">Ir a notificaciones</span>
               </Link>
             </Button>
@@ -223,14 +269,17 @@ export function AppSidebar({ role }: AppSidebarProps) {
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="bg-primary/12 flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/20 text-primary shadow-[0_10px_24px_rgba(102,145,255,0.18)]">
-                      <Sparkles className="h-5 w-5" />
+                    <div className="flex h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-primary/20 shadow-[0_10px_24px_rgba(102,145,255,0.18)]">
+                      <Image
+                        src="/favicon.png"
+                        alt=""
+                        width={48}
+                        height={48}
+                        className="h-full w-full object-cover"
+                      />
                     </div>
                     <div className="min-w-0">
                       <p className="font-heading text-xl font-semibold">PPAM</p>
-                      <p className="truncate text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                        Planificador
-                      </p>
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -277,7 +326,9 @@ export function AppSidebar({ role }: AppSidebarProps) {
                 </div>
                 <NavigationContent
                   items={items}
+                  notificationsHref={notificationsHref}
                   pathname={pathname}
+                  unreadNotificationCount={unreadNotificationCount}
                   onPreload={preloadRoute}
                   onNavigate={() => setMobileNavOpen(false)}
                 />
@@ -334,19 +385,22 @@ export function AppSidebar({ role }: AppSidebarProps) {
             >
               <div
                 className={cn(
-                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-glow",
+                  "flex h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-primary/20 shadow-glow",
                   desktopCollapsed && "h-11 w-11"
                 )}
               >
-                <Sparkles className="h-6 w-6" />
+                <Image
+                  src="/favicon.png"
+                  alt=""
+                  width={48}
+                  height={48}
+                  className="h-full w-full object-cover"
+                />
               </div>
               {!desktopCollapsed ? (
                 <div className="min-w-0">
                   <p className="truncate font-heading text-xl font-semibold">
                     PPAM
-                  </p>
-                  <p className="truncate text-xs uppercase tracking-[0.28em] text-muted-foreground">
-                    Planificador
                   </p>
                 </div>
               ) : null}
@@ -381,7 +435,9 @@ export function AppSidebar({ role }: AppSidebarProps) {
           <NavigationContent
             collapsed={desktopCollapsed}
             items={items}
+            notificationsHref={notificationsHref}
             pathname={pathname}
+            unreadNotificationCount={unreadNotificationCount}
             onPreload={preloadRoute}
           />
         </div>

@@ -25,7 +25,7 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ppam_scheduler?schema=public
       DIRECT_URL: postgresql://postgres:postgres@postgres:5432/ppam_scheduler?schema=public
       NEXTAUTH_SECRET: ppam-scheduler-docker-local-secret-change-in-production
-      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       SMTP_SECURE: "false"

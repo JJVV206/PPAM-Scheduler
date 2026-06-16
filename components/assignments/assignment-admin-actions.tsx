@@ -15,10 +15,7 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  DAY_LABELS,
-  TIME_SLOTS
-} from "@/lib/constants/domain";
+import { DAY_LABELS, TIME_SLOTS } from "@/lib/constants/domain";
 import { cn } from "@/lib/utils";
 import type {
   AssignmentDetailDto,
@@ -80,11 +77,28 @@ export function AssignmentAdminActions({
       ?.volunteerId ?? ""
   );
   const [notes, setNotes] = useState(assignment.notes ?? "");
-  const [loading, setLoading] = useState<"save" | "delete" | null>(null);
+  const [loading, setLoading] = useState<"save" | "resolve" | "cancel" | null>(
+    null
+  );
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error";
     text: string;
   } | null>(null);
+  const volunteerOptions = useMemo(() => {
+    const options = new Map<string, VolunteerSummary>();
+
+    for (const volunteer of volunteers) {
+      options.set(volunteer.id, volunteer);
+    }
+
+    for (const slot of assignment.volunteers) {
+      options.set(slot.volunteer.id, slot.volunteer);
+    }
+
+    return [...options.values()].sort((left, right) =>
+      left.name.localeCompare(right.name, "es-MX")
+    );
+  }, [assignment.volunteers, volunteers]);
 
   const selectedDayOfWeek = useMemo(
     () => getDayOfWeekFromDate(assignmentDate),
@@ -155,23 +169,36 @@ export function AssignmentAdminActions({
     }
   }
 
-  async function handleDelete() {
-    if (!window.confirm("Se eliminará esta asignación. ¿Deseas continuar?")) {
+  async function handleStatusOverride(status: "CONFIRMED" | "CANCELLED") {
+    if (
+      status === "CANCELLED" &&
+      !window.confirm("Se cancelará esta asignación. ¿Deseas continuar?")
+    ) {
       return;
     }
 
-    setLoading("delete");
+    const action = status === "CONFIRMED" ? "resolve" : "cancel";
+
+    setLoading(action);
     setFeedback(null);
 
     const response = await fetch(`/api/assignments/${assignment.id}`, {
-      method: "DELETE"
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ status })
     });
     const result = await response.json();
 
     setLoading(null);
     setFeedback({
       tone: response.ok ? "success" : "error",
-      text: response.ok ? "Asignación eliminada." : result.error
+      text: response.ok
+        ? status === "CONFIRMED"
+          ? "Asignación marcada como resuelta."
+          : "Asignación cancelada."
+        : result.error
     });
 
     if (response.ok) {
@@ -189,9 +216,15 @@ export function AssignmentAdminActions({
     >
       {showHeading ? (
         <div>
-          <p className="font-semibold">Editar asignación</p>
-          <p className={compact ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>
-            Ajusta fecha, horario o pareja sin salir del seguimiento.
+          <p className="font-semibold">Overrides manuales</p>
+          <p
+            className={
+              compact
+                ? "text-xs text-muted-foreground"
+                : "text-sm text-muted-foreground"
+            }
+          >
+            Ajusta fecha, asigna suplente manualmente o cierra el seguimiento.
           </p>
         </div>
       ) : null}
@@ -221,7 +254,14 @@ export function AssignmentAdminActions({
 
       <div className="grid gap-3">
         <label className="text-sm font-medium">Horario</label>
-        <div className={cn("grid gap-2", compact ? "grid-cols-2 md:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-5")}>
+        <div
+          className={cn(
+            "grid gap-2",
+            compact
+              ? "grid-cols-2 md:grid-cols-3"
+              : "sm:grid-cols-2 xl:grid-cols-5"
+          )}
+        >
           {TIME_SLOTS.map((slot) => (
             <TimeSlotOptionButton
               key={slot}
@@ -242,9 +282,10 @@ export function AssignmentAdminActions({
               <SelectValue placeholder="Primer puesto" />
             </SelectTrigger>
             <SelectContent>
-              {volunteers.map((volunteer) => (
+              {volunteerOptions.map((volunteer) => (
                 <SelectItem key={volunteer.id} value={volunteer.id}>
                   {volunteer.name}
+                  {volunteer.active ? "" : " (inactivo)"}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -258,9 +299,10 @@ export function AssignmentAdminActions({
               <SelectValue placeholder="Segundo puesto" />
             </SelectTrigger>
             <SelectContent>
-              {volunteers.map((volunteer) => (
+              {volunteerOptions.map((volunteer) => (
                 <SelectItem key={volunteer.id} value={volunteer.id}>
                   {volunteer.name}
+                  {volunteer.active ? "" : " (inactivo)"}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -285,16 +327,27 @@ export function AssignmentAdminActions({
         tone={feedback?.tone}
       />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-        <Button
-          type="button"
-          variant="danger"
-          size={compact ? "sm" : "default"}
-          onClick={handleDelete}
-          disabled={loading !== null}
-        >
-          {loading === "delete" ? "Eliminando..." : "Eliminar asignación"}
-        </Button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button
+            type="button"
+            variant="secondary"
+            size={compact ? "sm" : "default"}
+            onClick={() => handleStatusOverride("CONFIRMED")}
+            disabled={loading !== null || assignment.status === "CONFIRMED"}
+          >
+            {loading === "resolve" ? "Marcando..." : "Marcar como resuelto"}
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            size={compact ? "sm" : "default"}
+            onClick={() => handleStatusOverride("CANCELLED")}
+            disabled={loading !== null || assignment.status === "CANCELLED"}
+          >
+            {loading === "cancel" ? "Cancelando..." : "Cancelar asignación"}
+          </Button>
+        </div>
         <Button
           type="button"
           size={compact ? "sm" : "default"}

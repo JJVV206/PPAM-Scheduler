@@ -1,5 +1,7 @@
 import type {
   ASSIGNMENT_ACTIVITY_TYPES,
+  ASSIGNMENT_INVITATION_STATUSES,
+  ASSIGNMENT_INVITATION_TYPES,
   ASSIGNMENT_STATUSES,
   DAYS_OF_WEEK,
   NOTIFICATION_CHANNELS,
@@ -17,6 +19,10 @@ export type TimeSlot = (typeof TIME_SLOTS)[number];
 export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number];
 export type ResponseStatus = (typeof RESPONSE_STATUSES)[number];
 export type VolunteerPosition = (typeof VOLUNTEER_POSITIONS)[number];
+export type AssignmentInvitationType =
+  (typeof ASSIGNMENT_INVITATION_TYPES)[number];
+export type AssignmentInvitationStatus =
+  (typeof ASSIGNMENT_INVITATION_STATUSES)[number];
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number];
@@ -45,6 +51,7 @@ export type VolunteerSummary = {
   declineCount: number;
   noResponseCount: number;
   temporaryUnavailable: boolean;
+  canServeAsReplacement: boolean;
 };
 
 export type PreachingPointSummary = {
@@ -80,6 +87,37 @@ export type AssignmentTimelineEntry = {
   metadata?: Record<string, unknown> | null;
 };
 
+export type AssignmentAutomationStateKey =
+  | "INVITATION_PENDING"
+  | "EMAIL_SENT"
+  | "AWAITING_RESPONSE"
+  | "CONFIRMED"
+  | "DECLINED"
+  | "EXPIRED"
+  | "LOOKING_FOR_REPLACEMENT"
+  | "REPLACEMENT_INVITED"
+  | "REQUIRES_INTERVENTION";
+
+export type AssignmentAutomationState = {
+  key: AssignmentAutomationStateKey;
+  label: string;
+  description: string;
+  tone: "neutral" | "info" | "success" | "warning" | "danger";
+};
+
+export type AssignmentInvitationDto = {
+  id: string;
+  volunteerId: string;
+  volunteerName: string;
+  type: AssignmentInvitationType;
+  status: AssignmentInvitationStatus;
+  sentAt?: Date | null;
+  respondedAt?: Date | null;
+  expiresAt: Date;
+  emailAttempts: number;
+  createdAt: Date;
+};
+
 export type AssignmentDetailDto = {
   id: string;
   scheduleWeekId: string;
@@ -91,8 +129,11 @@ export type AssignmentDetailDto = {
   notes?: string | null;
   preachingPoint: PreachingPointSummary;
   volunteers: AssignmentVolunteerDto[];
+  invitations: AssignmentInvitationDto[];
+  automationState: AssignmentAutomationState;
   timeline: AssignmentTimelineEntry[];
   warnings: string[];
+  requiresAttention: boolean;
 };
 
 export type WeeklySchedulePair = {
@@ -137,18 +178,49 @@ export type AdminDashboardStats = {
     totalAssignments: number;
     confirmedAssignments: number;
     pendingConfirmations: number;
+    needsReplacement: number;
     declinedAssignments: number;
     openSlots: number;
+    requiresAttention: number;
+  };
+  census: {
+    status: string;
+    closesAt?: Date | null;
+    totalResponses: number;
+    submittedResponses: number;
+    pendingResponses: number;
+    declinedResponses: number;
+    responseRate: number;
+  };
+  alerts: {
+    failedEmails: number;
+    expiredPrimaryInvitations: number;
+    expiredReplacementInvitations: number;
+    uncoveredAssignments: number;
   };
   todaysAssignments: AssignmentDetailDto[];
+  upcomingAssignments: AssignmentDetailDto[];
   pendingConfirmations: AssignmentDetailDto[];
+  requiresAttention: AssignmentDetailDto[];
   urgentReplacements: OpenSlotDto[];
+};
+
+export type VolunteerAssignmentReminderDto = {
+  id: string;
+  assignmentId: string;
+  type: Extract<NotificationType, "REMINDER" | "FINAL_REMINDER">;
+  status: NotificationStatus;
+  sentAt?: Date | null;
+  createdAt: Date;
 };
 
 export type VolunteerDashboardData = {
   volunteer: VolunteerSummary;
   upcomingAssignments: AssignmentDetailDto[];
   pendingConfirmations: AssignmentDetailDto[];
+  confirmedAssignments: AssignmentDetailDto[];
+  assignmentHistory: AssignmentDetailDto[];
+  remindersByAssignmentId: Record<string, VolunteerAssignmentReminderDto[]>;
   openSlots: OpenSlotDto[];
   weeklyAvailabilitySummary: Array<{
     dayOfWeek: DayOfWeek;
@@ -207,5 +279,14 @@ export type AssignmentFilters = {
 export type SettingsDto = {
   confirmationLeadDays: number;
   reminderTimingDays: number[];
+  finalReminderHours: number;
+  primaryResponseTimeoutHours: number;
+  primaryReminderOffsetsHours: number[];
+  replacementResponseTimeoutHours: number;
+  replacementReminderOffsetsHours: number[];
+  censusResponseTimeoutHours: number;
+  censusReminderOffsetsHours: number[];
+  urgentThresholdHours: number;
+  adminAlertEmail: string;
   notificationChannels: NotificationChannel[];
 };
