@@ -28,8 +28,14 @@ export function getRequiredAppEnvKeys() {
     : ["DATABASE_URL"] as const;
 }
 
-export function getMissingRequiredAppEnv() {
-  return getRequiredAppEnvKeys().filter((key) => {
+export function getRequiredAuthEnvKeys() {
+  return isProductionRuntime()
+    ? ["DATABASE_URL", "NEXTAUTH_SECRET", "NEXTAUTH_URL"] as const
+    : ["DATABASE_URL"] as const;
+}
+
+function getMissingEnv(keys: readonly string[]) {
+  return keys.filter((key) => {
     const value = process.env[key];
 
     if (!hasValue(value)) {
@@ -42,6 +48,14 @@ export function getMissingRequiredAppEnv() {
 
     return false;
   });
+}
+
+export function getMissingRequiredAppEnv() {
+  return getMissingEnv(getRequiredAppEnvKeys());
+}
+
+export function getMissingRequiredAuthEnv() {
+  return getMissingEnv(getRequiredAuthEnvKeys());
 }
 
 export function getSessionSecret() {
