@@ -14,7 +14,7 @@ export default async function VolunteerLayout({
   const session = await getServerAuthSession();
 
   if (!session?.user) {
-    redirect("/login");
+    redirect("/logout?next=/login");
   }
 
   if (session.user.role !== "VOLUNTEER") {
