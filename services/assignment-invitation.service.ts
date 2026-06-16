@@ -2,7 +2,11 @@ import { randomBytes } from "node:crypto";
 
 import { addHours } from "date-fns";
 import { Prisma } from "@prisma/client";
-import type { AssignmentInvitationStatus } from "@prisma/client";
+import type {
+  AssignmentInvitationStatus,
+  AssignmentInvitationType,
+  NotificationType
+} from "@prisma/client";
 
 import { db } from "@/lib/db/prisma";
 import { getAppBaseUrl } from "@/lib/env/config";
@@ -15,6 +19,7 @@ import { formatDisplayDate } from "@/lib/utils";
 import { sendEmailNotification } from "@/services/notification.service";
 
 const PRIMARY_INVITATION_EXPIRATION_HOURS = 48;
+const REPLACEMENT_INVITATION_EXPIRATION_HOURS = 12;
 const TOKEN_BYTES = 32;
 const MAX_TOKEN_GENERATION_ATTEMPTS = 3;
 
@@ -25,7 +30,7 @@ export const ACTIVE_ASSIGNMENT_INVITATION_STATUSES = [
 
 type AssignmentInvitationClient = Prisma.TransactionClient | typeof db;
 
-type PendingPrimaryInvitation = Prisma.AssignmentInvitationGetPayload<{
+type PendingAssignmentInvitation = Prisma.AssignmentInvitationGetPayload<{
   include: {
     assignment: {
       include: {
@@ -156,10 +161,40 @@ export function buildPrimaryAssignmentInvitationEmail(input: {
   };
 }
 
+export function buildReplacementAssignmentInvitationEmail(input: {
+  volunteerName: string;
+  dateLabel: string;
+  timeSlotLabel: string;
+  pointName: string;
+  responseUrl: string;
+}) {
+  const volunteerName = escapeHtml(input.volunteerName);
+  const dateLabel = escapeHtml(input.dateLabel);
+  const timeSlotLabel = escapeHtml(input.timeSlotLabel);
+  const pointName = escapeHtml(input.pointName);
+  const responseUrl = escapeHtml(input.responseUrl);
+
+  return {
+    subject: "Oportunidad de reemplazo PPAM",
+    html: [
+      `<p>Hola ${volunteerName},</p>`,
+      "<p>Hay una asignación de PPAM que necesita suplente.</p>",
+      "<ul>",
+      `<li><strong>Fecha:</strong> ${dateLabel}</li>`,
+      `<li><strong>Horario:</strong> ${timeSlotLabel}</li>`,
+      `<li><strong>Punto de predicación:</strong> ${pointName}</li>`,
+      "</ul>",
+      `<p><a href="${responseUrl}">Responder si puedes cubrirla</a></p>`,
+      `<p>Si el botón no funciona, copia y pega esta URL en tu navegador:<br>${responseUrl}</p>`
+    ].join("")
+  };
+}
+
 async function createInvitationWithUniqueToken(input: {
   client: AssignmentInvitationClient;
   assignmentId: string;
   volunteerId: string;
+  type: AssignmentInvitationType;
   expiresAt: Date;
   metadata: Prisma.InputJsonObject;
 }) {
@@ -169,7 +204,7 @@ async function createInvitationWithUniqueToken(input: {
         data: {
           assignmentId: input.assignmentId,
           volunteerId: input.volunteerId,
-          type: "PRIMARY",
+          type: input.type,
           token: createInvitationToken(),
           expiresAt: input.expiresAt,
           metadata: input.metadata
@@ -246,6 +281,7 @@ export async function createPendingPrimaryInvitationsForAssignment(input: {
       client,
       assignmentId: input.assignmentId,
       volunteerId,
+      type: "PRIMARY",
       expiresAt,
       metadata
     });
@@ -255,6 +291,75 @@ export async function createPendingPrimaryInvitationsForAssignment(input: {
   return {
     createdCount,
     skippedCount: existingActiveInvitations.length
+  };
+}
+
+export async function createPendingReplacementInvitationForAssignment(input: {
+  tx?: Prisma.TransactionClient;
+  assignmentId: string;
+  volunteerId: string;
+  actorUserId?: string;
+  expiresAt?: Date;
+  metadata?: Record<string, unknown>;
+}) {
+  const client = input.tx ?? db;
+  const existingActiveInvitation = await client.assignmentInvitation.findFirst({
+    where: {
+      assignmentId: input.assignmentId,
+      type: "REPLACEMENT",
+      status: {
+        in: ACTIVE_ASSIGNMENT_INVITATION_STATUSES
+      }
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (existingActiveInvitation) {
+    return {
+      createdCount: 0,
+      skippedCount: 1
+    };
+  }
+
+  const alreadyAttempted = await client.assignmentInvitation.findFirst({
+    where: {
+      assignmentId: input.assignmentId,
+      volunteerId: input.volunteerId,
+      type: "REPLACEMENT"
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (alreadyAttempted) {
+    return {
+      createdCount: 0,
+      skippedCount: 1
+    };
+  }
+
+  await createInvitationWithUniqueToken({
+    client,
+    assignmentId: input.assignmentId,
+    volunteerId: input.volunteerId,
+    type: "REPLACEMENT",
+    expiresAt:
+      input.expiresAt ??
+      addHours(new Date(), REPLACEMENT_INVITATION_EXPIRATION_HOURS),
+    metadata: compactMetadata({
+      source: "replacement_flow",
+      actorUserId: input.actorUserId,
+      createdAutomatically: true,
+      ...input.metadata
+    }) as Prisma.InputJsonObject
+  });
+
+  return {
+    createdCount: 1,
+    skippedCount: 0
   };
 }
 
@@ -295,8 +400,42 @@ async function markInvitationFailed(input: {
   ]);
 }
 
-async function sendPrimaryInvitationEmail(
-  invitation: PendingPrimaryInvitation,
+function buildInvitationEmail(input: {
+  invitation: PendingAssignmentInvitation;
+  responseUrl: string;
+  dateLabel: string;
+  timeSlotLabel: string;
+  pointName: string;
+}) {
+  if (input.invitation.type === "REPLACEMENT") {
+    return buildReplacementAssignmentInvitationEmail({
+      volunteerName: input.invitation.volunteer.user.name,
+      dateLabel: input.dateLabel,
+      timeSlotLabel: input.timeSlotLabel,
+      pointName: input.pointName,
+      responseUrl: input.responseUrl
+    });
+  }
+
+  return buildPrimaryAssignmentInvitationEmail({
+    volunteerName: input.invitation.volunteer.user.name,
+    dateLabel: input.dateLabel,
+    timeSlotLabel: input.timeSlotLabel,
+    pointName: input.pointName,
+    responseUrl: input.responseUrl
+  });
+}
+
+function getInvitationNotificationType(
+  invitationType: AssignmentInvitationType
+): NotificationType {
+  return invitationType === "REPLACEMENT"
+    ? "REPLACEMENT_OPPORTUNITY"
+    : "CONFIRMATION_REQUEST";
+}
+
+async function sendAssignmentInvitationEmail(
+  invitation: PendingAssignmentInvitation,
   actorUserId?: string
 ): Promise<SendInvitationResult> {
   const responseUrl = buildAssignmentInvitationResponseUrl(invitation.token);
@@ -307,12 +446,12 @@ async function sendPrimaryInvitationEmail(
   const timeSlotLabel =
     TIME_SLOT_DEFINITIONS[invitation.assignment.timeSlot].label;
   const pointName = FIXED_PREACHING_POINT_NAME;
-  const email = buildPrimaryAssignmentInvitationEmail({
-    volunteerName: invitation.volunteer.user.name,
+  const email = buildInvitationEmail({
+    invitation,
+    responseUrl,
     dateLabel,
     timeSlotLabel,
-    pointName,
-    responseUrl
+    pointName
   });
 
   const attempt = await db.assignmentInvitation.update({
@@ -335,7 +474,7 @@ async function sendPrimaryInvitationEmail(
     const notification = await sendEmailNotification({
       userId: invitation.volunteer.userId,
       assignmentId: invitation.assignmentId,
-      type: "CONFIRMATION_REQUEST",
+      type: getInvitationNotificationType(invitation.type),
       subject: email.subject,
       html: email.html,
       metadata: {
@@ -451,7 +590,48 @@ export async function sendPendingPrimaryInvitationsForAssignment(input: {
 
   const results = await Promise.all(
     invitations.map((invitation) =>
-      sendPrimaryInvitationEmail(invitation, input.actorUserId)
+      sendAssignmentInvitationEmail(invitation, input.actorUserId)
+    )
+  );
+
+  return {
+    totalCount: results.length,
+    sentCount: results.filter((result) => result.status === "SENT").length,
+    failedCount: results.filter((result) => result.status === "FAILED").length,
+    results
+  };
+}
+
+export async function sendPendingReplacementInvitationsForAssignment(input: {
+  assignmentId: string;
+  actorUserId?: string;
+}) {
+  const invitations = await db.assignmentInvitation.findMany({
+    where: {
+      assignmentId: input.assignmentId,
+      type: "REPLACEMENT",
+      status: "PENDING"
+    },
+    include: {
+      assignment: {
+        include: {
+          preachingPoint: true
+        }
+      },
+      volunteer: {
+        include: {
+          user: true
+        }
+      }
+    },
+    orderBy: {
+      createdAt: "asc"
+    }
+  });
+
+  const results = await Promise.all(
+    invitations.map((invitation) =>
+      sendAssignmentInvitationEmail(invitation, input.actorUserId)
     )
   );
 

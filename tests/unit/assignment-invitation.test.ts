@@ -4,6 +4,7 @@ import {
   ACTIVE_ASSIGNMENT_INVITATION_STATUSES,
   buildAssignmentInvitationResponseUrl,
   buildPrimaryAssignmentInvitationEmail,
+  buildReplacementAssignmentInvitationEmail,
   getAssignmentInvitationAvailability
 } from "@/services/assignment-invitation.service";
 
@@ -48,6 +49,23 @@ describe("assignment invitation helpers", () => {
     expect(email.html).toContain("Confirmar o rechazar asignación");
     expect(email.html).toContain(
       "https://ppam.example.org/confirm-assignment/token"
+    );
+  });
+
+  it("builds replacement invitation emails with replacement-specific copy", () => {
+    const email = buildReplacementAssignmentInvitationEmail({
+      volunteerName: "Marco Davis",
+      dateLabel: "Viernes, 12 de junio de 2026",
+      timeSlotLabel: "11:00 - 13:00",
+      pointName: "Hospital Dr Jose G. Parres",
+      responseUrl: "https://ppam.example.org/confirm-assignment/replacement-token"
+    });
+
+    expect(email.subject).toBe("Oportunidad de reemplazo PPAM");
+    expect(email.html).toContain("necesita suplente");
+    expect(email.html).toContain("Responder si puedes cubrirla");
+    expect(email.html).toContain(
+      "https://ppam.example.org/confirm-assignment/replacement-token"
     );
   });
 

@@ -4,10 +4,19 @@ import type { Assignment, AssignmentInvitation } from "@prisma/client";
 
 import { db } from "@/lib/db/prisma";
 import {
+  DAY_LABELS,
+  TIME_SLOT_DEFINITIONS
+} from "@/lib/constants/domain";
+import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
+import { formatDisplayDate } from "@/lib/utils";
+import {
   ACTIVE_ASSIGNMENT_INVITATION_STATUSES,
+  createPendingReplacementInvitationForAssignment,
+  sendPendingReplacementInvitationsForAssignment,
   sendPendingPrimaryInvitationsForAssignment
 } from "@/services/assignment-invitation.service";
 import { selectNextReplacementCandidateForAssignment } from "@/services/replacement-candidate.service";
+import { sendEmailNotification } from "@/services/notification.service";
 
 const TERMINAL_ASSIGNMENT_STATUSES = ["CANCELLED", "COMPLETED"] as const;
 
@@ -41,9 +50,20 @@ export type ProcessAssignmentsNeedingReplacementResult =
 
 export type ReplacementCandidateSelectionResult =
   AssignmentAutomationStepResult & {
-    selectedCount: number;
+    invitedCount: number;
+    sentCount: number;
+    failedCount: number;
     unresolvedCount: number;
+    activeInvitationCount: number;
   };
+
+export type ReplacementInvitationResult = {
+  assignmentId: string;
+  status: "invited" | "no_candidate" | "active_invitation" | "skipped";
+  candidateId?: string;
+  sentCount: number;
+  failedCount: number;
+};
 
 export type AssignmentAutomationRunResult = {
   startedAt: string;
@@ -146,6 +166,171 @@ async function createReplacementRequiredActivityOnce(input: {
   });
 
   return true;
+}
+
+async function createNoReplacementAvailableActivityOnce(input: {
+  assignmentId: string;
+  tx: Prisma.TransactionClient;
+}) {
+  const existingActivity = await input.tx.assignmentActivity.findFirst({
+    where: {
+      assignmentId: input.assignmentId,
+      actionType: "NO_REPLACEMENT_AVAILABLE"
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (existingActivity) {
+    return false;
+  }
+
+  await input.tx.assignmentActivity.create({
+    data: {
+      assignmentId: input.assignmentId,
+      actionType: "NO_REPLACEMENT_AVAILABLE",
+      metadata: {
+        automationModule: "assignment_automation"
+      }
+    }
+  });
+
+  return true;
+}
+
+async function alertAdminsForNoReplacementAvailable(assignmentId: string) {
+  const alreadyAlerted = await db.assignmentActivity.findFirst({
+    where: {
+      assignmentId,
+      actionType: "ADMIN_ALERTED"
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (alreadyAlerted) {
+    return {
+      sentCount: 0,
+      failedCount: 0,
+      skipped: true
+    };
+  }
+
+  const [assignment, admins] = await Promise.all([
+    db.assignment.findUniqueOrThrow({
+      where: {
+        id: assignmentId
+      },
+      include: {
+        preachingPoint: true,
+        volunteers: {
+          include: {
+            volunteer: {
+              include: {
+                user: true
+              }
+            }
+          }
+        },
+        invitations: {
+          where: {
+            type: "REPLACEMENT"
+          },
+          include: {
+            volunteer: {
+              include: {
+                user: true
+              }
+            }
+          },
+          orderBy: {
+            createdAt: "asc"
+          }
+        }
+      }
+    }),
+    db.user.findMany({
+      where: {
+        role: "ADMIN",
+        active: true
+      }
+    })
+  ]);
+
+  await db.$transaction(async (tx) => {
+    await createNoReplacementAvailableActivityOnce({
+      assignmentId,
+      tx
+    });
+  });
+
+  const dateLabel = formatDisplayDate(
+    assignment.date,
+    "EEEE d 'de' MMMM"
+  );
+  const timeSlotLabel = TIME_SLOT_DEFINITIONS[assignment.timeSlot].label;
+  const attemptedNames = assignment.invitations.map(
+    (invitation) => invitation.volunteer.user.name
+  );
+  let sentCount = 0;
+  let failedCount = 0;
+
+  for (const admin of admins) {
+    try {
+      const notification = await sendEmailNotification({
+        userId: admin.id,
+        assignmentId,
+        type: "ASSIGNMENT_UPDATE",
+        subject: `Urgente: asignación sin cobertura para ${dateLabel}, ${timeSlotLabel}`,
+        html: [
+          `<p>Se requiere intervención humana para una asignación de PPAM.</p>`,
+          "<ul>",
+          `<li><strong>Fecha:</strong> ${dateLabel}</li>`,
+          `<li><strong>Horario:</strong> ${timeSlotLabel}</li>`,
+          `<li><strong>Punto:</strong> ${FIXED_PREACHING_POINT_NAME}</li>`,
+          `<li><strong>Suplentes intentados:</strong> ${
+            attemptedNames.length ? attemptedNames.join(", ") : "Ninguno"
+          }</li>`,
+          "</ul>"
+        ].join(""),
+        metadata: {
+          reason: "NO_REPLACEMENT_AVAILABLE",
+          attemptedReplacementCount: attemptedNames.length,
+          dayOfWeek: DAY_LABELS[assignment.dayOfWeek],
+          timeSlot: assignment.timeSlot
+        }
+      });
+
+      if (notification.status === "SENT") {
+        sentCount += 1;
+      } else {
+        failedCount += 1;
+      }
+    } catch {
+      failedCount += 1;
+    }
+  }
+
+  await db.assignmentActivity.create({
+    data: {
+      assignmentId,
+      actionType: "ADMIN_ALERTED",
+      metadata: {
+        reason: "NO_REPLACEMENT_AVAILABLE",
+        adminCount: admins.length,
+        sentCount,
+        failedCount
+      }
+    }
+  });
+
+  return {
+    sentCount,
+    failedCount,
+    skipped: false
+  };
 }
 
 async function reconcileInvitationFromExistingResponse(input: {
@@ -495,6 +680,84 @@ export async function processAssignmentsNeedingReplacement(): Promise<ProcessAss
   };
 }
 
+export async function inviteNextAvailableReplacementForAssignment(input: {
+  assignmentId: string;
+  actorUserId?: string;
+}): Promise<ReplacementInvitationResult> {
+  const assignment = await db.assignment.findUniqueOrThrow({
+    where: {
+      id: input.assignmentId
+    },
+    include: {
+      invitations: {
+        where: {
+          type: "REPLACEMENT",
+          status: {
+            in: ACTIVE_ASSIGNMENT_INVITATION_STATUSES
+          }
+        }
+      }
+    }
+  });
+
+  if (assignment.status !== "NEEDS_REPLACEMENT") {
+    return {
+      assignmentId: input.assignmentId,
+      status: "skipped",
+      sentCount: 0,
+      failedCount: 0
+    };
+  }
+
+  if (assignment.invitations.length) {
+    return {
+      assignmentId: input.assignmentId,
+      status: "active_invitation",
+      sentCount: 0,
+      failedCount: 0
+    };
+  }
+
+  const candidate = await selectNextReplacementCandidateForAssignment(
+    input.assignmentId
+  );
+
+  if (!candidate) {
+    await alertAdminsForNoReplacementAvailable(input.assignmentId);
+    return {
+      assignmentId: input.assignmentId,
+      status: "no_candidate",
+      sentCount: 0,
+      failedCount: 0
+    };
+  }
+
+  await createPendingReplacementInvitationForAssignment({
+    assignmentId: input.assignmentId,
+    volunteerId: candidate.id,
+    actorUserId: input.actorUserId,
+    metadata: {
+      selectedBy: "replacement_candidate_rules",
+      confirmationRate: candidate.replacementPriority.confirmationRate,
+      futureAssignmentCount: candidate.replacementPriority.futureAssignmentCount,
+      areaCompatible: candidate.replacementPriority.areaCompatible
+    }
+  });
+
+  const delivery = await sendPendingReplacementInvitationsForAssignment({
+    assignmentId: input.assignmentId,
+    actorUserId: input.actorUserId
+  });
+
+  return {
+    assignmentId: input.assignmentId,
+    status: "invited",
+    candidateId: candidate.id,
+    sentCount: delivery.sentCount,
+    failedCount: delivery.failedCount
+  };
+}
+
 export async function inviteNextAvailableReplacement(): Promise<ReplacementCandidateSelectionResult> {
   const assignments = await db.assignment.findMany({
     where: {
@@ -524,18 +787,29 @@ export async function inviteNextAvailableReplacement(): Promise<ReplacementCandi
     ]
   });
 
-  let selectedCount = 0;
+  let invitedCount = 0;
+  let sentCount = 0;
+  let failedCount = 0;
   let unresolvedCount = 0;
+  let activeInvitationCount = 0;
 
   for (const assignment of assignments) {
-    const candidate = await selectNextReplacementCandidateForAssignment(
-      assignment.id
-    );
+    const result = await inviteNextAvailableReplacementForAssignment({
+      assignmentId: assignment.id
+    });
 
-    if (candidate) {
-      selectedCount += 1;
-    } else {
+    if (result.status === "invited") {
+      invitedCount += 1;
+      sentCount += result.sentCount;
+      failedCount += result.failedCount;
+    }
+
+    if (result.status === "no_candidate") {
       unresolvedCount += 1;
+    }
+
+    if (result.status === "active_invitation") {
+      activeInvitationCount += 1;
     }
   }
 
@@ -543,10 +817,11 @@ export async function inviteNextAvailableReplacement(): Promise<ReplacementCandi
     status: "completed",
     processedCount: assignments.length,
     skippedCount: 0,
-    selectedCount,
+    invitedCount,
+    sentCount,
+    failedCount,
     unresolvedCount,
-    detail:
-      "Replacement candidates were selected only; replacement invitations are created in module 6."
+    activeInvitationCount
   };
 }
 

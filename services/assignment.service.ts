@@ -52,6 +52,7 @@ import {
   getReplacementCandidatesForAssignment,
   toVolunteerSummary
 } from "@/services/replacement-candidate.service";
+import { inviteNextAvailableReplacementForAssignment } from "@/services/assignment-automation.service";
 
 const assignmentInclude = {
   scheduleWeek: true,
@@ -357,6 +358,31 @@ function mergeJsonMetadata(
     ...asJsonObject(current),
     ...next
   });
+}
+
+export function selectReplacementAssignmentPosition(input: {
+  volunteers: Array<{ volunteerId: string; position: VolunteerPosition }>;
+  responses: Array<{ volunteerId: string; responseStatus: ResponseStatus }>;
+}): VolunteerPosition | null {
+  const declinedResponse = input.responses.find(
+    (response) => response.responseStatus === "DECLINED"
+  );
+  const declinedSlot = declinedResponse
+    ? input.volunteers.find(
+        (volunteer) => volunteer.volunteerId === declinedResponse.volunteerId
+      )
+    : null;
+
+  if (declinedSlot) {
+    return declinedSlot.position;
+  }
+
+  return (
+    (["FIRST", "SECOND"] as VolunteerPosition[]).find(
+      (position) =>
+        !input.volunteers.some((volunteer) => volunteer.position === position)
+    ) ?? input.volunteers[input.volunteers.length - 1]?.position ?? null
+  );
 }
 
 export async function recalculateAssignmentStatus(
@@ -943,6 +969,10 @@ export async function declineAssignment(input: {
     });
   });
 
+  await inviteNextAvailableReplacementForAssignment({
+    assignmentId: assignment.id
+  });
+
   return mapAssignmentDetail(assignment);
 }
 
@@ -1102,6 +1132,150 @@ export async function respondToAssignmentInvitation(input: {
       throw getInvitationResponseError(availability);
     }
 
+    if (
+      invitation.type === "REPLACEMENT" &&
+      input.responseStatus === "CONFIRMED"
+    ) {
+      const currentAssignment = await tx.assignment.findUniqueOrThrow({
+        where: { id: invitation.assignmentId },
+        include: {
+          volunteers: true,
+          responses: true
+        }
+      });
+      const targetPosition = selectReplacementAssignmentPosition({
+        volunteers: currentAssignment.volunteers,
+        responses: currentAssignment.responses
+      });
+
+      if (!targetPosition) {
+        throw new AppError(
+          "No se encontró un puesto disponible para asignar el reemplazo.",
+          400
+        );
+      }
+
+      const existingPosition = currentAssignment.volunteers.find(
+        (slot) => slot.position === targetPosition
+      );
+      const existingReplacementSlot = currentAssignment.volunteers.find(
+        (slot) => slot.volunteerId === invitation.volunteerId
+      );
+
+      if (
+        existingReplacementSlot &&
+        existingReplacementSlot.id !== existingPosition?.id
+      ) {
+        await tx.assignmentVolunteer.delete({
+          where: { id: existingReplacementSlot.id }
+        });
+      }
+
+      if (
+        existingPosition &&
+        existingPosition.volunteerId !== invitation.volunteerId
+      ) {
+        await tx.assignmentVolunteer.delete({
+          where: { id: existingPosition.id }
+        });
+        await tx.assignmentResponse.deleteMany({
+          where: {
+            assignmentId: invitation.assignmentId,
+            volunteerId: existingPosition.volunteerId
+          }
+        });
+      }
+
+      if (existingPosition?.volunteerId === invitation.volunteerId) {
+        await tx.assignmentVolunteer.update({
+          where: { id: existingPosition.id },
+          data: {
+            position: targetPosition,
+            isReplacement: true
+          }
+        });
+      } else {
+        await tx.assignmentVolunteer.create({
+          data: {
+            assignmentId: invitation.assignmentId,
+            volunteerId: invitation.volunteerId,
+            position: targetPosition,
+            isReplacement: true
+          }
+        });
+      }
+
+      await tx.assignmentInvitation.update({
+        where: { id: invitation.id },
+        data: {
+          status: "ACCEPTED",
+          respondedAt: now,
+          metadata: mergeJsonMetadata(invitation.metadata, {
+            responseStatus: input.responseStatus,
+            respondedVia: "PUBLIC_INVITATION_LINK",
+            responseRecordedAt: now.toISOString(),
+            assignedPosition: targetPosition
+          })
+        }
+      });
+
+      await tx.assignmentResponse.upsert({
+        where: {
+          assignmentId_volunteerId: {
+            assignmentId: invitation.assignmentId,
+            volunteerId: invitation.volunteerId
+          }
+        },
+        update: {
+          responseStatus: "CONFIRMED",
+          note: input.note,
+          respondedAt: now
+        },
+        create: {
+          assignmentId: invitation.assignmentId,
+          volunteerId: invitation.volunteerId,
+          responseStatus: "CONFIRMED",
+          note: input.note,
+          respondedAt: now
+        }
+      });
+
+      await tx.assignment.update({
+        where: { id: invitation.assignmentId },
+        data: { status: "REASSIGNED" }
+      });
+
+      await tx.assignmentActivity.create({
+        data: {
+          assignmentId: invitation.assignmentId,
+          actionType: "REPLACEMENT_ASSIGNED",
+          metadata: {
+            volunteerProfileId: invitation.volunteerId,
+            invitationId: invitation.id,
+            position: targetPosition,
+            source: "PUBLIC_INVITATION_LINK",
+            note: input.note
+          }
+        }
+      });
+
+      await tx.volunteerProfile.update({
+        where: { id: invitation.volunteerId },
+        data: {
+          confirmationCount: {
+            increment: 1
+          }
+        }
+      });
+
+      await recalculateAssignmentStatus(invitation.assignmentId, tx);
+
+      return tx.assignment.findUniqueOrThrow({
+        where: { id: invitation.assignmentId },
+        include: assignmentInclude
+      });
+    }
+
     await tx.assignmentInvitation.update({
       where: { id: invitation.id },
       data: {
@@ -1183,6 +1357,12 @@ export async function respondToAssignmentInvitation(input: {
       include: assignmentInclude
     });
   });
+
+  if (input.responseStatus === "DECLINED") {
+    await inviteNextAvailableReplacementForAssignment({
+      assignmentId: assignment.id
+    });
+  }
 
   return mapAssignmentDetail(assignment);
 }
