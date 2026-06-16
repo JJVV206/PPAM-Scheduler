@@ -61,11 +61,13 @@ Do not run `npm run db:push` or `npm run db:seed` against production.
 
 ## 4. Deploy
 
-Vercel uses `npm run vercel:build`, which runs:
+Vercel uses `npm run vercel:build`, which runs the production migrations before building when `VERCEL_ENV=production`:
 
 ```bash
-prisma generate && next build
+node scripts/vercel-build.mjs
 ```
+
+The build script requires non-empty `DATABASE_URL` and `DIRECT_URL` in production. If either variable is missing, the deploy fails before publishing so the app cannot run against an unmigrated schema. For preview and local builds, migrations are skipped automatically. To bypass migrations intentionally, set `SKIP_PRISMA_MIGRATE=1`.
 
 After deploy, verify:
 
