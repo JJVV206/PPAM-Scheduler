@@ -1,0 +1,195 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => {
+  const tx = {
+    assignmentActivity: {
+      create: vi.fn(),
+      findFirst: vi.fn()
+    },
+    assignmentInvitation: {
+      update: vi.fn()
+    }
+  };
+  const db = {
+    $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) =>
+      callback(tx)
+    ),
+    assignmentActivity: {
+      create: vi.fn(),
+      findFirst: vi.fn()
+    },
+    assignmentInvitation: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn()
+    },
+    notificationLog: {
+      create: vi.fn()
+    },
+    user: {
+      findUnique: vi.fn()
+    }
+  };
+
+  return {
+    db,
+    tx,
+    getAssignmentAutomationSettings: vi.fn()
+  };
+});
+
+vi.mock("@/lib/db/prisma", () => ({ db: mocks.db }));
+vi.mock("@/lib/env/config", () => ({
+  getAppBaseUrl: () => "https://ppam.example.org",
+  getSmtpConfig: () => null
+}));
+vi.mock("@/services/setting.service", () => ({
+  getAssignmentAutomationSettings: mocks.getAssignmentAutomationSettings
+}));
+
+import {
+  createPendingPrimaryInvitationsForAssignment,
+  sendPendingPrimaryInvitationsForAssignment
+} from "@/services/assignment-invitation.service";
+
+function pendingPrimaryInvitation() {
+  return {
+    id: "invitation-1",
+    assignmentId: "assignment-1",
+    volunteerId: "volunteer-1",
+    type: "PRIMARY",
+    status: "PENDING",
+    token: "token-1",
+    sentAt: null,
+    respondedAt: null,
+    expiresAt: new Date("2026-06-18T12:00:00.000Z"),
+    emailAttempts: 0,
+    metadata: {},
+    createdAt: new Date("2026-06-16T12:00:00.000Z"),
+    updatedAt: new Date("2026-06-16T12:00:00.000Z"),
+    assignment: {
+      id: "assignment-1",
+      date: new Date("2026-06-20T00:00:00.000Z"),
+      dayOfWeek: "SATURDAY",
+      timeSlot: "SLOT_11_13",
+      preachingPoint: {
+        name: "Hospital Dr Jose G. Parres"
+      }
+    },
+    volunteer: {
+      id: "volunteer-1",
+      userId: "user-1",
+      user: {
+        id: "user-1",
+        name: "Julia",
+        email: "julia@example.org"
+      }
+    }
+  };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.getAssignmentAutomationSettings.mockResolvedValue({
+    primaryResponseTimeoutHours: 48,
+    replacementResponseTimeoutHours: 12
+  });
+  mocks.db.assignmentActivity.findFirst.mockResolvedValue(null);
+  mocks.db.assignmentActivity.create.mockResolvedValue({ id: "activity-1" });
+  mocks.tx.assignmentActivity.findFirst.mockResolvedValue(null);
+  mocks.tx.assignmentActivity.create.mockResolvedValue({ id: "activity-1" });
+});
+
+describe("assignment invitation delivery QA", () => {
+  it("creates titular invitations without duplicating active invitations", async () => {
+    mocks.db.assignmentInvitation.findMany.mockResolvedValue([
+      { volunteerId: "volunteer-2" }
+    ]);
+    mocks.db.assignmentInvitation.create.mockImplementation(async ({ data }) => ({
+      id: `invitation-${data.volunteerId}`,
+      ...data
+    }));
+
+    const result = await createPendingPrimaryInvitationsForAssignment({
+      assignmentId: "assignment-1",
+      volunteerIds: ["volunteer-1", "volunteer-2", "volunteer-1"],
+      actorUserId: "admin-1",
+      source: "assignment_created"
+    });
+
+    expect(result).toEqual({ createdCount: 1, skippedCount: 1 });
+    expect(mocks.db.assignmentInvitation.create).toHaveBeenCalledTimes(1);
+    expect(mocks.db.assignmentInvitation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          assignmentId: "assignment-1",
+          volunteerId: "volunteer-1",
+          type: "PRIMARY"
+        })
+      })
+    );
+    expect(mocks.db.assignmentActivity.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          actionType: "INVITATION_CREATED"
+        })
+      })
+    );
+  });
+
+  it("sends a titular invitation email and records NotificationLog plus audit activity", async () => {
+    mocks.db.assignmentInvitation.findMany.mockResolvedValue([
+      pendingPrimaryInvitation()
+    ]);
+    mocks.db.assignmentInvitation.update.mockResolvedValue({
+      emailAttempts: 1,
+      metadata: {}
+    });
+    mocks.db.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "julia@example.org"
+    });
+    mocks.db.notificationLog.create.mockResolvedValue({
+      id: "notification-1",
+      status: "SENT",
+      sentAt: new Date("2026-06-16T12:05:00.000Z"),
+      errorMessage: null
+    });
+
+    const result = await sendPendingPrimaryInvitationsForAssignment({
+      assignmentId: "assignment-1",
+      actorUserId: "admin-1"
+    });
+
+    expect(result).toMatchObject({
+      totalCount: 1,
+      sentCount: 1,
+      failedCount: 0
+    });
+    expect(mocks.db.notificationLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "user-1",
+          assignmentId: "assignment-1",
+          type: "CONFIRMATION_REQUEST",
+          channel: "EMAIL",
+          status: "SENT"
+        })
+      })
+    );
+    expect(mocks.tx.assignmentInvitation.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "SENT"
+        })
+      })
+    );
+    expect(mocks.tx.assignmentActivity.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          actionType: "INVITATION_SENT"
+        })
+      })
+    );
+  });
+});
