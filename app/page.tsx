@@ -1,11 +1,18 @@
 import { redirect } from "next/navigation";
 
-import { getServerAuthSession } from "@/lib/auth/auth";
+import { getAuthRuntimeStatus } from "@/lib/env/runtime";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const session = await getServerAuthSession();
+  const status = await getAuthRuntimeStatus();
+
+  if (!status.ready) {
+    redirect("/login");
+  }
+
+  const { getServerAuthSession } = await import("@/lib/auth/auth");
+  const session = await getServerAuthSession().catch(() => null);
 
   if (!session) {
     redirect("/login");
