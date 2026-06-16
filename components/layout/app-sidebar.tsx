@@ -70,6 +70,7 @@ const volunteerItems: NavItem[] = [
 
 type AppSidebarProps = {
   role: UserRole;
+  unreadNotificationCount?: number;
 };
 
 type NavigationContentProps = {
@@ -78,6 +79,8 @@ type NavigationContentProps = {
   onNavigate?: () => void;
   onPreload?: (href: string) => void;
   pathname: string;
+  notificationsHref: string;
+  unreadNotificationCount: number;
 };
 
 function isActiveRoute(pathname: string, href: string) {
@@ -102,15 +105,19 @@ function getCurrentSectionLabel(pathname: string, items: NavItem[]) {
 function NavigationContent({
   collapsed = false,
   items,
+  notificationsHref,
   onNavigate,
   onPreload,
-  pathname
+  pathname,
+  unreadNotificationCount
 }: NavigationContentProps) {
   return (
     <nav className="space-y-2">
       {items.map((item) => {
         const active = isActiveRoute(pathname, item.href);
         const Icon = item.icon;
+        const showNotificationCount =
+          item.href === notificationsHref && unreadNotificationCount > 0;
 
         return (
           <Link
@@ -128,11 +135,27 @@ function NavigationContent({
                 "bg-primary/15 text-primary shadow-[inset_0_0_0_1px_rgba(133,168,255,0.2)]"
             )}
           >
-            <Icon className="h-4 w-4 shrink-0" />
+            <span className="relative inline-flex shrink-0">
+              <Icon className="h-4 w-4 shrink-0" />
+              {collapsed && showNotificationCount ? (
+                <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-danger-foreground">
+                  {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                </span>
+              ) : null}
+            </span>
             {collapsed ? (
               <span className="sr-only">{item.label}</span>
             ) : (
-              <span className="truncate">{item.label}</span>
+              <>
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                {showNotificationCount ? (
+                  <span className="ml-auto rounded-full bg-danger/15 px-2 py-0.5 text-[11px] font-semibold leading-none text-danger">
+                    {unreadNotificationCount > 99
+                      ? "99+"
+                      : unreadNotificationCount}
+                  </span>
+                ) : null}
+              </>
             )}
           </Link>
         );
@@ -141,7 +164,10 @@ function NavigationContent({
   );
 }
 
-export function AppSidebar({ role }: AppSidebarProps) {
+export function AppSidebar({
+  role,
+  unreadNotificationCount = 0
+}: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
@@ -195,8 +221,23 @@ export function AppSidebar({ role }: AppSidebarProps) {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" asChild>
-              <Link href={notificationsHref}>
+              <Link
+                href={notificationsHref}
+                className="relative"
+                aria-label={
+                  unreadNotificationCount > 0
+                    ? `Ir a notificaciones, ${unreadNotificationCount} sin leer`
+                    : "Ir a notificaciones"
+                }
+              >
                 <Bell className="h-4 w-4" />
+                {unreadNotificationCount > 0 ? (
+                  <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-danger-foreground">
+                    {unreadNotificationCount > 9
+                      ? "9+"
+                      : unreadNotificationCount}
+                  </span>
+                ) : null}
                 <span className="sr-only">Ir a notificaciones</span>
               </Link>
             </Button>
@@ -280,7 +321,9 @@ export function AppSidebar({ role }: AppSidebarProps) {
                 </div>
                 <NavigationContent
                   items={items}
+                  notificationsHref={notificationsHref}
                   pathname={pathname}
+                  unreadNotificationCount={unreadNotificationCount}
                   onPreload={preloadRoute}
                   onNavigate={() => setMobileNavOpen(false)}
                 />
@@ -387,7 +430,9 @@ export function AppSidebar({ role }: AppSidebarProps) {
           <NavigationContent
             collapsed={desktopCollapsed}
             items={items}
+            notificationsHref={notificationsHref}
             pathname={pathname}
+            unreadNotificationCount={unreadNotificationCount}
             onPreload={preloadRoute}
           />
         </div>

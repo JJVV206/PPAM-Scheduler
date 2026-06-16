@@ -58,6 +58,10 @@ import {
   isAssignmentRequiringAttention
 } from "@/services/assignment-ui-state.service";
 import { recordAssignmentAuditActivity } from "@/services/assignment-audit.service";
+import {
+  createVolunteerAssignmentConfirmedAppNotification,
+  markAssignmentPendingAppNotificationsRead
+} from "@/services/app-notification.service";
 
 const assignmentInclude = {
   scheduleWeek: true,
@@ -1033,6 +1037,7 @@ export async function confirmAssignment(input: {
   volunteerProfileId: string;
   note?: string;
 }) {
+  const now = new Date();
   const assignment = await db.$transaction(async (tx) => {
     await tx.assignmentResponse.upsert({
       where: {
@@ -1044,14 +1049,14 @@ export async function confirmAssignment(input: {
       update: {
         responseStatus: "CONFIRMED",
         note: input.note,
-        respondedAt: new Date()
+        respondedAt: now
       },
       create: {
         assignmentId: input.assignmentId,
         volunteerId: input.volunteerProfileId,
         responseStatus: "CONFIRMED",
         note: input.note,
-        respondedAt: new Date()
+        respondedAt: now
       }
     });
 
@@ -1068,6 +1073,12 @@ export async function confirmAssignment(input: {
     });
 
     await recalculateAssignmentStatus(input.assignmentId, tx);
+    await markAssignmentPendingAppNotificationsRead({
+      client: tx,
+      assignmentId: input.assignmentId,
+      volunteerProfileId: input.volunteerProfileId,
+      readAt: now
+    });
 
     await tx.volunteerProfile.update({
       where: { id: input.volunteerProfileId },
@@ -1078,10 +1089,20 @@ export async function confirmAssignment(input: {
       }
     });
 
-    return tx.assignment.findUniqueOrThrow({
+    const updatedAssignment = await tx.assignment.findUniqueOrThrow({
       where: { id: input.assignmentId },
       include: assignmentInclude
     });
+
+    await createVolunteerAssignmentConfirmedAppNotification({
+      client: tx,
+      assignmentId: input.assignmentId,
+      volunteerProfileId: input.volunteerProfileId,
+      assignment: updatedAssignment,
+      source: "assignment_response"
+    });
+
+    return updatedAssignment;
   });
 
   return mapAssignmentDetail(assignment);
@@ -1092,6 +1113,7 @@ export async function declineAssignment(input: {
   volunteerProfileId: string;
   note?: string;
 }) {
+  const now = new Date();
   const assignment = await db.$transaction(async (tx) => {
     await tx.assignmentResponse.upsert({
       where: {
@@ -1103,14 +1125,14 @@ export async function declineAssignment(input: {
       update: {
         responseStatus: "DECLINED",
         note: input.note,
-        respondedAt: new Date()
+        respondedAt: now
       },
       create: {
         assignmentId: input.assignmentId,
         volunteerId: input.volunteerProfileId,
         responseStatus: "DECLINED",
         note: input.note,
-        respondedAt: new Date()
+        respondedAt: now
       }
     });
 
@@ -1138,6 +1160,12 @@ export async function declineAssignment(input: {
           increment: 1
         }
       }
+    });
+    await markAssignmentPendingAppNotificationsRead({
+      client: tx,
+      assignmentId: input.assignmentId,
+      volunteerProfileId: input.volunteerProfileId,
+      readAt: now
     });
 
     return tx.assignment.findUniqueOrThrow({
@@ -1562,11 +1590,29 @@ export async function respondToAssignmentInvitation(input: {
       });
 
       await recalculateAssignmentStatus(invitation.assignmentId, tx);
+      await markAssignmentPendingAppNotificationsRead({
+        client: tx,
+        assignmentId: invitation.assignmentId,
+        volunteerProfileId: invitation.volunteerId,
+        readAt: now
+      });
 
-      return tx.assignment.findUniqueOrThrow({
+      const updatedAssignment = await tx.assignment.findUniqueOrThrow({
         where: { id: invitation.assignmentId },
         include: assignmentInclude
       });
+
+      await createVolunteerAssignmentConfirmedAppNotification({
+        client: tx,
+        assignmentId: invitation.assignmentId,
+        volunteerProfileId: invitation.volunteerId,
+        assignment: updatedAssignment,
+        source: "assignment_invitation",
+        invitationId: invitation.id,
+        invitationType: invitation.type
+      });
+
+      return updatedAssignment;
     }
 
     await tx.assignmentInvitation.update({
@@ -1660,11 +1706,31 @@ export async function respondToAssignmentInvitation(input: {
     });
 
     await recalculateAssignmentStatus(invitation.assignmentId, tx);
+    await markAssignmentPendingAppNotificationsRead({
+      client: tx,
+      assignmentId: invitation.assignmentId,
+      volunteerProfileId: invitation.volunteerId,
+      readAt: now
+    });
 
-    return tx.assignment.findUniqueOrThrow({
+    const updatedAssignment = await tx.assignment.findUniqueOrThrow({
       where: { id: invitation.assignmentId },
       include: assignmentInclude
     });
+
+    if (input.responseStatus === "CONFIRMED") {
+      await createVolunteerAssignmentConfirmedAppNotification({
+        client: tx,
+        assignmentId: invitation.assignmentId,
+        volunteerProfileId: invitation.volunteerId,
+        assignment: updatedAssignment,
+        source: "assignment_invitation",
+        invitationId: invitation.id,
+        invitationType: invitation.type
+      });
+    }
+
+    return updatedAssignment;
   });
 
   if (input.responseStatus === "DECLINED") {

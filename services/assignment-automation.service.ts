@@ -56,6 +56,11 @@ import {
 } from "@/services/setting.service";
 import { getAppBaseUrl } from "@/lib/env/config";
 import { recordAssignmentAuditActivity } from "@/services/assignment-audit.service";
+import {
+  createAdminAppNotifications,
+  createAdminAssignmentAppNotifications,
+  createAppNotificationOnce
+} from "@/services/app-notification.service";
 
 export {
   buildAdminAssignmentAlertEmail
@@ -357,6 +362,18 @@ function getAdminAssignmentUrl(assignmentId: string) {
   )}`;
 }
 
+function getAdminAlertAppNotificationType(reason: AdminAssignmentAlertReason) {
+  return reason === "INVITATION_EMAIL_FAILED"
+    ? ("EMAIL_FAILED" as const)
+    : ("REPLACEMENT_NEEDED" as const);
+}
+
+function getAdminAlertAppNotificationTitle(reason: AdminAssignmentAlertReason) {
+  return reason === "INVITATION_EMAIL_FAILED"
+    ? "Email crítico fallido"
+    : "Sin suplentes disponibles";
+}
+
 async function hasReplacementRequiredActivity(
   assignmentId: string,
   tx: Prisma.TransactionClient
@@ -585,6 +602,28 @@ async function alertAdminsForAssignment(input: {
     affectedVolunteerName: input.failedInvitation?.volunteerName,
     invitationType: input.failedInvitation?.type,
     errorMessage: input.failedInvitation?.errorMessage
+  });
+  await createAdminAssignmentAppNotifications({
+    admins,
+    assignmentId: input.assignmentId,
+    type: getAdminAlertAppNotificationType(input.reason),
+    priority: "URGENT",
+    title: getAdminAlertAppNotificationTitle(input.reason),
+    body: `${input.reasonLabel} ${dateLabel}, ${timeSlotLabel}.`,
+    dedupeKey: input.alertKey,
+    metadata: {
+      source: "assignment_admin_alert",
+      alertKey: input.alertKey,
+      reason: input.reason,
+      attemptedReplacementCount: attemptedReplacementNames.length,
+      originalVolunteerCount: originalVolunteerNames.length,
+      assignmentUrl,
+      failedInvitationId: input.failedInvitation?.id,
+      failedInvitationType: input.failedInvitation?.type,
+      failedVolunteerProfileId: input.failedInvitation?.volunteerProfileId,
+      dayOfWeek: assignment.dayOfWeek,
+      timeSlot: assignment.timeSlot
+    }
   });
   let sentCount = 0;
   let failedCount = 0;
@@ -1014,6 +1053,28 @@ export async function processAssignmentsNeedingReplacement(): Promise<ProcessAss
 
     if (result.statusChanged || result.logged) {
       markedCount += 1;
+      const dateLabel = `${DAY_LABELS[assignment.dayOfWeek]}, ${formatDisplayDate(
+        assignment.date,
+        "d 'de' MMMM 'de' yyyy"
+      )}`;
+      const timeSlotLabel = TIME_SLOT_DEFINITIONS[assignment.timeSlot].label;
+
+      await createAdminAssignmentAppNotifications({
+        assignmentId: assignment.id,
+        type: "ADMIN_ATTENTION_REQUIRED",
+        priority: "HIGH",
+        title: "Turno sin cobertura",
+        body: `${dateLabel}, ${timeSlotLabel}, requiere intervención para quedar cubierto.`,
+        dedupeKey: `assignment-needs-replacement:${assignment.id}`,
+        metadata: {
+          source: "process_assignments_needing_replacement",
+          reason: "assignment_needs_replacement",
+          statusChanged: result.statusChanged,
+          activityLogged: result.logged,
+          dayOfWeek: assignment.dayOfWeek,
+          timeSlot: assignment.timeSlot
+        }
+      });
     } else {
       alreadyMarkedCount += 1;
     }
@@ -1569,6 +1630,30 @@ async function sendAssignmentReminder(
         notificationLogId: notification.id
       }
     });
+    await createAppNotificationOnce({
+      userId: recipient.volunteerUserId,
+      assignmentId: recipient.assignmentId,
+      type:
+        recipient.reminder.kind === "PENDING_CONFIRMATION"
+          ? "ASSIGNMENT_PENDING"
+          : "ASSIGNMENT_CONFIRMED",
+      priority:
+        recipient.reminder.kind === "PENDING_CONFIRMATION" ? "HIGH" : "NORMAL",
+      title:
+        recipient.reminder.kind === "PENDING_CONFIRMATION"
+          ? "Respuesta pendiente"
+          : "Recordatorio de turno",
+      body:
+        recipient.reminder.kind === "PENDING_CONFIRMATION"
+          ? `Confirma o rechaza tu asignación para ${dateLabel}, ${timeSlotLabel}.`
+          : `Recuerda tu asignación para ${dateLabel}, ${timeSlotLabel}.`,
+      dedupeKey: `assignment-reminder:${recipient.assignmentId}:${recipient.volunteerUserId}:${recipient.reminder.reminderKey}`,
+      metadata: {
+        ...metadata,
+        source: "assignment_reminder",
+        notificationLogId: notification.id
+      }
+    });
 
     return "SENT";
   } catch {
@@ -1685,6 +1770,91 @@ async function getAssignmentsWithoutReplacementCandidates(now: Date) {
   return unresolvedAssignmentIds;
 }
 
+function buildCensusWeekLabel(input: { startDate: Date; endDate: Date }) {
+  return `Semana del ${formatDisplayDate(
+    input.startDate,
+    "d 'de' MMMM"
+  )} al ${formatDisplayDate(input.endDate, "d 'de' MMMM 'de' yyyy")}`;
+}
+
+async function notifyAdminsForLowResponseCensuses(now: Date) {
+  const censuses = await db.replacementCensus.findMany({
+    where: {
+      status: "OPEN",
+      closesAt: {
+        lte: addHours(now, 24)
+      }
+    },
+    include: {
+      scheduleWeek: true,
+      responses: {
+        select: {
+          status: true
+        }
+      }
+    },
+    orderBy: {
+      closesAt: "asc"
+    }
+  });
+  let processedCount = 0;
+  let alertedCount = 0;
+  let duplicateCount = 0;
+
+  for (const census of censuses) {
+    const totalResponses = census.responses.length;
+
+    if (!totalResponses) {
+      continue;
+    }
+
+    const answeredCount = census.responses.filter((response) =>
+      ["SUBMITTED", "DECLINED"].includes(response.status)
+    ).length;
+    const responseRate = answeredCount / totalResponses;
+
+    if (responseRate >= 0.5) {
+      continue;
+    }
+
+    processedCount += 1;
+
+    const weekLabel = buildCensusWeekLabel({
+      startDate: census.scheduleWeek.startDate,
+      endDate: census.scheduleWeek.endDate
+    });
+    const notifications = await createAdminAppNotifications({
+      censusId: census.id,
+      type: "ADMIN_ATTENTION_REQUIRED",
+      priority: "HIGH",
+      title: "Censo con baja respuesta",
+      body: `${weekLabel}: ${answeredCount} de ${totalResponses} suplentes han respondido.`,
+      dedupeKey: `low-response-census:${census.id}`,
+      metadata: {
+        source: "low_response_replacement_census",
+        censusId: census.id,
+        scheduleWeekId: census.scheduleWeekId,
+        responseRate,
+        answeredCount,
+        totalResponses,
+        closesAt: census.closesAt.toISOString()
+      }
+    });
+
+    if (notifications.length) {
+      alertedCount += 1;
+    } else {
+      duplicateCount += 1;
+    }
+  }
+
+  return {
+    processedCount,
+    alertedCount,
+    duplicateCount
+  };
+}
+
 export async function notifyAdminsForUnresolvedAssignments(input?: {
   now?: Date;
 }): Promise<NotifyAdminsForUnresolvedAssignmentsResult> {
@@ -1714,10 +1884,11 @@ export async function notifyAdminsForUnresolvedAssignments(input?: {
   });
   const unresolvedAssignmentIds =
     await getAssignmentsWithoutReplacementCandidates(now);
+  const lowResponseCensuses = await notifyAdminsForLowResponseCensuses(now);
   let sentCount = 0;
   let failedCount = 0;
-  let duplicateCount = 0;
-  let alertedCount = 0;
+  let duplicateCount = lowResponseCensuses.duplicateCount;
+  let alertedCount = lowResponseCensuses.alertedCount;
 
   for (const invitation of failedInvitations) {
     const result = await alertAdminsForAssignment({
@@ -1766,7 +1937,9 @@ export async function notifyAdminsForUnresolvedAssignments(input?: {
   }
 
   const processedCount =
-    failedInvitations.length + unresolvedAssignmentIds.length;
+    failedInvitations.length +
+    unresolvedAssignmentIds.length +
+    lowResponseCensuses.processedCount;
 
   return {
     status: "completed",

@@ -31,7 +31,13 @@ const mocks = vi.hoisted(() => {
       deleteMany: vi.fn(),
       update: vi.fn()
     },
+    appNotification: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
+      updateMany: vi.fn()
+    },
     volunteerProfile: {
+      findUnique: vi.fn(),
       update: vi.fn()
     }
   };
@@ -268,6 +274,14 @@ beforeEach(() => {
   mocks.getAssignmentInvitationAvailability.mockReturnValue("READY");
   mocks.tx.assignment.updateMany.mockResolvedValue({ count: 1 });
   mocks.tx.assignmentActivity.findFirst.mockResolvedValue(null);
+  mocks.tx.appNotification.findFirst.mockResolvedValue(null);
+  mocks.tx.appNotification.create.mockResolvedValue({ id: "app-notification-1" });
+  mocks.tx.appNotification.updateMany.mockResolvedValue({ count: 1 });
+  mocks.tx.volunteerProfile.findUnique.mockImplementation(
+    async ({ where }: { where: { id: string } }) => ({
+      userId: `user-${where.id}`
+    })
+  );
   mocks.inviteNextAvailableReplacementForAssignment.mockResolvedValue({
     assignmentId: "assignment-1",
     status: "invited",

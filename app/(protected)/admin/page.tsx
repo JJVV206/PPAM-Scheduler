@@ -11,12 +11,39 @@ import Link from "next/link";
 import { AssignmentCard } from "@/components/assignments/assignment-card";
 import { DashboardStatCard } from "@/components/dashboard/dashboard-stat-card";
 import { EmptyState } from "@/components/forms/empty-state";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { VOLUNTEER_POSITION_LABELS } from "@/lib/constants/domain";
+import { getServerAuthSession } from "@/lib/auth/auth";
+import {
+  getUnreadCriticalAppNotificationsForUser,
+  type AppNotificationListItem
+} from "@/services/app-notification.service";
 import { getAdminDashboardStats } from "@/services/dashboard.service";
+import { formatDisplayDate } from "@/lib/utils";
+
+function getAttentionNotificationHref(notification: AppNotificationListItem) {
+  if (notification.assignmentId) {
+    return `/admin/assignments/${notification.assignmentId}`;
+  }
+
+  if (notification.censusId) {
+    return "/admin/replacements";
+  }
+
+  return "/admin/notifications";
+}
 
 export default async function AdminDashboardPage() {
-  const dashboard = await getAdminDashboardStats();
+  const session = await getServerAuthSession();
+  const [dashboard, attentionNotifications] = await Promise.all([
+    getAdminDashboardStats(),
+    session?.user.id
+      ? getUnreadCriticalAppNotificationsForUser({
+          userId: session.user.id
+        })
+      : []
+  ]);
 
   return (
     <div className="space-y-6">
@@ -54,6 +81,39 @@ export default async function AdminDashboardPage() {
           <CardTitle>Requiere atención</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {attentionNotifications.map((notification) => (
+            <Link
+              key={notification.id}
+              href={getAttentionNotificationHref(notification)}
+              className="group block h-full rounded-2xl border border-danger/20 bg-danger/[0.04] p-4 transition hover:border-danger/35 hover:bg-danger/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              <div className="flex h-full flex-col justify-between gap-4">
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="danger">Crítica</Badge>
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-danger">
+                      Notificación interna
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <h2 className="font-heading text-lg font-semibold">
+                      {notification.title}
+                    </h2>
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      {notification.body}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between border-t border-danger/10 pt-3 text-sm font-medium text-danger">
+                  <span>
+                    {formatDisplayDate(notification.createdAt, "d MMM, h:mm a")}
+                  </span>
+                  <ArrowUpRight className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                </div>
+              </div>
+            </Link>
+          ))}
+
           {dashboard.requiresAttention.length ? (
             dashboard.requiresAttention.slice(0, 6).map((assignment) => (
               <Link
@@ -75,9 +135,11 @@ export default async function AdminDashboardPage() {
               </Link>
             ))
           ) : (
-            <p className="text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
+            !attentionNotifications.length && (
+              <p className="text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
               El flujo automático no requiere acciones manuales ahora.
-            </p>
+              </p>
+            )
           )}
         </CardContent>
       </Card>

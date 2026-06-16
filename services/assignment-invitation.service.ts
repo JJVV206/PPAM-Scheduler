@@ -27,6 +27,7 @@ import { formatDisplayDate } from "@/lib/utils";
 import { sendEmailNotification } from "@/services/notification.service";
 import { getAssignmentAutomationSettings } from "@/services/setting.service";
 import { recordAssignmentAuditActivity } from "@/services/assignment-audit.service";
+import { createAppNotificationOnce } from "@/services/app-notification.service";
 import {
   buildPrimaryAssignmentInvitationEmail,
   buildReplacementAssignmentInvitationEmail
@@ -580,6 +581,32 @@ async function sendAssignmentInvitationEmail(
           invitationType: invitation.type,
           notificationLogId: notification.id,
           emailAttempts: attempt.emailAttempts
+        }
+      });
+      await createAppNotificationOnce({
+        client: tx,
+        userId: invitation.volunteer.userId,
+        assignmentId: invitation.assignmentId,
+        type: "ASSIGNMENT_PENDING",
+        priority: invitation.type === "REPLACEMENT" ? "HIGH" : "NORMAL",
+        title:
+          invitation.type === "REPLACEMENT"
+            ? "Invitación de suplente"
+            : "Asignación pendiente de respuesta",
+        body:
+          invitation.type === "REPLACEMENT"
+            ? `Puedes cubrir como suplente el ${dateLabel}, ${timeSlotLabel}.`
+            : `Confirma tu asignación para ${dateLabel}, ${timeSlotLabel}.`,
+        dedupeKey: `assignment-pending:${invitation.id}`,
+        metadata: {
+          source: "assignment_invitation",
+          invitationId: invitation.id,
+          invitationType: invitation.type,
+          pointName,
+          date: invitation.assignment.date.toISOString(),
+          dayOfWeek: invitation.assignment.dayOfWeek,
+          timeSlot: invitation.assignment.timeSlot,
+          notificationLogId: notification.id
         }
       });
     });

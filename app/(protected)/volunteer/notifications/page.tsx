@@ -1,7 +1,7 @@
 import { DataTable } from "@/components/forms/data-table";
-import { NotificationTable } from "@/components/notifications/notification-table";
+import { AppNotificationList } from "@/components/notifications/app-notification-list";
 import { getServerAuthSession } from "@/lib/auth/auth";
-import { db } from "@/lib/db/prisma";
+import { getAppNotificationsForUser } from "@/services/app-notification.service";
 
 export default async function VolunteerNotificationsPage() {
   const session = await getServerAuthSession();
@@ -10,23 +10,16 @@ export default async function VolunteerNotificationsPage() {
     return null;
   }
 
-  const notifications = await db.notificationLog.findMany({
-    where: { userId: session.user.id },
-    include: {
-      user: true,
-      assignment: {
-        include: { preachingPoint: true }
-      }
-    },
-    orderBy: { createdAt: "desc" }
+  const notifications = await getAppNotificationsForUser({
+    userId: session.user.id
   });
 
   return (
     <DataTable
       title="Mis notificaciones"
-      description="Solicitudes de confirmación, recordatorios y cambios de asignación."
+      description="Solicitudes de confirmación, recordatorios y avisos visibles dentro de la app."
     >
-      <NotificationTable notifications={notifications} />
+      <AppNotificationList notifications={notifications} role={session.user.role} />
     </DataTable>
   );
 }

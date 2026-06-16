@@ -8,6 +8,10 @@ const mocks = vi.hoisted(() => {
     },
     assignmentInvitation: {
       update: vi.fn()
+    },
+    appNotification: {
+      create: vi.fn(),
+      findFirst: vi.fn()
     }
   };
   const db = {
@@ -29,9 +33,16 @@ const mocks = vi.hoisted(() => {
       create: vi.fn(),
       update: vi.fn()
     },
+    appNotification: {
+      create: vi.fn(),
+      findFirst: vi.fn()
+    },
     notificationLog: {
       create: vi.fn(),
       findFirst: vi.fn()
+    },
+    replacementCensus: {
+      findMany: vi.fn()
     },
     user: {
       findMany: vi.fn(),
@@ -62,6 +73,7 @@ vi.mock("@/services/setting.service", () => ({
 
 import {
   inviteNextAvailableReplacementForAssignment,
+  notifyAdminsForUnresolvedAssignments,
   processAssignmentAutomationRun,
   sendDueAssignmentReminders
 } from "@/services/assignment-automation.service";
@@ -349,9 +361,14 @@ beforeEach(() => {
   mocks.db.assignmentActivity.findFirst.mockResolvedValue(null);
   mocks.db.assignmentActivity.create.mockResolvedValue({ id: "activity-1" });
   mocks.db.assignment.updateMany.mockResolvedValue({ count: 1 });
+  mocks.db.appNotification.findFirst.mockResolvedValue(null);
+  mocks.db.appNotification.create.mockResolvedValue({ id: "app-notification-1" });
+  mocks.db.replacementCensus.findMany.mockResolvedValue([]);
   mocks.tx.assignmentActivity.findFirst.mockResolvedValue(null);
   mocks.tx.assignmentActivity.create.mockResolvedValue({ id: "activity-1" });
   mocks.tx.assignmentInvitation.update.mockResolvedValue({ id: "invitation-1" });
+  mocks.tx.appNotification.findFirst.mockResolvedValue(null);
+  mocks.tx.appNotification.create.mockResolvedValue({ id: "app-notification-1" });
 });
 
 afterEach(() => {
@@ -409,9 +426,9 @@ describe("assignment automation idempotency QA", () => {
   });
 
   it("tries the next replacement candidate when the first invitation email fails", async () => {
-    mocks.db.assignment.findUniqueOrThrow
-      .mockResolvedValueOnce(replacementAssignment())
-      .mockResolvedValueOnce(replacementAssignment());
+    mocks.db.assignment.findUniqueOrThrow.mockResolvedValue(
+      replacementAssignment()
+    );
     mocks.db.volunteerProfile.findMany.mockResolvedValue([
       replacementVolunteer({
         id: "replacement-1",
@@ -616,6 +633,49 @@ describe("assignment automation idempotency QA", () => {
             path: ["reminderKey"],
             equals: "pending-confirmation-replacement-invitation-1-4h"
           }
+        })
+      })
+    );
+  });
+
+  it("creates internal admin notifications for low-response replacement census", async () => {
+    mocks.db.assignmentInvitation.findMany.mockResolvedValue([]);
+    mocks.db.assignment.findMany.mockResolvedValue([]);
+    mocks.db.user.findMany.mockResolvedValue([{ id: "admin-1" }]);
+    mocks.db.replacementCensus.findMany.mockResolvedValue([
+      {
+        id: "census-1",
+        scheduleWeekId: "week-1",
+        closesAt: new Date("2026-06-17T12:00:00.000Z"),
+        scheduleWeek: {
+          startDate: new Date("2026-06-15T00:00:00.000Z"),
+          endDate: new Date("2026-06-21T00:00:00.000Z")
+        },
+        responses: [
+          { status: "SUBMITTED" },
+          { status: "SENT" },
+          { status: "PENDING" }
+        ]
+      }
+    ]);
+
+    const result = await notifyAdminsForUnresolvedAssignments({
+      now: new Date("2026-06-16T12:00:00.000Z")
+    });
+
+    expect(result).toMatchObject({
+      processedCount: 1,
+      alertedCount: 1,
+      duplicateCount: 0
+    });
+    expect(mocks.db.appNotification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "admin-1",
+          censusId: "census-1",
+          type: "ADMIN_ATTENTION_REQUIRED",
+          priority: "HIGH",
+          title: "Censo con baja respuesta"
         })
       })
     );

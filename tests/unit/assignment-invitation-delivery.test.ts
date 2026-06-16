@@ -8,6 +8,10 @@ const mocks = vi.hoisted(() => {
     },
     assignmentInvitation: {
       update: vi.fn()
+    },
+    appNotification: {
+      create: vi.fn(),
+      findFirst: vi.fn()
     }
   };
   const db = {
@@ -119,6 +123,8 @@ beforeEach(() => {
   mocks.db.assignmentInvitation.findFirst.mockResolvedValue(null);
   mocks.tx.assignmentActivity.findFirst.mockResolvedValue(null);
   mocks.tx.assignmentActivity.create.mockResolvedValue({ id: "activity-1" });
+  mocks.tx.appNotification.findFirst.mockResolvedValue(null);
+  mocks.tx.appNotification.create.mockResolvedValue({ id: "app-notification-1" });
 });
 
 afterEach(() => {
