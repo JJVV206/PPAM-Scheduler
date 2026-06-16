@@ -96,16 +96,16 @@ export default async function AdminSchedulePage({
   }));
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
-      <section className="surface-panel shrink-0 px-4 py-4 sm:px-5 sm:py-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="min-w-0 xl:shrink-0">
+      <section className="surface-panel shrink-0 overflow-hidden px-4 py-4 sm:px-5 sm:py-5">
+        <div className="flex min-w-0 flex-col gap-4">
+          <div className="min-w-0">
             <h1 className="font-heading text-3xl font-semibold leading-tight sm:text-4xl lg:whitespace-nowrap">
               Horario semanal
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {schedulePeriodLabel}
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex max-w-full flex-wrap gap-2">
               {scheduleStateLegend.map((item) => (
                 <Badge key={item.label} variant={item.variant}>
                   {item.label}
@@ -114,7 +114,7 @@ export default async function AdminSchedulePage({
             </div>
           </div>
 
-          <div className="flex w-full flex-col gap-2.5 xl:w-auto xl:flex-row xl:items-center xl:justify-end">
+          <div className="flex min-w-0 flex-col gap-2.5 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
             <ScheduleWeekToolbar
               selectedWeekStart={schedule.startDate.toISOString().slice(0, 10)}
               currentWeekStart={currentWeekStart}
@@ -126,10 +126,10 @@ export default async function AdminSchedulePage({
             />
 
             {currentWeek ? (
-              <div className="w-full xl:w-auto xl:shrink-0">
+              <div className="w-full sm:w-auto sm:shrink-0">
                 <AssignmentForm
                   scheduleWeekId={currentWeek.id}
-                  triggerClassName="xl:whitespace-nowrap"
+                  triggerClassName="w-full sm:w-auto sm:whitespace-nowrap"
                   triggerLabel="Agregar pareja"
                   triggerSize="default"
                   weekStartDate={schedule.startDate.toISOString().slice(0, 10)}

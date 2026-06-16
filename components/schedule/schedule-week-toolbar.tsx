@@ -128,12 +128,12 @@ export function ScheduleWeekToolbar({
   }
 
   return (
-    <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
-      <div className="grid w-full gap-2 sm:flex sm:flex-wrap sm:items-center lg:w-auto xl:flex-nowrap">
+    <div className="flex min-w-0 flex-col gap-2.5 lg:flex-row lg:flex-wrap lg:items-center">
+      <div className="grid w-full min-w-0 gap-2 sm:grid-cols-3 lg:flex lg:w-auto lg:flex-wrap lg:items-center">
         <Button
           type="button"
           variant="secondary"
-          className="w-full sm:w-auto"
+          className="w-full sm:min-w-0 lg:w-auto"
           onClick={() =>
             navigateToWeek(
               format(
@@ -150,7 +150,7 @@ export function ScheduleWeekToolbar({
           type="button"
           variant="secondary"
           aria-current={viewingCurrentWeek ? "date" : undefined}
-          className="w-full sm:w-auto xl:whitespace-nowrap"
+          className="w-full sm:min-w-0 lg:w-auto"
           onClick={() => navigateToWeek(currentWeekStart)}
         >
           <CalendarDays className="h-4 w-4" />
@@ -159,7 +159,7 @@ export function ScheduleWeekToolbar({
         <Button
           type="button"
           variant="secondary"
-          className="w-full sm:w-auto"
+          className="w-full sm:min-w-0 lg:w-auto"
           onClick={() =>
             navigateToWeek(
               format(
