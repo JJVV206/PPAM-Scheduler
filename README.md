@@ -66,6 +66,7 @@ Before deploying, configure these environment variables with real production val
 - `DIRECT_URL`
 - `NEXTAUTH_SECRET`
 - `NEXTAUTH_URL`
+- `CRON_SECRET`
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_SECURE`
