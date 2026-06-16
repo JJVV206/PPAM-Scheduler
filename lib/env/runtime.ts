@@ -1,5 +1,5 @@
 import { ensureServerEnvLoaded } from "@/lib/env/load-env";
-import { getMissingRequiredAppEnv } from "@/lib/env/config";
+import { getMissingRequiredAuthEnv } from "@/lib/env/config";
 import { db } from "@/lib/db/prisma";
 
 ensureServerEnvLoaded();
@@ -11,7 +11,7 @@ export type AuthRuntimeStatus = {
 };
 
 export async function getAuthRuntimeStatus(): Promise<AuthRuntimeStatus> {
-  const missingEnv = getMissingRequiredAppEnv();
+  const missingEnv = getMissingRequiredAuthEnv();
 
   if (missingEnv.length > 0) {
     return {
