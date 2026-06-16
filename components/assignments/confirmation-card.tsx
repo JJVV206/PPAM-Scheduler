@@ -14,6 +14,7 @@ type ConfirmationCardProps = {
   assignmentId?: string;
   responseId?: string;
   invitationToken?: string;
+  invitationType?: "PRIMARY" | "REPLACEMENT";
   pointName: string;
   date: Date;
   timeSlot: import("@/types/domain").TimeSlot;
@@ -23,6 +24,7 @@ export function ConfirmationCard({
   assignmentId,
   responseId,
   invitationToken,
+  invitationType = "PRIMARY",
   pointName,
   date,
   timeSlot
@@ -36,6 +38,7 @@ export function ConfirmationCard({
     text: string;
   } | null>(null);
   const [completed, setCompleted] = useState(false);
+  const isReplacementInvitation = invitationType === "REPLACEMENT";
 
   async function respond(intent: "confirm" | "decline") {
     setSubmitting(intent);
@@ -69,11 +72,16 @@ export function ConfirmationCard({
       <CardContent className="space-y-6 p-8">
         <div className="space-y-3 text-center">
           <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">
-            Confirmación de asignación
+            {isReplacementInvitation
+              ? "Invitación de suplente"
+              : "Confirmación de asignación"}
           </p>
           <h1 className="text-balance font-heading text-4xl font-semibold">
-            Tienes una asignación para el {formatDisplayDate(date, "EEEE")} en
-            el horario {TIME_SLOT_DEFINITIONS[timeSlot].label} en {pointName}.
+            {isReplacementInvitation
+              ? "Puedes cubrir como suplente el "
+              : "Tienes una asignación para el "}
+            {formatDisplayDate(date, "EEEE")} en el horario{" "}
+            {TIME_SLOT_DEFINITIONS[timeSlot].label} en {pointName}.
           </h1>
         </div>
         <div className="rounded-3xl bg-background/60 p-5 text-sm text-muted-foreground">

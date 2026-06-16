@@ -81,6 +81,7 @@ export default async function ConfirmAssignmentPage({
       {context.state === "READY" ? (
         <ConfirmationCard
           invitationToken={context.token}
+          invitationType={context.invitationType}
           pointName={context.pointName}
           date={context.date}
           timeSlot={context.timeSlot}

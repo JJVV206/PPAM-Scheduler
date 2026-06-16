@@ -77,6 +77,9 @@ function automationSettings() {
     urgentPrimaryReminderOffsetsHours: [4, 8],
     urgentThresholdHours: 72,
     replacementResponseTimeoutHours: 12,
+    replacementReminderOffsetsHours: [4, 8],
+    urgentReplacementResponseTimeoutHours: 4,
+    urgentReplacementReminderOffsetsHours: [2],
     censusResponseTimeoutHours: 72
   };
 }
@@ -235,6 +238,42 @@ function pendingReplacementInvitation(input: {
         id: input.userId,
         name: input.userName,
         email: `${input.userId}@example.org`
+      }
+    }
+  };
+}
+
+function sentReplacementInvitation() {
+  return {
+    ...pendingReplacementInvitation({
+      id: "replacement-invitation-1",
+      volunteerId: "replacement-1",
+      userId: "user-replacement-1",
+      userName: "Bea"
+    }),
+    status: "SENT",
+    sentAt: new Date(2026, 5, 16, 9, 0, 0),
+    expiresAt: new Date(2026, 5, 16, 21, 0, 0),
+    metadata: {
+      replacementReminderOffsetsHours: [4, 8]
+    },
+    assignment: {
+      id: "assignment-1",
+      date: new Date(2026, 5, 20),
+      dayOfWeek: "SATURDAY",
+      timeSlot: "SLOT_11_13",
+      status: "PENDING_CONFIRMATION",
+      responses: []
+    },
+    volunteer: {
+      id: "replacement-1",
+      userId: "user-replacement-1",
+      active: true,
+      user: {
+        id: "user-replacement-1",
+        name: "Bea",
+        email: "bea@example.org",
+        active: true
       }
     }
   };
@@ -537,6 +576,45 @@ describe("assignment automation idempotency QA", () => {
           metadata: {
             path: ["reminderKey"],
             equals: "pending-confirmation-invitation-1-12h"
+          }
+        })
+      })
+    );
+  });
+
+  it("does not duplicate pending replacement response-window reminders", async () => {
+    mocks.getAssignmentAutomationSettings.mockResolvedValue(automationSettings());
+    mocks.db.assignment.findMany.mockResolvedValue([]);
+    mocks.db.assignmentInvitation.findMany.mockResolvedValue([
+      sentReplacementInvitation()
+    ]);
+    mocks.db.user.findUnique.mockResolvedValue({
+      id: "user-replacement-1",
+      email: "bea@example.org"
+    });
+    mocks.db.notificationLog.create.mockResolvedValue({
+      id: "notification-1",
+      status: "SENT",
+      sentAt: new Date(2026, 5, 16, 13, 30, 0),
+      errorMessage: null
+    });
+    mocks.db.notificationLog.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: "existing-reminder" });
+
+    const now = new Date(2026, 5, 16, 13, 30, 0);
+    const firstRun = await sendDueAssignmentReminders({ now });
+    const secondRun = await sendDueAssignmentReminders({ now });
+
+    expect(firstRun).toMatchObject({ sentCount: 1, duplicateCount: 0 });
+    expect(secondRun).toMatchObject({ sentCount: 0, duplicateCount: 1 });
+    expect(mocks.db.notificationLog.create).toHaveBeenCalledTimes(1);
+    expect(mocks.db.notificationLog.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          metadata: {
+            path: ["reminderKey"],
+            equals: "pending-confirmation-replacement-invitation-1-4h"
           }
         })
       })

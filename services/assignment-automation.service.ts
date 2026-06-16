@@ -17,9 +17,12 @@ import {
   DEFAULT_FINAL_REMINDER_HOURS,
   DEFAULT_PRIMARY_REMINDER_OFFSETS_HOURS,
   DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS,
+  DEFAULT_REPLACEMENT_REMINDER_OFFSETS_HOURS,
   DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS,
   DEFAULT_URGENT_PRIMARY_REMINDER_OFFSETS_HOURS,
   DEFAULT_URGENT_PRIMARY_RESPONSE_TIMEOUT_HOURS,
+  DEFAULT_URGENT_REPLACEMENT_REMINDER_OFFSETS_HOURS,
+  DEFAULT_URGENT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS,
   DEFAULT_URGENT_THRESHOLD_HOURS
 } from "@/lib/constants/app";
 import { buildAssignmentStartDate } from "@/lib/assignments/time";
@@ -225,6 +228,21 @@ function getPrimaryPendingReminderOffsets(input: {
   );
 }
 
+function getReplacementPendingReminderOffsets(input: {
+  invitationMetadata: Prisma.JsonValue | null;
+  settings: AssignmentAutomationSettings;
+}) {
+  const metadata = asMetadataObject(input.invitationMetadata);
+  const metadataOffsets = getMetadataNumberArray(
+    metadata.replacementReminderOffsetsHours
+  );
+
+  return normalizeReminderOffsetsHours(
+    metadataOffsets ?? input.settings.replacementReminderOffsetsHours,
+    DEFAULT_REPLACEMENT_REMINDER_OFFSETS_HOURS
+  );
+}
+
 function isTerminalAssignment(status: Assignment["status"]) {
   return TERMINAL_ASSIGNMENT_STATUSES.includes(
     status as (typeof TERMINAL_ASSIGNMENT_STATUSES)[number]
@@ -289,6 +307,7 @@ export function getDuePendingConfirmationReminder(input: {
   expiresAt: Date;
   now: Date;
   reminderOffsetsHours: number[];
+  fallbackReminderOffsetsHours?: readonly number[];
 }): DueAssignmentReminder | null {
   if (input.expiresAt <= input.now) {
     return null;
@@ -296,7 +315,7 @@ export function getDuePendingConfirmationReminder(input: {
 
   const dueOffsets = normalizeReminderOffsetsHours(
     input.reminderOffsetsHours,
-    DEFAULT_PRIMARY_REMINDER_OFFSETS_HOURS
+    input.fallbackReminderOffsetsHours ?? DEFAULT_PRIMARY_REMINDER_OFFSETS_HOURS
   ).filter((offsetHours) => {
     const targetAt = addHours(input.sentAt, offsetHours);
     return targetAt <= input.now && targetAt < input.expiresAt;
@@ -315,30 +334,6 @@ export function getDuePendingConfirmationReminder(input: {
     notificationType: "REMINDER",
     targetAt,
     offsetHours
-  };
-}
-
-function getDueFinalPendingConfirmationReminder(input: {
-  invitationId: string;
-  expiresAt: Date;
-  now: Date;
-  finalReminderHours: number;
-}): DueAssignmentReminder | null {
-  if (input.expiresAt <= input.now || input.finalReminderHours <= 0) {
-    return null;
-  }
-
-  const targetAt = subHours(input.expiresAt, input.finalReminderHours);
-  if (targetAt > input.now) {
-    return null;
-  }
-
-  return {
-    kind: "PENDING_CONFIRMATION",
-    reminderKey: `pending-confirmation-${input.invitationId}`,
-    notificationType: "REMINDER",
-    targetAt,
-    offsetHours: input.finalReminderHours
   };
 }
 
@@ -1249,6 +1244,18 @@ function getNormalizedReminderSettings(
     replacementResponseTimeoutHours: normalizePositiveHourSetting(
       settings.replacementResponseTimeoutHours,
       DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
+    ),
+    replacementReminderOffsetsHours: normalizeReminderOffsetsHours(
+      settings.replacementReminderOffsetsHours,
+      DEFAULT_REPLACEMENT_REMINDER_OFFSETS_HOURS
+    ),
+    urgentReplacementResponseTimeoutHours: normalizePositiveHourSetting(
+      settings.urgentReplacementResponseTimeoutHours,
+      DEFAULT_URGENT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
+    ),
+    urgentReplacementReminderOffsetsHours: normalizeReminderOffsetsHours(
+      settings.urgentReplacementReminderOffsetsHours,
+      DEFAULT_URGENT_REPLACEMENT_REMINDER_OFFSETS_HOURS
     )
   };
 }
@@ -1416,11 +1423,17 @@ async function getDuePendingConfirmationReminderRecipients(input: {
               settings: input.settings
             })
           })
-        : getDueFinalPendingConfirmationReminder({
+        : getDuePendingConfirmationReminder({
             invitationId: invitation.id,
+            sentAt: invitation.sentAt ?? invitation.createdAt,
             expiresAt: invitation.expiresAt,
             now: input.now,
-            finalReminderHours: input.settings.finalReminderHours
+            reminderOffsetsHours: getReplacementPendingReminderOffsets({
+              invitationMetadata: invitation.metadata,
+              settings: input.settings
+            }),
+            fallbackReminderOffsetsHours:
+              DEFAULT_REPLACEMENT_REMINDER_OFFSETS_HOURS
           });
 
     if (!reminder) {

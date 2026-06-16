@@ -19,7 +19,10 @@ import {
   DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
 } from "@/lib/constants/app";
 import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
-import { resolvePrimaryInvitationTiming } from "@/lib/assignments/invitation-timing";
+import {
+  resolvePrimaryInvitationTiming,
+  resolveReplacementInvitationTiming
+} from "@/lib/assignments/invitation-timing";
 import { formatDisplayDate } from "@/lib/utils";
 import { sendEmailNotification } from "@/services/notification.service";
 import { getAssignmentAutomationSettings } from "@/services/setting.service";
@@ -342,16 +345,34 @@ export async function createPendingReplacementInvitationForAssignment(input: {
     };
   }
 
-  const settings = input.expiresAt
-    ? null
-    : await getAssignmentAutomationSettings();
+  const now = new Date();
+  const [settings, assignment] = input.expiresAt
+    ? [null, null]
+    : await Promise.all([
+        getAssignmentAutomationSettings(),
+        client.assignment.findUniqueOrThrow({
+          where: {
+            id: input.assignmentId
+          },
+          select: {
+            date: true,
+            timeSlot: true
+          }
+        })
+      ]);
+  const timing =
+    settings && assignment
+      ? resolveReplacementInvitationTiming({
+          assignmentDate: assignment.date,
+          timeSlot: assignment.timeSlot,
+          now,
+          settings
+        })
+      : null;
   const expiresAt =
     input.expiresAt ??
-    addHours(
-      new Date(),
-      settings?.replacementResponseTimeoutHours ??
-        DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
-    );
+    timing?.expiresAt ??
+    addHours(now, DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS);
 
   const invitation = await createInvitationWithUniqueToken({
     client,
@@ -363,6 +384,10 @@ export async function createPendingReplacementInvitationForAssignment(input: {
       source: "replacement_flow",
       actorUserId: input.actorUserId,
       createdAutomatically: true,
+      assignmentStartAt: timing?.assignmentStartAt.toISOString(),
+      replacementResponseTimeoutHours: timing?.timeoutHours,
+      replacementReminderOffsetsHours: timing?.reminderOffsetsHours,
+      urgentReplacementWindow: timing?.urgent,
       ...input.metadata
     }) as Prisma.InputJsonObject
   });

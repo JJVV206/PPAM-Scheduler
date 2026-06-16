@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => {
     },
     assignmentInvitation: {
       create: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn()
     },
@@ -52,6 +53,7 @@ vi.mock("@/services/setting.service", () => ({
 
 import {
   createPendingPrimaryInvitationsForAssignment,
+  createPendingReplacementInvitationForAssignment,
   sendPendingPrimaryInvitationsForAssignment
 } from "@/services/assignment-invitation.service";
 
@@ -100,6 +102,9 @@ beforeEach(() => {
     urgentPrimaryReminderOffsetsHours: [4, 8],
     urgentThresholdHours: 72,
     replacementResponseTimeoutHours: 12,
+    replacementReminderOffsetsHours: [4, 8],
+    urgentReplacementResponseTimeoutHours: 4,
+    urgentReplacementReminderOffsetsHours: [2],
     censusResponseTimeoutHours: 72,
     finalReminderHours: 3,
     reminderTimingDays: [5, 1],
@@ -111,6 +116,7 @@ beforeEach(() => {
   });
   mocks.db.assignmentActivity.findFirst.mockResolvedValue(null);
   mocks.db.assignmentActivity.create.mockResolvedValue({ id: "activity-1" });
+  mocks.db.assignmentInvitation.findFirst.mockResolvedValue(null);
   mocks.tx.assignmentActivity.findFirst.mockResolvedValue(null);
   mocks.tx.assignmentActivity.create.mockResolvedValue({ id: "activity-1" });
 });
@@ -185,6 +191,42 @@ describe("assignment invitation delivery QA", () => {
             primaryReminderOffsetsHours: [4, 8],
             urgentPrimaryWindow: true,
             urgentThresholdHours: 72
+          })
+        })
+      })
+    );
+  });
+
+  it("compresses replacement response windows when the assignment is urgent", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 20, 6, 0, 0));
+    mocks.db.assignment.findUniqueOrThrow.mockResolvedValue({
+      date: new Date(2026, 5, 20),
+      timeSlot: "SLOT_11_13"
+    });
+    mocks.db.assignmentInvitation.create.mockImplementation(async ({ data }) => ({
+      id: `invitation-${data.volunteerId}`,
+      ...data
+    }));
+
+    const result = await createPendingReplacementInvitationForAssignment({
+      assignmentId: "assignment-1",
+      volunteerId: "replacement-1",
+      actorUserId: "admin-1"
+    });
+
+    expect(result).toEqual({ createdCount: 1, skippedCount: 0 });
+    expect(mocks.db.assignmentInvitation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          assignmentId: "assignment-1",
+          volunteerId: "replacement-1",
+          type: "REPLACEMENT",
+          expiresAt: new Date(2026, 5, 20, 10, 0, 0),
+          metadata: expect.objectContaining({
+            replacementResponseTimeoutHours: 4,
+            replacementReminderOffsetsHours: [2],
+            urgentReplacementWindow: true
           })
         })
       })

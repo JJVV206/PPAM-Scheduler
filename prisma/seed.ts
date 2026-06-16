@@ -347,6 +347,18 @@ async function main() {
         value: 12
       },
       {
+        key: "replacementReminderOffsetsHours",
+        value: [4, 8]
+      },
+      {
+        key: "urgentReplacementResponseTimeoutHours",
+        value: 4
+      },
+      {
+        key: "urgentReplacementReminderOffsetsHours",
+        value: [2]
+      },
+      {
         key: "notificationChannels",
         value: ["EMAIL"]
       }

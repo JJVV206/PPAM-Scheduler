@@ -6,9 +6,12 @@ import {
   DEFAULT_PRIMARY_REMINDER_OFFSETS_HOURS,
   DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS,
   DEFAULT_REMINDER_TIMING_DAYS,
+  DEFAULT_REPLACEMENT_REMINDER_OFFSETS_HOURS,
   DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS,
   DEFAULT_URGENT_PRIMARY_REMINDER_OFFSETS_HOURS,
   DEFAULT_URGENT_PRIMARY_RESPONSE_TIMEOUT_HOURS,
+  DEFAULT_URGENT_REPLACEMENT_REMINDER_OFFSETS_HOURS,
+  DEFAULT_URGENT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS,
   DEFAULT_URGENT_THRESHOLD_HOURS
 } from "@/lib/constants/app";
 import type { SettingsDto } from "@/types/domain";
@@ -22,6 +25,9 @@ export type AssignmentAutomationSettings = {
   urgentPrimaryReminderOffsetsHours: number[];
   urgentThresholdHours: number;
   replacementResponseTimeoutHours: number;
+  replacementReminderOffsetsHours: number[];
+  urgentReplacementResponseTimeoutHours: number;
+  urgentReplacementReminderOffsetsHours: number[];
   censusResponseTimeoutHours: number;
   notificationChannels: SettingsDto["notificationChannels"];
 };
@@ -62,6 +68,9 @@ export async function getAssignmentAutomationSettings(): Promise<AssignmentAutom
     urgentPrimaryReminderOffsetsHours,
     urgentThresholdHours,
     replacementResponseTimeoutHours,
+    replacementReminderOffsetsHours,
+    urgentReplacementResponseTimeoutHours,
+    urgentReplacementReminderOffsetsHours,
     censusResponseTimeoutHours
   ] = await Promise.all([
     getSettingValue("finalReminderHours", DEFAULT_FINAL_REMINDER_HOURS),
@@ -86,6 +95,18 @@ export async function getAssignmentAutomationSettings(): Promise<AssignmentAutom
       "replacementResponseTimeoutHours",
       DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
     ),
+    getSettingValue<number[]>(
+      "replacementReminderOffsetsHours",
+      [...DEFAULT_REPLACEMENT_REMINDER_OFFSETS_HOURS]
+    ),
+    getSettingValue(
+      "urgentReplacementResponseTimeoutHours",
+      DEFAULT_URGENT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
+    ),
+    getSettingValue<number[]>(
+      "urgentReplacementReminderOffsetsHours",
+      [...DEFAULT_URGENT_REPLACEMENT_REMINDER_OFFSETS_HOURS]
+    ),
     getSettingValue(
       "censusResponseTimeoutHours",
       DEFAULT_CENSUS_RESPONSE_TIMEOUT_HOURS
@@ -101,6 +122,9 @@ export async function getAssignmentAutomationSettings(): Promise<AssignmentAutom
     urgentPrimaryReminderOffsetsHours,
     urgentThresholdHours,
     replacementResponseTimeoutHours,
+    replacementReminderOffsetsHours,
+    urgentReplacementResponseTimeoutHours,
+    urgentReplacementReminderOffsetsHours,
     censusResponseTimeoutHours,
     notificationChannels: appSettings.notificationChannels
   };

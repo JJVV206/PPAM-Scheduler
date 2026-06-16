@@ -4,8 +4,12 @@ import type { TimeSlot } from "@prisma/client";
 import {
   DEFAULT_PRIMARY_REMINDER_OFFSETS_HOURS,
   DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS,
+  DEFAULT_REPLACEMENT_REMINDER_OFFSETS_HOURS,
+  DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS,
   DEFAULT_URGENT_PRIMARY_REMINDER_OFFSETS_HOURS,
   DEFAULT_URGENT_PRIMARY_RESPONSE_TIMEOUT_HOURS,
+  DEFAULT_URGENT_REPLACEMENT_REMINDER_OFFSETS_HOURS,
+  DEFAULT_URGENT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS,
   DEFAULT_URGENT_THRESHOLD_HOURS
 } from "@/lib/constants/app";
 import { buildAssignmentStartDate } from "@/lib/assignments/time";
@@ -18,6 +22,13 @@ export type PrimaryInvitationTimingSettings = {
   urgentPrimaryResponseTimeoutHours?: number | null;
   urgentPrimaryReminderOffsetsHours?: readonly number[] | null;
   urgentThresholdHours?: number | null;
+};
+
+export type ReplacementInvitationTimingSettings = {
+  replacementResponseTimeoutHours?: number | null;
+  replacementReminderOffsetsHours?: readonly number[] | null;
+  urgentReplacementResponseTimeoutHours?: number | null;
+  urgentReplacementReminderOffsetsHours?: readonly number[] | null;
 };
 
 export function normalizePositiveHourSetting(
@@ -90,5 +101,54 @@ export function resolvePrimaryInvitationTiming(input: {
     reminderOffsetsHours,
     urgent,
     urgentThresholdHours
+  };
+}
+
+export function resolveReplacementInvitationTiming(input: {
+  assignmentDate: Date;
+  timeSlot: TimeSlot;
+  now: Date;
+  settings: ReplacementInvitationTimingSettings;
+}) {
+  const assignmentStartAt = buildAssignmentStartDate({
+    date: input.assignmentDate,
+    timeSlot: input.timeSlot
+  });
+  const regularTimeoutHours = normalizePositiveHourSetting(
+    input.settings.replacementResponseTimeoutHours,
+    DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
+  );
+  const hoursUntilAssignment =
+    (assignmentStartAt.getTime() - input.now.getTime()) / MS_PER_HOUR;
+  const urgent = hoursUntilAssignment <= regularTimeoutHours;
+  const timeoutHours = urgent
+    ? normalizePositiveHourSetting(
+        input.settings.urgentReplacementResponseTimeoutHours,
+        DEFAULT_URGENT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
+      )
+    : regularTimeoutHours;
+  const reminderOffsetsHours = urgent
+    ? normalizeReminderOffsetsHours(
+        input.settings.urgentReplacementReminderOffsetsHours,
+        DEFAULT_URGENT_REPLACEMENT_REMINDER_OFFSETS_HOURS
+      )
+    : normalizeReminderOffsetsHours(
+        input.settings.replacementReminderOffsetsHours,
+        DEFAULT_REPLACEMENT_REMINDER_OFFSETS_HOURS
+      );
+  const timeoutExpiresAt = addHours(input.now, timeoutHours);
+  const expiresAt =
+    assignmentStartAt > input.now
+      ? new Date(
+          Math.min(timeoutExpiresAt.getTime(), assignmentStartAt.getTime())
+        )
+      : input.now;
+
+  return {
+    assignmentStartAt,
+    expiresAt,
+    timeoutHours,
+    reminderOffsetsHours,
+    urgent
   };
 }
