@@ -79,6 +79,10 @@ function getTimelineDetail(entry: AssignmentDetailDto["timeline"][number]) {
   const position = getStringMetadata(entry.metadata, "position");
 
   switch (entry.actionType) {
+    case "INVITATION_CREATED":
+      return invitationType === "REPLACEMENT"
+        ? "Invitación de suplente creada"
+        : "Invitación titular creada";
     case "INVITATION_SENT":
       return [
         invitationType === "REPLACEMENT" ? "Suplente" : "Titular",
@@ -86,6 +90,22 @@ function getTimelineDetail(entry: AssignmentDetailDto["timeline"][number]) {
       ]
         .filter(Boolean)
         .join(" • ");
+    case "INVITATION_FAILED":
+      return invitationType === "REPLACEMENT"
+        ? "Falló email a suplente"
+        : "Falló email a titular";
+    case "INVITATION_ACCEPTED":
+      return invitationType === "REPLACEMENT"
+        ? "Suplente aceptó la invitación"
+        : "Titular aceptó la invitación";
+    case "INVITATION_DECLINED":
+      return invitationType === "REPLACEMENT"
+        ? "Suplente rechazó la invitación"
+        : "Titular rechazó la invitación";
+    case "INVITATION_EXPIRED":
+      return invitationType === "REPLACEMENT"
+        ? "Invitación de suplente expirada"
+        : "Invitación titular expirada";
     case "RESPONSE_RECEIVED":
       return [
         responseStatus === "CONFIRMED"
@@ -101,6 +121,8 @@ function getTimelineDetail(entry: AssignmentDetailDto["timeline"][number]) {
       return position === "FIRST" || position === "SECOND"
         ? `Puesto actualizado: ${VOLUNTEER_POSITION_LABELS[position]}`
         : "Suplente seleccionado";
+    case "REPLACEMENT_SELECTED":
+      return "Suplente seleccionado por reglas automáticas";
     case "REMINDER_SENT":
       return notificationLogId
         ? "Recordatorio enviado por email"

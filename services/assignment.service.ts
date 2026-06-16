@@ -56,6 +56,7 @@ import {
   deriveAssignmentAutomationState,
   isAssignmentRequiringAttention
 } from "@/services/assignment-ui-state.service";
+import { recordAssignmentAuditActivity } from "@/services/assignment-audit.service";
 
 const assignmentInclude = {
   scheduleWeek: true,
@@ -1142,17 +1143,39 @@ function getInvitationResponseError(
 
 async function markExpiredInvitationIfNeeded(input: {
   id: string;
+  assignmentId: string;
+  volunteerId: string;
+  type: "PRIMARY" | "REPLACEMENT";
+  expiresAt: Date;
   metadata: Prisma.JsonValue | null;
 }) {
-  await db.assignmentInvitation.update({
-    where: { id: input.id },
-    data: {
-      status: "EXPIRED",
-      metadata: mergeJsonMetadata(input.metadata, {
-        expiredAt: new Date().toISOString(),
-        expireReason: "response_attempt_after_expiration"
-      })
-    }
+  const expiredAt = new Date();
+
+  await db.$transaction(async (tx) => {
+    await tx.assignmentInvitation.update({
+      where: { id: input.id },
+      data: {
+        status: "EXPIRED",
+        metadata: mergeJsonMetadata(input.metadata, {
+          expiredAt: expiredAt.toISOString(),
+          expireReason: "response_attempt_after_expiration"
+        })
+      }
+    });
+    await recordAssignmentAuditActivity({
+      client: tx,
+      assignmentId: input.assignmentId,
+      event: "INVITATION_EXPIRED",
+      dedupeKey: `invitation-expired:${input.id}`,
+      metadata: {
+        invitationId: input.id,
+        invitationType: input.type,
+        volunteerProfileId: input.volunteerId,
+        expiresAt: input.expiresAt,
+        expiredAt,
+        source: "response_attempt_after_expiration"
+      }
+    });
   });
 }
 
@@ -1179,6 +1202,10 @@ export async function respondToAssignmentInvitation(input: {
     if (preflightInvitation.status !== "EXPIRED") {
       await markExpiredInvitationIfNeeded({
         id: preflightInvitation.id,
+        assignmentId: preflightInvitation.assignmentId,
+        volunteerId: preflightInvitation.volunteerId,
+        type: preflightInvitation.type,
+        expiresAt: preflightInvitation.expiresAt,
         metadata: preflightInvitation.metadata
       });
     }
@@ -1291,6 +1318,21 @@ export async function respondToAssignmentInvitation(input: {
           })
         }
       });
+      await recordAssignmentAuditActivity({
+        client: tx,
+        assignmentId: invitation.assignmentId,
+        event: "INVITATION_ACCEPTED",
+        dedupeKey: `invitation-response:${invitation.id}`,
+        metadata: {
+          invitationId: invitation.id,
+          invitationType: invitation.type,
+          volunteerProfileId: invitation.volunteerId,
+          responseStatus: input.responseStatus,
+          respondedAt: now,
+          source: "PUBLIC_INVITATION_LINK",
+          assignedPosition: targetPosition
+        }
+      });
 
       await tx.assignmentResponse.upsert({
         where: {
@@ -1359,6 +1401,23 @@ export async function respondToAssignmentInvitation(input: {
           respondedVia: "PUBLIC_INVITATION_LINK",
           responseRecordedAt: now.toISOString()
         })
+      }
+    });
+    await recordAssignmentAuditActivity({
+      client: tx,
+      assignmentId: invitation.assignmentId,
+      event:
+        input.responseStatus === "CONFIRMED"
+          ? "INVITATION_ACCEPTED"
+          : "INVITATION_DECLINED",
+      dedupeKey: `invitation-response:${invitation.id}`,
+      metadata: {
+        invitationId: invitation.id,
+        invitationType: invitation.type,
+        volunteerProfileId: invitation.volunteerId,
+        responseStatus: input.responseStatus,
+        respondedAt: now,
+        source: "PUBLIC_INVITATION_LINK"
       }
     });
 
@@ -1883,7 +1942,7 @@ export async function resendAssignmentConfirmation(assignmentId: string) {
         ? buildAssignmentInvitationResponseUrl(invitation.token)
         : null;
 
-      await resendConfirmationReminder({
+      const notification = await resendConfirmationReminder({
         assignmentId,
         volunteerUserId: slot.volunteer.userId,
         volunteerName: slot.volunteer.user.name,
@@ -1893,14 +1952,17 @@ export async function resendAssignmentConfirmation(assignmentId: string) {
         confirmationLink
       });
 
-      await db.assignmentActivity.create({
-        data: {
-          assignmentId,
-          actionType: "REMINDER_SENT",
-          metadata: {
-            volunteerProfileId: slot.volunteerId,
-            deliveryType: "REMINDER"
-          }
+      await recordAssignmentAuditActivity({
+        assignmentId,
+        event: "REMINDER_SENT",
+        dedupeKey: `manual-reminder:${assignmentId}:${slot.volunteer.userId}:${notification.id}`,
+        metadata: {
+          volunteerProfileId: slot.volunteerId,
+          volunteerUserId: slot.volunteer.userId,
+          deliveryType: "MANUAL_REMINDER",
+          notificationLogId: notification.id,
+          notificationStatus: notification.status,
+          invitationId: invitation?.id
         }
       });
     })

@@ -40,6 +40,7 @@ import {
   type AssignmentAutomationSettings
 } from "@/services/setting.service";
 import { getAppBaseUrl } from "@/lib/env/config";
+import { recordAssignmentAuditActivity } from "@/services/assignment-audit.service";
 
 export {
   buildAdminAssignmentAlertEmail
@@ -355,13 +356,13 @@ async function createNoReplacementAvailableActivityOnce(input: {
     return false;
   }
 
-  await input.tx.assignmentActivity.create({
-    data: {
-      assignmentId: input.assignmentId,
-      actionType: "NO_REPLACEMENT_AVAILABLE",
-      metadata: {
-        automationModule: "assignment_automation"
-      }
+  await recordAssignmentAuditActivity({
+    client: input.tx,
+    assignmentId: input.assignmentId,
+    event: "NO_REPLACEMENT_AVAILABLE",
+    dedupeKey: `no-replacement-available:${input.assignmentId}`,
+    metadata: {
+      reason: "no_eligible_replacement_candidate"
     }
   });
 
@@ -553,23 +554,22 @@ async function alertAdminsForAssignment(input: {
   }
 
   if (sentCount > 0) {
-    await db.assignmentActivity.create({
-      data: {
-        assignmentId: input.assignmentId,
-        actionType: "ADMIN_ALERTED",
-        metadata: compactMetadata({
-          alertKey: input.alertKey,
-          reason: input.reason,
-          adminCount: admins.length,
-          sentCount,
-          failedCount,
-          attemptedReplacementCount: attemptedReplacementNames.length,
-          originalVolunteerCount: originalVolunteerNames.length,
-          assignmentUrl,
-          failedInvitationId: input.failedInvitation?.id,
-          failedInvitationType: input.failedInvitation?.type,
-          failedVolunteerProfileId: input.failedInvitation?.volunteerProfileId
-        })
+    await recordAssignmentAuditActivity({
+      assignmentId: input.assignmentId,
+      event: "ADMIN_ALERTED",
+      dedupeKey: input.alertKey,
+      metadata: {
+        alertKey: input.alertKey,
+        reason: input.reason,
+        adminCount: admins.length,
+        sentCount,
+        failedCount,
+        attemptedReplacementCount: attemptedReplacementNames.length,
+        originalVolunteerCount: originalVolunteerNames.length,
+        assignmentUrl,
+        failedInvitationId: input.failedInvitation?.id,
+        failedInvitationType: input.failedInvitation?.type,
+        failedVolunteerProfileId: input.failedInvitation?.volunteerProfileId
       }
     });
   }
@@ -629,7 +629,27 @@ async function reconcileInvitationFromExistingResponse(input: {
     }
   });
 
-  return updated.count === 1;
+  if (updated.count !== 1) {
+    return false;
+  }
+
+  await recordAssignmentAuditActivity({
+    client: input.tx,
+    assignmentId: input.invitation.assignmentId,
+    event: status === "ACCEPTED" ? "INVITATION_ACCEPTED" : "INVITATION_DECLINED",
+    dedupeKey: `invitation-response:${input.invitation.id}`,
+    metadata: {
+      invitationId: input.invitation.id,
+      invitationType: input.invitation.type,
+      volunteerProfileId: input.invitation.volunteerId,
+      responseStatus: response.responseStatus,
+      responseId: response.id,
+      respondedAt: response.respondedAt ?? input.now,
+      source: "response_reconciliation"
+    }
+  });
+
+  return true;
 }
 
 async function expireInvitation(input: {
@@ -663,16 +683,18 @@ async function expireInvitation(input: {
     };
   }
 
-  await input.tx.assignmentActivity.create({
-    data: {
-      assignmentId: input.invitation.assignmentId,
-      actionType: "INVITATION_EXPIRED",
-      metadata: {
-        invitationId: input.invitation.id,
-        invitationType: input.invitation.type,
-        volunteerProfileId: input.invitation.volunteerId,
-        expiresAt: input.invitation.expiresAt.toISOString()
-      }
+  await recordAssignmentAuditActivity({
+    client: input.tx,
+    assignmentId: input.invitation.assignmentId,
+    event: "INVITATION_EXPIRED",
+    dedupeKey: `invitation-expired:${input.invitation.id}`,
+    metadata: {
+      invitationId: input.invitation.id,
+      invitationType: input.invitation.type,
+      volunteerProfileId: input.invitation.volunteerId,
+      expiresAt: input.invitation.expiresAt,
+      expiredAt: input.now,
+      source: "automation_timeout"
     }
   });
 
@@ -989,6 +1011,20 @@ export async function inviteNextAvailableReplacementForAssignment(input: {
       failedCount: 0
     };
   }
+
+  await recordAssignmentAuditActivity({
+    assignmentId: input.assignmentId,
+    actorUserId: input.actorUserId,
+    event: "REPLACEMENT_SELECTED",
+    dedupeKey: `replacement-selected:${input.assignmentId}:${candidate.id}`,
+    metadata: {
+      volunteerProfileId: candidate.id,
+      selectedBy: "replacement_candidate_rules",
+      confirmationRate: candidate.replacementPriority.confirmationRate,
+      futureAssignmentCount: candidate.replacementPriority.futureAssignmentCount,
+      areaCompatible: candidate.replacementPriority.areaCompatible
+    }
+  });
 
   await createPendingReplacementInvitationForAssignment({
     assignmentId: input.assignmentId,
@@ -1377,14 +1413,13 @@ async function sendAssignmentReminder(
       return "FAILED";
     }
 
-    await db.assignmentActivity.create({
-      data: {
-        assignmentId: recipient.assignmentId,
-        actionType: "REMINDER_SENT",
-        metadata: compactMetadata({
-          ...metadata,
-          notificationLogId: notification.id
-        })
+    await recordAssignmentAuditActivity({
+      assignmentId: recipient.assignmentId,
+      event: "REMINDER_SENT",
+      dedupeKey: `reminder-sent:${recipient.assignmentId}:${recipient.volunteerUserId}:${recipient.reminder.reminderKey}`,
+      metadata: {
+        ...metadata,
+        notificationLogId: notification.id
       }
     });
 

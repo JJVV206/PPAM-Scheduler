@@ -22,6 +22,7 @@ import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import { formatDisplayDate } from "@/lib/utils";
 import { sendEmailNotification } from "@/services/notification.service";
 import { getAssignmentAutomationSettings } from "@/services/setting.service";
+import { recordAssignmentAuditActivity } from "@/services/assignment-audit.service";
 import {
   buildPrimaryAssignmentInvitationEmail,
   buildReplacementAssignmentInvitationEmail
@@ -230,13 +231,28 @@ export async function createPendingPrimaryInvitationsForAssignment(input: {
       continue;
     }
 
-    await createInvitationWithUniqueToken({
+    const invitation = await createInvitationWithUniqueToken({
       client,
       assignmentId: input.assignmentId,
       volunteerId,
       type: "PRIMARY",
       expiresAt,
       metadata
+    });
+    await recordAssignmentAuditActivity({
+      client,
+      assignmentId: input.assignmentId,
+      actorUserId: input.actorUserId,
+      event: "INVITATION_CREATED",
+      dedupeKey: `invitation-created:${invitation.id}`,
+      metadata: {
+        invitationId: invitation.id,
+        invitationType: "PRIMARY",
+        volunteerProfileId: volunteerId,
+        expiresAt,
+        source: input.source,
+        createdAutomatically: input.source === "assignment_created"
+      }
     });
     createdCount += 1;
   }
@@ -305,7 +321,7 @@ export async function createPendingReplacementInvitationForAssignment(input: {
         DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
     );
 
-  await createInvitationWithUniqueToken({
+  const invitation = await createInvitationWithUniqueToken({
     client,
     assignmentId: input.assignmentId,
     volunteerId: input.volunteerId,
@@ -317,6 +333,22 @@ export async function createPendingReplacementInvitationForAssignment(input: {
       createdAutomatically: true,
       ...input.metadata
     }) as Prisma.InputJsonObject
+  });
+  await recordAssignmentAuditActivity({
+    client,
+    assignmentId: input.assignmentId,
+    actorUserId: input.actorUserId,
+    event: "INVITATION_CREATED",
+    dedupeKey: `invitation-created:${invitation.id}`,
+    metadata: {
+      invitationId: invitation.id,
+      invitationType: "REPLACEMENT",
+      volunteerProfileId: input.volunteerId,
+      expiresAt,
+      source: "replacement_flow",
+      createdAutomatically: true,
+      ...input.metadata
+    }
   });
 
   return {
@@ -334,8 +366,8 @@ async function markInvitationFailed(input: {
   metadata: Prisma.JsonValue | null;
   errorMessage: string;
 }) {
-  await db.$transaction([
-    db.assignmentInvitation.update({
+  await db.$transaction(async (tx) => {
+    await tx.assignmentInvitation.update({
       where: { id: input.invitationId },
       data: {
         status: "FAILED",
@@ -345,21 +377,21 @@ async function markInvitationFailed(input: {
           lastEmailAttemptedAt: new Date().toISOString()
         })
       }
-    }),
-    db.assignmentActivity.create({
-      data: {
-        assignmentId: input.assignmentId,
-        actorUserId: input.actorUserId,
-        actionType: "INVITATION_FAILED",
-        metadata: {
-          invitationId: input.invitationId,
-          volunteerProfileId: input.volunteerId,
-          invitationType: input.invitationType,
-          errorMessage: input.errorMessage
-        }
+    });
+    await recordAssignmentAuditActivity({
+      client: tx,
+      assignmentId: input.assignmentId,
+      actorUserId: input.actorUserId,
+      event: "INVITATION_FAILED",
+      dedupeKey: `invitation-failed:${input.invitationId}`,
+      metadata: {
+        invitationId: input.invitationId,
+        volunteerProfileId: input.volunteerId,
+        invitationType: input.invitationType,
+        errorMessage: input.errorMessage
       }
-    })
-  ]);
+    });
+  });
 }
 
 function buildInvitationEmail(input: {
@@ -467,8 +499,8 @@ async function sendAssignmentInvitationEmail(
       };
     }
 
-    await db.$transaction([
-      db.assignmentInvitation.update({
+    await db.$transaction(async (tx) => {
+      await tx.assignmentInvitation.update({
         where: { id: invitation.id },
         data: {
           status: "SENT",
@@ -478,22 +510,22 @@ async function sendAssignmentInvitationEmail(
             lastNotificationLogId: notification.id
           })
         }
-      }),
-      db.assignmentActivity.create({
-        data: {
-          assignmentId: invitation.assignmentId,
-          actorUserId,
-          actionType: "INVITATION_SENT",
-          metadata: {
-            invitationId: invitation.id,
-            volunteerProfileId: invitation.volunteerId,
-            invitationType: invitation.type,
-            notificationLogId: notification.id,
-            emailAttempts: attempt.emailAttempts
-          }
+      });
+      await recordAssignmentAuditActivity({
+        client: tx,
+        assignmentId: invitation.assignmentId,
+        actorUserId,
+        event: "INVITATION_SENT",
+        dedupeKey: `invitation-sent:${invitation.id}:${attempt.emailAttempts}`,
+        metadata: {
+          invitationId: invitation.id,
+          volunteerProfileId: invitation.volunteerId,
+          invitationType: invitation.type,
+          notificationLogId: notification.id,
+          emailAttempts: attempt.emailAttempts
         }
-      })
-    ]);
+      });
+    });
 
     return {
       invitationId: invitation.id,

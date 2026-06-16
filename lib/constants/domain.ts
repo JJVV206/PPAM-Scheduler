@@ -55,10 +55,14 @@ export const NOTIFICATION_CHANNELS = [
 export const NOTIFICATION_STATUSES = ["PENDING", "SENT", "FAILED"] as const;
 export const ASSIGNMENT_ACTIVITY_TYPES = [
   "ASSIGNED",
+  "INVITATION_CREATED",
   "INVITATION_SENT",
   "INVITATION_FAILED",
+  "INVITATION_ACCEPTED",
+  "INVITATION_DECLINED",
   "INVITATION_EXPIRED",
   "REPLACEMENT_REQUIRED",
+  "REPLACEMENT_SELECTED",
   "NO_REPLACEMENT_AVAILABLE",
   "ADMIN_ALERTED",
   "REMINDER_SENT",
@@ -169,10 +173,14 @@ export const NOTIFICATION_STATUS_LABELS = {
 
 export const ASSIGNMENT_ACTIVITY_LABELS = {
   ASSIGNED: "Asignado",
+  INVITATION_CREATED: "Invitación creada",
   INVITATION_SENT: "Invitación enviada",
   INVITATION_FAILED: "Invitación fallida",
+  INVITATION_ACCEPTED: "Invitación aceptada",
+  INVITATION_DECLINED: "Invitación rechazada",
   INVITATION_EXPIRED: "Invitación expirada",
   REPLACEMENT_REQUIRED: "Reemplazo requerido",
+  REPLACEMENT_SELECTED: "Suplente seleccionado",
   NO_REPLACEMENT_AVAILABLE: "Sin suplente disponible",
   ADMIN_ALERTED: "Administrador alertado",
   REMINDER_SENT: "Recordatorio enviado",
