@@ -212,6 +212,7 @@ async function createCensusPendingAppNotificationOnce(input: {
   userId: string;
   censusId: string;
   weekLabel: string;
+  metadata?: Record<string, unknown>;
 }) {
   const existing = await input.client.appNotification.findFirst({
     where: {
@@ -237,6 +238,7 @@ async function createCensusPendingAppNotificationOnce(input: {
       title: "Censo semanal pendiente",
       body: `Indica tu disponibilidad como suplente para ${input.weekLabel}.`,
       metadata: {
+        ...(input.metadata ?? {}),
         source: "replacement_census",
         weekLabel: input.weekLabel
       }
@@ -378,14 +380,16 @@ export async function openReplacementCensusForWeek(input: {
         metadata: compactMetadata({
           source: "week_preparation",
           scheduleWeekId: week.id,
-          createdAutomatically: true
+          createdAutomatically: true,
+          ...input.metadata
         })
       });
       await createCensusPendingAppNotificationOnce({
         client: tx,
         userId: replacement.userId,
         censusId: openedCensus.id,
-        weekLabel
+        weekLabel,
+        metadata: input.metadata
       });
       createdResponseCount += 1;
     }
@@ -420,7 +424,8 @@ async function markCensusResponseFailed(input: {
 }
 
 async function sendReplacementCensusResponseEmail(
-  response: PendingReplacementCensusResponse
+  response: PendingReplacementCensusResponse,
+  automationRunId?: string
 ) {
   const responseUrl = buildReplacementCensusResponseUrl(response.token);
   const weekLabel = buildWeekLabel({
@@ -445,7 +450,8 @@ async function sendReplacementCensusResponseEmail(
         increment: 1
       },
       metadata: mergeMetadata(response.metadata, {
-        lastEmailAttemptedAt: new Date().toISOString()
+        lastEmailAttemptedAt: new Date().toISOString(),
+        automationRunId
       })
     },
     select: {
@@ -466,7 +472,8 @@ async function sendReplacementCensusResponseEmail(
         scheduleWeekId: response.census.scheduleWeekId,
         weekStartDate: response.census.scheduleWeek.startDate.toISOString(),
         weekEndDate: response.census.scheduleWeek.endDate.toISOString(),
-        closesAt: response.expiresAt.toISOString()
+        closesAt: response.expiresAt.toISOString(),
+        automationRunId
       }
     });
 
@@ -496,7 +503,8 @@ async function sendReplacementCensusResponseEmail(
           sentAt,
           metadata: mergeMetadata(attempt.metadata, {
             lastEmailStatus: "SENT",
-            lastNotificationLogId: notification.id
+            lastNotificationLogId: notification.id,
+            automationRunId
           })
         }
       });
@@ -533,6 +541,7 @@ async function sendReplacementCensusResponseEmail(
 
 export async function sendPendingReplacementCensusInvitations(input: {
   censusId: string;
+  automationRunId?: string;
 }) {
   const responses = await db.replacementCensusResponse.findMany({
     where: {
@@ -558,7 +567,9 @@ export async function sendPendingReplacementCensusInvitations(input: {
   const results = [];
 
   for (const response of responses) {
-    results.push(await sendReplacementCensusResponseEmail(response));
+    results.push(
+      await sendReplacementCensusResponseEmail(response, input.automationRunId)
+    );
   }
 
   return {

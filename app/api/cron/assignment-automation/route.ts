@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     const result = await processAssignmentAutomationRun();
 
     return NextResponse.json({
-      status: "completed",
+      status: result.status,
       result
     });
   } catch (error) {

@@ -1,4 +1,12 @@
-import { addHours, startOfDay, subDays, subHours } from "date-fns";
+import { randomUUID } from "node:crypto";
+
+import {
+  addHours,
+  startOfDay,
+  startOfWeek,
+  subDays,
+  subHours
+} from "date-fns";
 import { Prisma } from "@prisma/client";
 import type {
   Assignment,
@@ -47,6 +55,7 @@ import { sendEmailNotification } from "@/services/notification.service";
 import {
   buildAdminAssignmentAlertEmail,
   buildAssignmentReminderEmail,
+  buildReplacementCensusReminderEmail,
   type AdminAssignmentAlertEmailInput,
   type AdminAssignmentAlertReason
 } from "@/services/email-template.service";
@@ -61,6 +70,11 @@ import {
   createAdminAssignmentAppNotifications,
   createAppNotificationOnce
 } from "@/services/app-notification.service";
+import {
+  buildReplacementCensusResponseUrl,
+  openReplacementCensusForWeek,
+  sendPendingReplacementCensusInvitations
+} from "@/services/replacement-census.service";
 
 export {
   buildAdminAssignmentAlertEmail
@@ -72,8 +86,11 @@ export type {
 } from "@/services/email-template.service";
 
 const TERMINAL_ASSIGNMENT_STATUSES = ["CANCELLED", "COMPLETED"] as const;
+const AUTOMATION_BATCH_SIZE = 50;
+const CENSUS_REMINDER_HOURS_BEFORE_CLOSE = 24;
+const AUTOMATION_LAST_RUN_SETTING_KEY = "assignmentAutomationLastRun";
 
-type AutomationStepStatus = "completed" | "skipped";
+type AutomationStepStatus = "completed" | "skipped" | "failed";
 
 export type AssignmentAutomationStepResult = {
   status: AutomationStepStatus;
@@ -132,14 +149,61 @@ export type NotifyAdminsForUnresolvedAssignmentsResult =
     duplicateCount: number;
   };
 
+export type OpenWeeklyReplacementCensusResult = AssignmentAutomationStepResult & {
+  openedCount: number;
+  existingOpenCount: number;
+  replacementCount: number;
+  createdResponseCount: number;
+  skippedResponseCount: number;
+};
+
+export type SendReplacementCensusInvitationsResult =
+  AssignmentAutomationStepResult & {
+    sentCount: number;
+    failedCount: number;
+  };
+
+export type SendReplacementCensusRemindersResult =
+  AssignmentAutomationStepResult & {
+    sentCount: number;
+    failedCount: number;
+    duplicateCount: number;
+  };
+
+export type CloseExpiredReplacementCensusResult =
+  AssignmentAutomationStepResult & {
+    closedCount: number;
+    expiredResponseCount: number;
+    readNotificationCount: number;
+  };
+
+export type CreateDueAppNotificationsResult = AssignmentAutomationStepResult & {
+  createdCount: number;
+  duplicateCount: number;
+};
+
 export type AssignmentAutomationRunResult = {
+  automationRunId: string;
+  status: "completed" | "completed_with_errors";
   startedAt: string;
   finishedAt: string;
+  durationMs: number;
+  failedStepCount: number;
+  summarySaved: boolean;
+  summaryError?: string;
   sendPendingPrimaryInvitations: SendPendingPrimaryInvitationsResult;
-  expireTimedOutInvitations: ExpireTimedOutInvitationsResult;
+  sendPrimaryResponseReminders: SendDueAssignmentRemindersResult;
+  expireTimedOutPrimaryInvitations: ExpireTimedOutInvitationsResult;
+  openWeeklyReplacementCensus: OpenWeeklyReplacementCensusResult;
+  sendReplacementCensusInvitations: SendReplacementCensusInvitationsResult;
+  sendReplacementCensusReminders: SendReplacementCensusRemindersResult;
+  closeExpiredReplacementCensus: CloseExpiredReplacementCensusResult;
   processAssignmentsNeedingReplacement: ProcessAssignmentsNeedingReplacementResult;
   inviteNextAvailableReplacement: ReplacementCandidateSelectionResult;
+  sendReplacementResponseReminders: SendDueAssignmentRemindersResult;
+  expireTimedOutReplacementInvitations: ExpireTimedOutInvitationsResult;
   sendDueAssignmentReminders: SendDueAssignmentRemindersResult;
+  createDueAppNotifications: CreateDueAppNotificationsResult;
   notifyAdminsForUnresolvedAssignments: NotifyAdminsForUnresolvedAssignmentsResult;
 };
 
@@ -182,6 +246,12 @@ type AdminAssignmentAlertDeliveryResult = {
   skipped: boolean;
 };
 
+type AssignmentAutomationRunInput = {
+  now?: Date;
+  automationRunId?: string;
+  actorUserId?: string;
+};
+
 function asMetadataObject(value: Prisma.JsonValue | null) {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     return value as Record<string, unknown>;
@@ -203,6 +273,54 @@ function mergeMetadata(
   return compactMetadata({
     ...asMetadataObject(current),
     ...next
+  });
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error
+    ? error.message
+    : "Ocurrió un error inesperado durante la automatización.";
+}
+
+function mergeRunMetadata(
+  metadata: Record<string, unknown>,
+  automationRunId?: string
+) {
+  return compactMetadata({
+    ...metadata,
+    automationRunId
+  });
+}
+
+async function runAutomationStep<T extends AssignmentAutomationStepResult>(
+  execute: () => Promise<T>,
+  fallback: Omit<T, "status" | "detail">
+): Promise<T> {
+  try {
+    return await execute();
+  } catch (error) {
+    return {
+      ...fallback,
+      status: "failed",
+      detail: getErrorMessage(error)
+    } as T;
+  }
+}
+
+async function saveAssignmentAutomationRunSummary(
+  result: AssignmentAutomationRunResult
+) {
+  await db.appSetting.upsert({
+    where: {
+      key: AUTOMATION_LAST_RUN_SETTING_KEY
+    },
+    update: {
+      value: result as unknown as Prisma.InputJsonValue
+    },
+    create: {
+      key: AUTOMATION_LAST_RUN_SETTING_KEY,
+      value: result as unknown as Prisma.InputJsonValue
+    }
   });
 }
 
@@ -397,6 +515,7 @@ async function createReplacementRequiredActivityOnce(input: {
   reason: string;
   invitationId?: string;
   volunteerProfileId?: string;
+  automationRunId?: string;
 }) {
   const alreadyLogged = await hasReplacementRequiredActivity(
     input.assignmentId,
@@ -415,6 +534,7 @@ async function createReplacementRequiredActivityOnce(input: {
         reason: input.reason,
         invitationId: input.invitationId,
         volunteerProfileId: input.volunteerProfileId,
+        automationRunId: input.automationRunId,
         automationModule: "assignment_automation"
       })
     }
@@ -426,6 +546,7 @@ async function createReplacementRequiredActivityOnce(input: {
 async function createNoReplacementAvailableActivityOnce(input: {
   assignmentId: string;
   tx: Prisma.TransactionClient;
+  automationRunId?: string;
 }) {
   const existingActivity = await input.tx.assignmentActivity.findFirst({
     where: {
@@ -447,7 +568,8 @@ async function createNoReplacementAvailableActivityOnce(input: {
     event: "NO_REPLACEMENT_AVAILABLE",
     dedupeKey: `no-replacement-available:${input.assignmentId}`,
     metadata: {
-      reason: "no_eligible_replacement_candidate"
+      reason: "no_eligible_replacement_candidate",
+      automationRunId: input.automationRunId
     }
   });
 
@@ -510,6 +632,7 @@ async function alertAdminsForAssignment(input: {
     volunteerName: string;
     errorMessage?: string;
   };
+  automationRunId?: string;
 }): Promise<AdminAssignmentAlertDeliveryResult> {
   const alreadyAlerted = await hasAdminAlerted({
     assignmentId: input.assignmentId,
@@ -571,7 +694,8 @@ async function alertAdminsForAssignment(input: {
     await db.$transaction(async (tx) => {
       await createNoReplacementAvailableActivityOnce({
         assignmentId: input.assignmentId,
-        tx
+        tx,
+        automationRunId: input.automationRunId
       });
     });
   }
@@ -621,6 +745,7 @@ async function alertAdminsForAssignment(input: {
       failedInvitationId: input.failedInvitation?.id,
       failedInvitationType: input.failedInvitation?.type,
       failedVolunteerProfileId: input.failedInvitation?.volunteerProfileId,
+      automationRunId: input.automationRunId,
       dayOfWeek: assignment.dayOfWeek,
       timeSlot: assignment.timeSlot
     }
@@ -645,6 +770,7 @@ async function alertAdminsForAssignment(input: {
           failedInvitationId: input.failedInvitation?.id,
           failedInvitationType: input.failedInvitation?.type,
           failedVolunteerProfileId: input.failedInvitation?.volunteerProfileId,
+          automationRunId: input.automationRunId,
           dayOfWeek: DAY_LABELS[assignment.dayOfWeek],
           timeSlot: assignment.timeSlot
         }
@@ -676,7 +802,8 @@ async function alertAdminsForAssignment(input: {
         assignmentUrl,
         failedInvitationId: input.failedInvitation?.id,
         failedInvitationType: input.failedInvitation?.type,
-        failedVolunteerProfileId: input.failedInvitation?.volunteerProfileId
+        failedVolunteerProfileId: input.failedInvitation?.volunteerProfileId,
+        automationRunId: input.automationRunId
       }
     });
   }
@@ -688,13 +815,17 @@ async function alertAdminsForAssignment(input: {
   };
 }
 
-async function alertAdminsForNoReplacementAvailable(assignmentId: string) {
+async function alertAdminsForNoReplacementAvailable(
+  assignmentId: string,
+  automationRunId?: string
+) {
   return alertAdminsForAssignment({
     assignmentId,
     alertKey: `no-replacement-available:${assignmentId}`,
     reason: "NO_REPLACEMENT_AVAILABLE",
     reasonLabel:
-      "No hay suplentes disponibles o ya se intentaron todos los candidatos elegibles."
+      "No hay suplentes disponibles o ya se intentaron todos los candidatos elegibles.",
+    automationRunId
   });
 }
 
@@ -702,6 +833,7 @@ async function reconcileInvitationFromExistingResponse(input: {
   invitation: ExpirableInvitation;
   now: Date;
   tx: Prisma.TransactionClient;
+  automationRunId?: string;
 }) {
   const response = await input.tx.assignmentResponse.findUnique({
     where: {
@@ -731,7 +863,8 @@ async function reconcileInvitationFromExistingResponse(input: {
       metadata: mergeMetadata(input.invitation.metadata, {
         reconciledByAutomationAt: input.now.toISOString(),
         reconciledFromResponseId: response.id,
-        responseStatus: response.responseStatus
+        responseStatus: response.responseStatus,
+        automationRunId: input.automationRunId
       })
     }
   });
@@ -745,7 +878,7 @@ async function reconcileInvitationFromExistingResponse(input: {
     assignmentId: input.invitation.assignmentId,
     event: status === "ACCEPTED" ? "INVITATION_ACCEPTED" : "INVITATION_DECLINED",
     dedupeKey: `invitation-response:${input.invitation.id}`,
-    metadata: {
+    metadata: mergeRunMetadata({
       invitationId: input.invitation.id,
       invitationType: input.invitation.type,
       volunteerProfileId: input.invitation.volunteerId,
@@ -753,7 +886,7 @@ async function reconcileInvitationFromExistingResponse(input: {
       responseId: response.id,
       respondedAt: response.respondedAt ?? input.now,
       source: "response_reconciliation"
-    }
+    }, input.automationRunId)
   });
 
   return true;
@@ -763,6 +896,7 @@ async function expireInvitation(input: {
   invitation: ExpirableInvitation;
   now: Date;
   tx: Prisma.TransactionClient;
+  automationRunId?: string;
 }) {
   const updated = await input.tx.assignmentInvitation.updateMany({
     where: {
@@ -778,7 +912,8 @@ async function expireInvitation(input: {
       status: "EXPIRED",
       metadata: mergeMetadata(input.invitation.metadata, {
         expiredAt: input.now.toISOString(),
-        expiredBy: "assignment_automation"
+        expiredBy: "assignment_automation",
+        automationRunId: input.automationRunId
       })
     }
   });
@@ -795,14 +930,14 @@ async function expireInvitation(input: {
     assignmentId: input.invitation.assignmentId,
     event: "INVITATION_EXPIRED",
     dedupeKey: `invitation-expired:${input.invitation.id}`,
-    metadata: {
+    metadata: mergeRunMetadata({
       invitationId: input.invitation.id,
       invitationType: input.invitation.type,
       volunteerProfileId: input.invitation.volunteerId,
       expiresAt: input.invitation.expiresAt,
       expiredAt: input.now,
       source: "automation_timeout"
-    }
+    }, input.automationRunId)
   });
 
   await input.tx.volunteerProfile.update({
@@ -837,7 +972,8 @@ async function expireInvitation(input: {
     tx: input.tx,
     reason: "invitation_expired",
     invitationId: input.invitation.id,
-    volunteerProfileId: input.invitation.volunteerId
+    volunteerProfileId: input.invitation.volunteerId,
+    automationRunId: input.automationRunId
   });
 
   return {
@@ -846,7 +982,9 @@ async function expireInvitation(input: {
   };
 }
 
-export async function sendPendingPrimaryInvitations(): Promise<SendPendingPrimaryInvitationsResult> {
+export async function sendPendingPrimaryInvitations(input?: {
+  automationRunId?: string;
+}): Promise<SendPendingPrimaryInvitationsResult> {
   const pendingAssignmentIds = await db.assignmentInvitation.findMany({
     where: {
       type: "PRIMARY",
@@ -855,7 +993,8 @@ export async function sendPendingPrimaryInvitations(): Promise<SendPendingPrimar
     distinct: ["assignmentId"],
     select: {
       assignmentId: true
-    }
+    },
+    take: AUTOMATION_BATCH_SIZE
   });
 
   let sentCount = 0;
@@ -864,7 +1003,8 @@ export async function sendPendingPrimaryInvitations(): Promise<SendPendingPrimar
 
   for (const pendingAssignment of pendingAssignmentIds) {
     const result = await sendPendingPrimaryInvitationsForAssignment({
-      assignmentId: pendingAssignment.assignmentId
+      assignmentId: pendingAssignment.assignmentId,
+      automationRunId: input?.automationRunId
     });
 
     sentCount += result.sentCount;
@@ -883,10 +1023,17 @@ export async function sendPendingPrimaryInvitations(): Promise<SendPendingPrimar
 
 export async function expireTimedOutInvitations(input?: {
   now?: Date;
+  invitationTypes?: AssignmentInvitationType[];
+  automationRunId?: string;
 }): Promise<ExpireTimedOutInvitationsResult> {
   const now = input?.now ?? new Date();
   const invitations = await db.assignmentInvitation.findMany({
     where: {
+      type: input?.invitationTypes?.length
+        ? {
+            in: input.invitationTypes
+          }
+        : undefined,
       status: {
         in: ACTIVE_ASSIGNMENT_INVITATION_STATUSES
       },
@@ -904,7 +1051,8 @@ export async function expireTimedOutInvitations(input?: {
     },
     orderBy: {
       expiresAt: "asc"
-    }
+    },
+    take: AUTOMATION_BATCH_SIZE
   });
 
   let expiredCount = 0;
@@ -917,7 +1065,8 @@ export async function expireTimedOutInvitations(input?: {
       const reconciled = await reconcileInvitationFromExistingResponse({
         invitation,
         now,
-        tx
+        tx,
+        automationRunId: input?.automationRunId
       });
 
       if (reconciled) {
@@ -931,7 +1080,8 @@ export async function expireTimedOutInvitations(input?: {
       const expired = await expireInvitation({
         invitation,
         now,
-        tx
+        tx,
+        automationRunId: input?.automationRunId
       });
 
       return {
@@ -966,8 +1116,33 @@ export async function expireTimedOutInvitations(input?: {
   };
 }
 
-export async function processAssignmentsNeedingReplacement(): Promise<ProcessAssignmentsNeedingReplacementResult> {
-  const today = startOfDay(new Date());
+export async function expireTimedOutPrimaryInvitations(input?: {
+  now?: Date;
+  automationRunId?: string;
+}) {
+  return expireTimedOutInvitations({
+    now: input?.now,
+    automationRunId: input?.automationRunId,
+    invitationTypes: ["PRIMARY"]
+  });
+}
+
+export async function expireTimedOutReplacementInvitations(input?: {
+  now?: Date;
+  automationRunId?: string;
+}) {
+  return expireTimedOutInvitations({
+    now: input?.now,
+    automationRunId: input?.automationRunId,
+    invitationTypes: ["REPLACEMENT"]
+  });
+}
+
+export async function processAssignmentsNeedingReplacement(input?: {
+  now?: Date;
+  automationRunId?: string;
+}): Promise<ProcessAssignmentsNeedingReplacementResult> {
+  const today = startOfDay(input?.now ?? new Date());
   const assignments = await db.assignment.findMany({
     where: {
       date: {
@@ -1009,7 +1184,8 @@ export async function processAssignmentsNeedingReplacement(): Promise<ProcessAss
       {
         timeSlot: "asc"
       }
-    ]
+    ],
+    take: AUTOMATION_BATCH_SIZE
   });
 
   let markedCount = 0;
@@ -1042,7 +1218,8 @@ export async function processAssignmentsNeedingReplacement(): Promise<ProcessAss
       const logged = await createReplacementRequiredActivityOnce({
         assignmentId: assignment.id,
         tx,
-        reason: "assignment_needs_replacement"
+        reason: "assignment_needs_replacement",
+        automationRunId: input?.automationRunId
       });
 
       return {
@@ -1069,6 +1246,7 @@ export async function processAssignmentsNeedingReplacement(): Promise<ProcessAss
         metadata: {
           source: "process_assignments_needing_replacement",
           reason: "assignment_needs_replacement",
+          automationRunId: input?.automationRunId,
           statusChanged: result.statusChanged,
           activityLogged: result.logged,
           dayOfWeek: assignment.dayOfWeek,
@@ -1092,6 +1270,7 @@ export async function processAssignmentsNeedingReplacement(): Promise<ProcessAss
 export async function inviteNextAvailableReplacementForAssignment(input: {
   assignmentId: string;
   actorUserId?: string;
+  automationRunId?: string;
 }): Promise<ReplacementInvitationResult> {
   const assignment = await db.assignment.findUniqueOrThrow({
     where: {
@@ -1132,7 +1311,10 @@ export async function inviteNextAvailableReplacementForAssignment(input: {
   });
 
   if (!candidates.length) {
-    await alertAdminsForNoReplacementAvailable(input.assignmentId);
+    await alertAdminsForNoReplacementAvailable(
+      input.assignmentId,
+      input.automationRunId
+    );
     return {
       assignmentId: input.assignmentId,
       status: "no_candidate",
@@ -1152,7 +1334,8 @@ export async function inviteNextAvailableReplacementForAssignment(input: {
       availabilityRank: candidate.replacementPriority.availabilityRank,
       confirmationRate: candidate.replacementPriority.confirmationRate,
       futureAssignmentCount: candidate.replacementPriority.futureAssignmentCount,
-      areaCompatible: candidate.replacementPriority.areaCompatible
+      areaCompatible: candidate.replacementPriority.areaCompatible,
+      automationRunId: input.automationRunId
     };
 
     await recordAssignmentAuditActivity({
@@ -1176,7 +1359,8 @@ export async function inviteNextAvailableReplacementForAssignment(input: {
 
     const delivery = await sendPendingReplacementInvitationsForAssignment({
       assignmentId: input.assignmentId,
-      actorUserId: input.actorUserId
+      actorUserId: input.actorUserId,
+      automationRunId: input.automationRunId
     });
 
     failedCount += delivery.failedCount;
@@ -1204,7 +1388,10 @@ export async function inviteNextAvailableReplacementForAssignment(input: {
     };
   }
 
-  await alertAdminsForNoReplacementAvailable(input.assignmentId);
+  await alertAdminsForNoReplacementAvailable(
+    input.assignmentId,
+    input.automationRunId
+  );
 
   return {
     assignmentId: input.assignmentId,
@@ -1214,11 +1401,14 @@ export async function inviteNextAvailableReplacementForAssignment(input: {
   };
 }
 
-export async function inviteNextAvailableReplacement(): Promise<ReplacementCandidateSelectionResult> {
+export async function inviteNextAvailableReplacement(input?: {
+  now?: Date;
+  automationRunId?: string;
+}): Promise<ReplacementCandidateSelectionResult> {
   const assignments = await db.assignment.findMany({
     where: {
       date: {
-        gte: startOfDay(new Date())
+        gte: startOfDay(input?.now ?? new Date())
       },
       status: "NEEDS_REPLACEMENT",
       invitations: {
@@ -1240,7 +1430,8 @@ export async function inviteNextAvailableReplacement(): Promise<ReplacementCandi
       {
         timeSlot: "asc"
       }
-    ]
+    ],
+    take: AUTOMATION_BATCH_SIZE
   });
 
   let invitedCount = 0;
@@ -1251,7 +1442,8 @@ export async function inviteNextAvailableReplacement(): Promise<ReplacementCandi
 
   for (const assignment of assignments) {
     const result = await inviteNextAvailableReplacementForAssignment({
-      assignmentId: assignment.id
+      assignmentId: assignment.id,
+      automationRunId: input?.automationRunId
     });
 
     if (result.status === "invited") {
@@ -1334,6 +1526,7 @@ function getNormalizedReminderSettings(
 async function getDueConfirmedReminderRecipients(input: {
   now: Date;
   settings: AssignmentAutomationSettings;
+  take?: number;
 }): Promise<AssignmentReminderRecipient[]> {
   const assignments = await db.assignment.findMany({
     where: {
@@ -1368,7 +1561,8 @@ async function getDueConfirmedReminderRecipients(input: {
       {
         timeSlot: "asc"
       }
-    ]
+    ],
+    take: input.take ?? AUTOMATION_BATCH_SIZE
   });
 
   const recipients: AssignmentReminderRecipient[] = [];
@@ -1428,9 +1622,16 @@ async function getDueConfirmedReminderRecipients(input: {
 async function getDuePendingConfirmationReminderRecipients(input: {
   now: Date;
   settings: AssignmentAutomationSettings;
+  invitationTypes?: AssignmentInvitationType[];
+  take?: number;
 }): Promise<AssignmentReminderRecipient[]> {
   const invitations = await db.assignmentInvitation.findMany({
     where: {
+      type: input.invitationTypes?.length
+        ? {
+            in: input.invitationTypes
+          }
+        : undefined,
       status: "SENT",
       expiresAt: {
         gt: input.now
@@ -1458,7 +1659,8 @@ async function getDuePendingConfirmationReminderRecipients(input: {
     },
     orderBy: {
       expiresAt: "asc"
-    }
+    },
+    take: input.take ?? AUTOMATION_BATCH_SIZE
   });
 
   const recipients: AssignmentReminderRecipient[] = [];
@@ -1560,7 +1762,8 @@ async function hasSentReminder(input: {
 }
 
 async function sendAssignmentReminder(
-  recipient: AssignmentReminderRecipient
+  recipient: AssignmentReminderRecipient,
+  automationRunId?: string
 ): Promise<"SENT" | "FAILED" | "DUPLICATE"> {
   const alreadySent = await hasSentReminder({
     assignmentId: recipient.assignmentId,
@@ -1604,7 +1807,8 @@ async function sendAssignmentReminder(
     dayOfWeek: recipient.dayOfWeek,
     timeSlot: recipient.timeSlot,
     offsetDays: recipient.reminder.offsetDays,
-    offsetHours: recipient.reminder.offsetHours
+    offsetHours: recipient.reminder.offsetHours,
+    automationRunId
   };
 
   try {
@@ -1663,8 +1867,16 @@ async function sendAssignmentReminder(
 
 export async function sendDueAssignmentReminders(input?: {
   now?: Date;
+  invitationTypes?: AssignmentInvitationType[];
+  includePendingConfirmationReminders?: boolean;
+  includeConfirmedAssignmentReminders?: boolean;
+  automationRunId?: string;
 }): Promise<SendDueAssignmentRemindersResult> {
   const now = input?.now ?? new Date();
+  const includePendingConfirmationReminders =
+    input?.includePendingConfirmationReminders ?? true;
+  const includeConfirmedAssignmentReminders =
+    input?.includeConfirmedAssignmentReminders ?? true;
   const settings = getNormalizedReminderSettings(
     await getAssignmentAutomationSettings()
   );
@@ -1682,14 +1894,19 @@ export async function sendDueAssignmentReminders(input?: {
   }
 
   const [confirmedRecipients, pendingRecipients] = await Promise.all([
-    getDueConfirmedReminderRecipients({
-      now,
-      settings
-    }),
-    getDuePendingConfirmationReminderRecipients({
-      now,
-      settings
-    })
+    includeConfirmedAssignmentReminders
+      ? getDueConfirmedReminderRecipients({
+          now,
+          settings
+        })
+      : Promise.resolve([]),
+    includePendingConfirmationReminders
+      ? getDuePendingConfirmationReminderRecipients({
+          now,
+          settings,
+          invitationTypes: input?.invitationTypes
+        })
+      : Promise.resolve([])
   ]);
   const recipients = [...pendingRecipients, ...confirmedRecipients];
   let sentCount = 0;
@@ -1697,7 +1914,10 @@ export async function sendDueAssignmentReminders(input?: {
   let duplicateCount = 0;
 
   for (const recipient of recipients) {
-    const result = await sendAssignmentReminder(recipient);
+    const result = await sendAssignmentReminder(
+      recipient,
+      input?.automationRunId
+    );
 
     if (result === "SENT") {
       sentCount += 1;
@@ -1716,6 +1936,32 @@ export async function sendDueAssignmentReminders(input?: {
     failedCount,
     duplicateCount
   };
+}
+
+export async function sendPrimaryResponseReminders(input?: {
+  now?: Date;
+  automationRunId?: string;
+}) {
+  return sendDueAssignmentReminders({
+    now: input?.now,
+    automationRunId: input?.automationRunId,
+    invitationTypes: ["PRIMARY"],
+    includePendingConfirmationReminders: true,
+    includeConfirmedAssignmentReminders: false
+  });
+}
+
+export async function sendReplacementResponseReminders(input?: {
+  now?: Date;
+  automationRunId?: string;
+}) {
+  return sendDueAssignmentReminders({
+    now: input?.now,
+    automationRunId: input?.automationRunId,
+    invitationTypes: ["REPLACEMENT"],
+    includePendingConfirmationReminders: true,
+    includeConfirmedAssignmentReminders: false
+  });
 }
 
 function getInvitationFailureError(metadata: Prisma.JsonValue | null) {
@@ -1753,7 +1999,8 @@ async function getAssignmentsWithoutReplacementCandidates(now: Date) {
       {
         timeSlot: "asc"
       }
-    ]
+    ],
+    take: AUTOMATION_BATCH_SIZE
   });
   const unresolvedAssignmentIds: string[] = [];
 
@@ -1777,7 +2024,647 @@ function buildCensusWeekLabel(input: { startDate: Date; endDate: Date }) {
   )} al ${formatDisplayDate(input.endDate, "d 'de' MMMM 'de' yyyy")}`;
 }
 
-async function notifyAdminsForLowResponseCensuses(now: Date) {
+function buildAssignmentNotificationLabels(
+  assignment: Pick<Assignment, "date" | "dayOfWeek" | "timeSlot">
+) {
+  return {
+    dateLabel: `${DAY_LABELS[assignment.dayOfWeek]}, ${formatDisplayDate(
+      assignment.date,
+      "d 'de' MMMM 'de' yyyy"
+    )}`,
+    timeSlotLabel: TIME_SLOT_DEFINITIONS[assignment.timeSlot].label
+  };
+}
+
+async function getAutomationActorUserId(actorUserId?: string) {
+  if (actorUserId) {
+    return actorUserId;
+  }
+
+  const admin = await db.user.findFirst({
+    where: {
+      role: "ADMIN",
+      active: true
+    },
+    select: {
+      id: true
+    },
+    orderBy: {
+      createdAt: "asc"
+    }
+  });
+
+  return admin?.id ?? null;
+}
+
+export async function openWeeklyReplacementCensus(input?: {
+  now?: Date;
+  actorUserId?: string;
+  automationRunId?: string;
+}): Promise<OpenWeeklyReplacementCensusResult> {
+  const now = input?.now ?? new Date();
+  const actorUserId = await getAutomationActorUserId(input?.actorUserId);
+
+  if (!actorUserId) {
+    return {
+      status: "skipped",
+      processedCount: 0,
+      skippedCount: 0,
+      openedCount: 0,
+      existingOpenCount: 0,
+      replacementCount: 0,
+      createdResponseCount: 0,
+      skippedResponseCount: 0,
+      detail: "No active admin user is available to own the weekly census."
+    };
+  }
+
+  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+  const weeks = await db.scheduleWeek.findMany({
+    where: {
+      endDate: {
+        gte: weekStart
+      },
+      assignments: {
+        some: {
+          status: {
+            notIn: [...TERMINAL_ASSIGNMENT_STATUSES]
+          }
+        }
+      },
+      OR: [
+        {
+          census: {
+            is: null
+          }
+        },
+        {
+          census: {
+            is: {
+              status: "DRAFT"
+            }
+          }
+        }
+      ]
+    },
+    include: {
+      census: true
+    },
+    orderBy: {
+      startDate: "asc"
+    },
+    take: AUTOMATION_BATCH_SIZE
+  });
+  let openedCount = 0;
+  let existingOpenCount = 0;
+  let replacementCount = 0;
+  let createdResponseCount = 0;
+  let skippedResponseCount = 0;
+
+  for (const week of weeks) {
+    if (week.census?.status === "OPEN") {
+      existingOpenCount += 1;
+      continue;
+    }
+
+    const result = await openReplacementCensusForWeek({
+      scheduleWeekId: week.id,
+      actorUserId,
+      metadata: {
+        source: "assignment_automation",
+        automationRunId: input?.automationRunId
+      }
+    });
+
+    openedCount += result.census.status === "OPEN" ? 1 : 0;
+    replacementCount += result.replacementCount;
+    createdResponseCount += result.createdResponseCount;
+    skippedResponseCount += result.skippedResponseCount;
+  }
+
+  return {
+    status: "completed",
+    processedCount: weeks.length,
+    skippedCount: existingOpenCount,
+    openedCount,
+    existingOpenCount,
+    replacementCount,
+    createdResponseCount,
+    skippedResponseCount
+  };
+}
+
+export async function sendReplacementCensusInvitations(input?: {
+  now?: Date;
+  automationRunId?: string;
+}): Promise<SendReplacementCensusInvitationsResult> {
+  const now = input?.now ?? new Date();
+  const settings = await getAssignmentAutomationSettings();
+
+  if (!settings.notificationChannels.includes("EMAIL")) {
+    return {
+      status: "skipped",
+      processedCount: 0,
+      skippedCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+      detail: "Email census invitations are disabled in notification settings."
+    };
+  }
+
+  const censuses = await db.replacementCensus.findMany({
+    where: {
+      status: "OPEN",
+      closesAt: {
+        gt: now
+      },
+      responses: {
+        some: {
+          status: "PENDING"
+        }
+      }
+    },
+    select: {
+      id: true
+    },
+    orderBy: {
+      closesAt: "asc"
+    },
+    take: AUTOMATION_BATCH_SIZE
+  });
+  let sentCount = 0;
+  let failedCount = 0;
+  let processedCount = 0;
+
+  for (const census of censuses) {
+    const result = await sendPendingReplacementCensusInvitations({
+      censusId: census.id,
+      automationRunId: input?.automationRunId
+    });
+
+    sentCount += result.sentCount;
+    failedCount += result.failedCount;
+    processedCount += result.totalCount;
+  }
+
+  return {
+    status: "completed",
+    processedCount,
+    skippedCount: 0,
+    sentCount,
+    failedCount
+  };
+}
+
+async function hasSentCensusReminder(input: {
+  userId: string;
+  censusId: string;
+  reminderKey: string;
+}) {
+  const existingReminder = await db.notificationLog.findFirst({
+    where: {
+      userId: input.userId,
+      type: "CENSUS_REMINDER",
+      channel: "EMAIL",
+      status: "SENT",
+      metadata: {
+        path: ["reminderKey"],
+        equals: input.reminderKey
+      }
+    },
+    select: {
+      id: true
+    }
+  });
+
+  return Boolean(existingReminder);
+}
+
+export async function sendReplacementCensusReminders(input?: {
+  now?: Date;
+  automationRunId?: string;
+}): Promise<SendReplacementCensusRemindersResult> {
+  const now = input?.now ?? new Date();
+  const settings = await getAssignmentAutomationSettings();
+
+  if (!settings.notificationChannels.includes("EMAIL")) {
+    return {
+      status: "skipped",
+      processedCount: 0,
+      skippedCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+      duplicateCount: 0,
+      detail: "Email census reminders are disabled in notification settings."
+    };
+  }
+
+  const targetAt = addHours(now, CENSUS_REMINDER_HOURS_BEFORE_CLOSE);
+  const responses = await db.replacementCensusResponse.findMany({
+    where: {
+      status: "SENT",
+      respondedAt: null,
+      expiresAt: {
+        gt: now,
+        lte: targetAt
+      },
+      census: {
+        status: "OPEN"
+      }
+    },
+    include: {
+      census: {
+        include: {
+          scheduleWeek: true
+        }
+      },
+      volunteer: {
+        include: {
+          user: true
+        }
+      }
+    },
+    orderBy: {
+      expiresAt: "asc"
+    },
+    take: AUTOMATION_BATCH_SIZE
+  });
+  let sentCount = 0;
+  let failedCount = 0;
+  let duplicateCount = 0;
+
+  for (const response of responses) {
+    const reminderKey = `census-reminder:${response.id}:${CENSUS_REMINDER_HOURS_BEFORE_CLOSE}h`;
+    const duplicate = await hasSentCensusReminder({
+      userId: response.volunteer.userId,
+      censusId: response.censusId,
+      reminderKey
+    });
+
+    if (duplicate) {
+      duplicateCount += 1;
+      continue;
+    }
+
+    const weekLabel = buildCensusWeekLabel({
+      startDate: response.census.scheduleWeek.startDate,
+      endDate: response.census.scheduleWeek.endDate
+    });
+    const email = buildReplacementCensusReminderEmail({
+      volunteerName: response.volunteer.user.name,
+      weekLabel,
+      closesAtLabel: formatDisplayDate(
+        response.expiresAt,
+        "d 'de' MMMM 'de' yyyy, HH:mm"
+      ),
+      responseUrl: buildReplacementCensusResponseUrl(response.token)
+    });
+    const notification = await sendEmailNotification({
+      userId: response.volunteer.userId,
+      type: "CENSUS_REMINDER",
+      subject: email.subject,
+      html: email.html,
+      metadata: {
+        reminderKey,
+        censusId: response.censusId,
+        censusResponseId: response.id,
+        scheduleWeekId: response.census.scheduleWeekId,
+        closesAt: response.expiresAt.toISOString(),
+        automationRunId: input?.automationRunId
+      }
+    });
+
+    if (notification.status === "SENT") {
+      sentCount += 1;
+    } else {
+      failedCount += 1;
+    }
+  }
+
+  return {
+    status: "completed",
+    processedCount: responses.length,
+    skippedCount: duplicateCount,
+    sentCount,
+    failedCount,
+    duplicateCount
+  };
+}
+
+export async function closeExpiredReplacementCensus(input?: {
+  now?: Date;
+  automationRunId?: string;
+}): Promise<CloseExpiredReplacementCensusResult> {
+  const now = input?.now ?? new Date();
+  const censuses = await db.replacementCensus.findMany({
+    where: {
+      status: "OPEN",
+      closesAt: {
+        lte: now
+      }
+    },
+    select: {
+      id: true,
+      metadata: true
+    },
+    orderBy: {
+      closesAt: "asc"
+    },
+    take: AUTOMATION_BATCH_SIZE
+  });
+  let closedCount = 0;
+  let expiredResponseCount = 0;
+  let readNotificationCount = 0;
+
+  for (const census of censuses) {
+    const result = await db.$transaction(async (tx) => {
+      const updatedCensus = await tx.replacementCensus.updateMany({
+        where: {
+          id: census.id,
+          status: "OPEN"
+        },
+        data: {
+          status: "CLOSED",
+          metadata: mergeMetadata(census.metadata, {
+            closedAt: now.toISOString(),
+            closedBy: "assignment_automation",
+            automationRunId: input?.automationRunId
+          })
+        }
+      });
+      const expiredResponses = await tx.replacementCensusResponse.updateMany({
+        where: {
+          censusId: census.id,
+          status: {
+            in: ["PENDING", "SENT"]
+          }
+        },
+        data: {
+          status: "EXPIRED"
+        }
+      });
+      const readNotifications = await tx.appNotification.updateMany({
+        where: {
+          censusId: census.id,
+          type: "CENSUS_PENDING",
+          readAt: null
+        },
+        data: {
+          readAt: now
+        }
+      });
+
+      return {
+        closedCount: updatedCensus.count,
+        expiredResponseCount: expiredResponses.count,
+        readNotificationCount: readNotifications.count
+      };
+    });
+
+    closedCount += result.closedCount;
+    expiredResponseCount += result.expiredResponseCount;
+    readNotificationCount += result.readNotificationCount;
+  }
+
+  return {
+    status: "completed",
+    processedCount: censuses.length,
+    skippedCount: censuses.length - closedCount,
+    closedCount,
+    expiredResponseCount,
+    readNotificationCount
+  };
+}
+
+export async function createDueAppNotifications(input?: {
+  now?: Date;
+  automationRunId?: string;
+}): Promise<CreateDueAppNotificationsResult> {
+  const now = input?.now ?? new Date();
+  const today = startOfDay(now);
+  const [censusResponses, pendingInvitations, confirmedResponses] =
+    await Promise.all([
+      db.replacementCensusResponse.findMany({
+        where: {
+          status: {
+            in: ["PENDING", "SENT"]
+          },
+          expiresAt: {
+            gt: now
+          },
+          census: {
+            status: "OPEN"
+          },
+          volunteer: {
+            active: true,
+            user: {
+              active: true
+            }
+          }
+        },
+        include: {
+          census: {
+            include: {
+              scheduleWeek: true
+            }
+          },
+          volunteer: {
+            include: {
+              user: true
+            }
+          }
+        },
+        orderBy: {
+          expiresAt: "asc"
+        },
+        take: AUTOMATION_BATCH_SIZE
+      }),
+      db.assignmentInvitation.findMany({
+        where: {
+          status: "SENT",
+          expiresAt: {
+            gt: now
+          },
+          assignment: {
+            date: {
+              gte: today
+            },
+            status: {
+              notIn: [...TERMINAL_ASSIGNMENT_STATUSES]
+            }
+          },
+          volunteer: {
+            active: true,
+            user: {
+              active: true
+            }
+          }
+        },
+        include: {
+          assignment: true,
+          volunteer: {
+            include: {
+              user: true
+            }
+          }
+        },
+        orderBy: {
+          expiresAt: "asc"
+        },
+        take: AUTOMATION_BATCH_SIZE
+      }),
+      db.assignmentResponse.findMany({
+        where: {
+          responseStatus: "CONFIRMED",
+          assignment: {
+            date: {
+              gte: today
+            },
+            status: {
+              notIn: [...TERMINAL_ASSIGNMENT_STATUSES]
+            }
+          },
+          volunteer: {
+            active: true,
+            user: {
+              active: true
+            }
+          }
+        },
+        include: {
+          assignment: true,
+          volunteer: {
+            include: {
+              user: true
+            }
+          }
+        },
+        orderBy: [
+          {
+            assignment: {
+              date: "asc"
+            }
+          },
+          {
+            id: "asc"
+          }
+        ],
+        take: AUTOMATION_BATCH_SIZE
+      })
+    ]);
+  let createdCount = 0;
+  let duplicateCount = 0;
+
+  for (const response of censusResponses) {
+    const weekLabel = buildCensusWeekLabel({
+      startDate: response.census.scheduleWeek.startDate,
+      endDate: response.census.scheduleWeek.endDate
+    });
+    const notification = await createAppNotificationOnce({
+      userId: response.volunteer.userId,
+      censusId: response.censusId,
+      type: "CENSUS_PENDING",
+      priority: "NORMAL",
+      title: "Censo semanal pendiente",
+      body: `Indica tu disponibilidad como suplente para ${weekLabel}.`,
+      metadata: {
+        source: "create_due_app_notifications",
+        censusResponseId: response.id,
+        scheduleWeekId: response.census.scheduleWeekId,
+        weekLabel,
+        closesAt: response.expiresAt.toISOString(),
+        automationRunId: input?.automationRunId
+      }
+    });
+
+    if (notification) {
+      createdCount += 1;
+    } else {
+      duplicateCount += 1;
+    }
+  }
+
+  for (const invitation of pendingInvitations) {
+    const { dateLabel, timeSlotLabel } = buildAssignmentNotificationLabels(
+      invitation.assignment
+    );
+    const isReplacement = invitation.type === "REPLACEMENT";
+    const notification = await createAppNotificationOnce({
+      userId: invitation.volunteer.userId,
+      assignmentId: invitation.assignmentId,
+      type: "ASSIGNMENT_PENDING",
+      priority: isReplacement ? "HIGH" : "NORMAL",
+      title: isReplacement
+        ? "Invitación de suplente"
+        : "Asignación pendiente de respuesta",
+      body: isReplacement
+        ? `Puedes cubrir como suplente el ${dateLabel}, ${timeSlotLabel}.`
+        : `Confirma tu asignación para ${dateLabel}, ${timeSlotLabel}.`,
+      dedupeKey: `assignment-pending:${invitation.id}`,
+      metadata: {
+        source: "create_due_app_notifications",
+        invitationId: invitation.id,
+        invitationType: invitation.type,
+        volunteerProfileId: invitation.volunteerId,
+        expiresAt: invitation.expiresAt.toISOString(),
+        date: invitation.assignment.date.toISOString(),
+        dayOfWeek: invitation.assignment.dayOfWeek,
+        timeSlot: invitation.assignment.timeSlot,
+        automationRunId: input?.automationRunId
+      }
+    });
+
+    if (notification) {
+      createdCount += 1;
+    } else {
+      duplicateCount += 1;
+    }
+  }
+
+  for (const response of confirmedResponses) {
+    const { dateLabel, timeSlotLabel } = buildAssignmentNotificationLabels(
+      response.assignment
+    );
+    const notification = await createAppNotificationOnce({
+      userId: response.volunteer.userId,
+      assignmentId: response.assignmentId,
+      type: "ASSIGNMENT_CONFIRMED",
+      priority: "NORMAL",
+      title: "Asignación confirmada",
+      body: `Tu asignación para ${dateLabel}, ${timeSlotLabel}, está confirmada.`,
+      dedupeKey: `assignment-confirmed:${response.assignmentId}:${response.volunteerId}`,
+      metadata: {
+        source: "create_due_app_notifications",
+        responseId: response.id,
+        volunteerProfileId: response.volunteerId,
+        date: response.assignment.date.toISOString(),
+        dayOfWeek: response.assignment.dayOfWeek,
+        timeSlot: response.assignment.timeSlot,
+        automationRunId: input?.automationRunId
+      }
+    });
+
+    if (notification) {
+      createdCount += 1;
+    } else {
+      duplicateCount += 1;
+    }
+  }
+
+  return {
+    status: "completed",
+    processedCount:
+      censusResponses.length + pendingInvitations.length + confirmedResponses.length,
+    skippedCount: duplicateCount,
+    createdCount,
+    duplicateCount
+  };
+}
+
+async function notifyAdminsForLowResponseCensuses(
+  now: Date,
+  automationRunId?: string
+) {
   const censuses = await db.replacementCensus.findMany({
     where: {
       status: "OPEN",
@@ -1795,7 +2682,8 @@ async function notifyAdminsForLowResponseCensuses(now: Date) {
     },
     orderBy: {
       closesAt: "asc"
-    }
+    },
+    take: AUTOMATION_BATCH_SIZE
   });
   let processedCount = 0;
   let alertedCount = 0;
@@ -1837,7 +2725,8 @@ async function notifyAdminsForLowResponseCensuses(now: Date) {
         responseRate,
         answeredCount,
         totalResponses,
-        closesAt: census.closesAt.toISOString()
+        closesAt: census.closesAt.toISOString(),
+        automationRunId
       }
     });
 
@@ -1857,6 +2746,7 @@ async function notifyAdminsForLowResponseCensuses(now: Date) {
 
 export async function notifyAdminsForUnresolvedAssignments(input?: {
   now?: Date;
+  automationRunId?: string;
 }): Promise<NotifyAdminsForUnresolvedAssignmentsResult> {
   const now = input?.now ?? new Date();
   const failedInvitations = await db.assignmentInvitation.findMany({
@@ -1880,11 +2770,15 @@ export async function notifyAdminsForUnresolvedAssignments(input?: {
     },
     orderBy: {
       updatedAt: "asc"
-    }
+    },
+    take: AUTOMATION_BATCH_SIZE
   });
   const unresolvedAssignmentIds =
     await getAssignmentsWithoutReplacementCandidates(now);
-  const lowResponseCensuses = await notifyAdminsForLowResponseCensuses(now);
+  const lowResponseCensuses = await notifyAdminsForLowResponseCensuses(
+    now,
+    input?.automationRunId
+  );
   let sentCount = 0;
   let failedCount = 0;
   let duplicateCount = lowResponseCensuses.duplicateCount;
@@ -1904,7 +2798,8 @@ export async function notifyAdminsForUnresolvedAssignments(input?: {
         volunteerProfileId: invitation.volunteerId,
         volunteerName: invitation.volunteer.user.name,
         errorMessage: getInvitationFailureError(invitation.metadata)
-      }
+      },
+      automationRunId: input?.automationRunId
     });
 
     if (result.skipped) {
@@ -1921,7 +2816,10 @@ export async function notifyAdminsForUnresolvedAssignments(input?: {
   }
 
   for (const assignmentId of unresolvedAssignmentIds) {
-    const result = await alertAdminsForNoReplacementAvailable(assignmentId);
+    const result = await alertAdminsForNoReplacementAvailable(
+      assignmentId,
+      input?.automationRunId
+    );
 
     if (result.skipped) {
       duplicateCount += 1;
@@ -1952,25 +2850,222 @@ export async function notifyAdminsForUnresolvedAssignments(input?: {
   };
 }
 
-export async function processAssignmentAutomationRun(): Promise<AssignmentAutomationRunResult> {
+export async function processAssignmentAutomationRun(
+  input?: AssignmentAutomationRunInput
+): Promise<AssignmentAutomationRunResult> {
   const startedAt = new Date();
-  const pendingPrimaryInvitations = await sendPendingPrimaryInvitations();
-  const expiredInvitations = await expireTimedOutInvitations();
-  const assignmentsNeedingReplacement =
-    await processAssignmentsNeedingReplacement();
-  const replacementInvitations = await inviteNextAvailableReplacement();
-  const reminders = await sendDueAssignmentReminders();
-  const adminNotifications = await notifyAdminsForUnresolvedAssignments();
-  const finishedAt = new Date();
+  const now = input?.now ?? startedAt;
+  const automationRunId = input?.automationRunId ?? randomUUID();
 
-  return {
+  const sendPendingPrimaryInvitationsResult = await runAutomationStep(
+    () => sendPendingPrimaryInvitations({ automationRunId }),
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      sentCount: 0,
+      failedCount: 0
+    }
+  );
+  const sendPrimaryResponseRemindersResult = await runAutomationStep(
+    () => sendPrimaryResponseReminders({ now, automationRunId }),
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+      duplicateCount: 0
+    }
+  );
+  const expireTimedOutPrimaryInvitationsResult = await runAutomationStep(
+    () => expireTimedOutPrimaryInvitations({ now, automationRunId }),
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      expiredCount: 0,
+      reconciledCount: 0,
+      replacementRequiredCount: 0
+    }
+  );
+  const openWeeklyReplacementCensusResult = await runAutomationStep(
+    () =>
+      openWeeklyReplacementCensus({
+        now,
+        actorUserId: input?.actorUserId,
+        automationRunId
+      }),
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      openedCount: 0,
+      existingOpenCount: 0,
+      replacementCount: 0,
+      createdResponseCount: 0,
+      skippedResponseCount: 0
+    }
+  );
+  const sendReplacementCensusInvitationsResult = await runAutomationStep(
+    () => sendReplacementCensusInvitations({ now, automationRunId }),
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      sentCount: 0,
+      failedCount: 0
+    }
+  );
+  const sendReplacementCensusRemindersResult = await runAutomationStep(
+    () => sendReplacementCensusReminders({ now, automationRunId }),
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+      duplicateCount: 0
+    }
+  );
+  const closeExpiredReplacementCensusResult = await runAutomationStep(
+    () => closeExpiredReplacementCensus({ now, automationRunId }),
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      closedCount: 0,
+      expiredResponseCount: 0,
+      readNotificationCount: 0
+    }
+  );
+  const processAssignmentsNeedingReplacementResult = await runAutomationStep(
+    () => processAssignmentsNeedingReplacement({ now, automationRunId }),
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      markedCount: 0,
+      alreadyMarkedCount: 0
+    }
+  );
+  const inviteNextAvailableReplacementResult = await runAutomationStep(
+    () => inviteNextAvailableReplacement({ now, automationRunId }),
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      invitedCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+      unresolvedCount: 0,
+      activeInvitationCount: 0
+    }
+  );
+  const sendReplacementResponseRemindersResult = await runAutomationStep(
+    () => sendReplacementResponseReminders({ now, automationRunId }),
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+      duplicateCount: 0
+    }
+  );
+  const expireTimedOutReplacementInvitationsResult = await runAutomationStep(
+    () => expireTimedOutReplacementInvitations({ now, automationRunId }),
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      expiredCount: 0,
+      reconciledCount: 0,
+      replacementRequiredCount: 0
+    }
+  );
+  const sendDueAssignmentRemindersResult = await runAutomationStep(
+    () =>
+      sendDueAssignmentReminders({
+        now,
+        automationRunId,
+        includePendingConfirmationReminders: false,
+        includeConfirmedAssignmentReminders: true
+      }),
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+      duplicateCount: 0
+    }
+  );
+  const createDueAppNotificationsResult = await runAutomationStep(
+    () => createDueAppNotifications({ now, automationRunId }),
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      createdCount: 0,
+      duplicateCount: 0
+    }
+  );
+  const notifyAdminsForUnresolvedAssignmentsResult = await runAutomationStep(
+    () => notifyAdminsForUnresolvedAssignments({ now, automationRunId }),
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      alertedCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+      duplicateCount: 0
+    }
+  );
+  const stepResults: AssignmentAutomationStepResult[] = [
+    sendPendingPrimaryInvitationsResult,
+    sendPrimaryResponseRemindersResult,
+    expireTimedOutPrimaryInvitationsResult,
+    openWeeklyReplacementCensusResult,
+    sendReplacementCensusInvitationsResult,
+    sendReplacementCensusRemindersResult,
+    closeExpiredReplacementCensusResult,
+    processAssignmentsNeedingReplacementResult,
+    inviteNextAvailableReplacementResult,
+    sendReplacementResponseRemindersResult,
+    expireTimedOutReplacementInvitationsResult,
+    sendDueAssignmentRemindersResult,
+    createDueAppNotificationsResult,
+    notifyAdminsForUnresolvedAssignmentsResult
+  ];
+  const failedStepCount = stepResults.filter(
+    (result) => result.status === "failed"
+  ).length;
+  const finishedAt = new Date();
+  let result: AssignmentAutomationRunResult = {
+    automationRunId,
+    status: failedStepCount > 0 ? "completed_with_errors" : "completed",
     startedAt: startedAt.toISOString(),
     finishedAt: finishedAt.toISOString(),
-    sendPendingPrimaryInvitations: pendingPrimaryInvitations,
-    expireTimedOutInvitations: expiredInvitations,
-    processAssignmentsNeedingReplacement: assignmentsNeedingReplacement,
-    inviteNextAvailableReplacement: replacementInvitations,
-    sendDueAssignmentReminders: reminders,
-    notifyAdminsForUnresolvedAssignments: adminNotifications
+    durationMs: finishedAt.getTime() - startedAt.getTime(),
+    failedStepCount,
+    summarySaved: true,
+    sendPendingPrimaryInvitations: sendPendingPrimaryInvitationsResult,
+    sendPrimaryResponseReminders: sendPrimaryResponseRemindersResult,
+    expireTimedOutPrimaryInvitations: expireTimedOutPrimaryInvitationsResult,
+    openWeeklyReplacementCensus: openWeeklyReplacementCensusResult,
+    sendReplacementCensusInvitations: sendReplacementCensusInvitationsResult,
+    sendReplacementCensusReminders: sendReplacementCensusRemindersResult,
+    closeExpiredReplacementCensus: closeExpiredReplacementCensusResult,
+    processAssignmentsNeedingReplacement:
+      processAssignmentsNeedingReplacementResult,
+    inviteNextAvailableReplacement: inviteNextAvailableReplacementResult,
+    sendReplacementResponseReminders: sendReplacementResponseRemindersResult,
+    expireTimedOutReplacementInvitations:
+      expireTimedOutReplacementInvitationsResult,
+    sendDueAssignmentReminders: sendDueAssignmentRemindersResult,
+    createDueAppNotifications: createDueAppNotificationsResult,
+    notifyAdminsForUnresolvedAssignments:
+      notifyAdminsForUnresolvedAssignmentsResult
   };
+
+  try {
+    await saveAssignmentAutomationRunSummary(result);
+  } catch (error) {
+    result = {
+      ...result,
+      status: "completed_with_errors",
+      summarySaved: false,
+      summaryError: getErrorMessage(error)
+    };
+  }
+
+  return result;
 }

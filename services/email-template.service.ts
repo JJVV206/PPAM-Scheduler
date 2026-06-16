@@ -160,6 +160,30 @@ export function buildReplacementCensusInvitationEmail(
   };
 }
 
+export function buildReplacementCensusReminderEmail(
+  input: ReplacementCensusEmailInput
+): EmailTemplate {
+  return {
+    subject: "Recordatorio: responde el censo semanal de suplentes",
+    html: [
+      `<p>Hola ${escapeHtml(input.volunteerName)},</p>`,
+      `<p>El censo de suplentes para la ${escapeHtml(
+        input.weekLabel
+      )} sigue pendiente. Por favor indica si puedes apoyar antes del cierre.</p>`,
+      "<ul>",
+      `<li><strong>Semana:</strong> ${escapeHtml(input.weekLabel)}</li>`,
+      `<li><strong>Fecha límite:</strong> ${escapeHtml(
+        input.closesAtLabel
+      )}</li>`,
+      "</ul>",
+      actionWithFallback({
+        href: input.responseUrl,
+        label: "Responder censo semanal"
+      })
+    ].join("")
+  };
+}
+
 export function buildAssignmentReminderEmail(
   input: AssignmentReminderEmailInput
 ): EmailTemplate {

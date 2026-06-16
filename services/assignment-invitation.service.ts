@@ -488,7 +488,8 @@ function getInvitationNotificationType(
 
 async function sendAssignmentInvitationEmail(
   invitation: PendingAssignmentInvitation,
-  actorUserId?: string
+  actorUserId?: string,
+  automationRunId?: string
 ): Promise<SendInvitationResult> {
   const responseUrl = buildAssignmentInvitationResponseUrl(invitation.token);
   const dateLabel = `${DAY_LABELS[invitation.assignment.dayOfWeek]}, ${formatDisplayDate(
@@ -513,7 +514,8 @@ async function sendAssignmentInvitationEmail(
         increment: 1
       },
       metadata: mergeInvitationMetadata(invitation.metadata, {
-        lastEmailAttemptedAt: new Date().toISOString()
+        lastEmailAttemptedAt: new Date().toISOString(),
+        automationRunId
       })
     },
     select: {
@@ -534,7 +536,8 @@ async function sendAssignmentInvitationEmail(
         invitationType: invitation.type,
         pointName,
         date: invitation.assignment.date.toISOString(),
-        timeSlot: invitation.assignment.timeSlot
+        timeSlot: invitation.assignment.timeSlot,
+        automationRunId
       }
     });
 
@@ -565,7 +568,8 @@ async function sendAssignmentInvitationEmail(
           sentAt: notification.sentAt ?? new Date(),
           metadata: mergeInvitationMetadata(attempt.metadata, {
             lastEmailStatus: "SENT",
-            lastNotificationLogId: notification.id
+            lastNotificationLogId: notification.id,
+            automationRunId
           })
         }
       });
@@ -580,7 +584,8 @@ async function sendAssignmentInvitationEmail(
           volunteerProfileId: invitation.volunteerId,
           invitationType: invitation.type,
           notificationLogId: notification.id,
-          emailAttempts: attempt.emailAttempts
+          emailAttempts: attempt.emailAttempts,
+          automationRunId
         }
       });
       await createAppNotificationOnce({
@@ -606,7 +611,8 @@ async function sendAssignmentInvitationEmail(
           date: invitation.assignment.date.toISOString(),
           dayOfWeek: invitation.assignment.dayOfWeek,
           timeSlot: invitation.assignment.timeSlot,
-          notificationLogId: notification.id
+          notificationLogId: notification.id,
+          automationRunId
         }
       });
     });
@@ -642,6 +648,7 @@ async function sendAssignmentInvitationEmail(
 export async function sendPendingPrimaryInvitationsForAssignment(input: {
   assignmentId: string;
   actorUserId?: string;
+  automationRunId?: string;
 }) {
   const invitations = await db.assignmentInvitation.findMany({
     where: {
@@ -668,7 +675,11 @@ export async function sendPendingPrimaryInvitationsForAssignment(input: {
 
   const results = await Promise.all(
     invitations.map((invitation) =>
-      sendAssignmentInvitationEmail(invitation, input.actorUserId)
+      sendAssignmentInvitationEmail(
+        invitation,
+        input.actorUserId,
+        input.automationRunId
+      )
     )
   );
 
@@ -683,6 +694,7 @@ export async function sendPendingPrimaryInvitationsForAssignment(input: {
 export async function sendPendingReplacementInvitationsForAssignment(input: {
   assignmentId: string;
   actorUserId?: string;
+  automationRunId?: string;
 }) {
   const invitations = await db.assignmentInvitation.findMany({
     where: {
@@ -709,7 +721,11 @@ export async function sendPendingReplacementInvitationsForAssignment(input: {
 
   const results = await Promise.all(
     invitations.map((invitation) =>
-      sendAssignmentInvitationEmail(invitation, input.actorUserId)
+      sendAssignmentInvitationEmail(
+        invitation,
+        input.actorUserId,
+        input.automationRunId
+      )
     )
   );
 

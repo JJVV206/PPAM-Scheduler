@@ -6,12 +6,29 @@ const mocks = vi.hoisted(() => {
       create: vi.fn(),
       findFirst: vi.fn()
     },
-    assignmentInvitation: {
+    assignment: {
       update: vi.fn()
+    },
+    assignmentResponse: {
+      findUnique: vi.fn()
+    },
+    assignmentInvitation: {
+      update: vi.fn(),
+      updateMany: vi.fn()
     },
     appNotification: {
       create: vi.fn(),
-      findFirst: vi.fn()
+      findFirst: vi.fn(),
+      updateMany: vi.fn()
+    },
+    replacementCensus: {
+      updateMany: vi.fn()
+    },
+    replacementCensusResponse: {
+      updateMany: vi.fn()
+    },
+    volunteerProfile: {
+      update: vi.fn()
     }
   };
   const db = {
@@ -37,6 +54,9 @@ const mocks = vi.hoisted(() => {
       create: vi.fn(),
       findFirst: vi.fn()
     },
+    appSetting: {
+      upsert: vi.fn()
+    },
     notificationLog: {
       create: vi.fn(),
       findFirst: vi.fn()
@@ -44,7 +64,17 @@ const mocks = vi.hoisted(() => {
     replacementCensus: {
       findMany: vi.fn()
     },
+    replacementCensusResponse: {
+      findMany: vi.fn()
+    },
+    assignmentResponse: {
+      findMany: vi.fn()
+    },
+    scheduleWeek: {
+      findMany: vi.fn()
+    },
     user: {
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn()
     },
@@ -363,12 +393,24 @@ beforeEach(() => {
   mocks.db.assignment.updateMany.mockResolvedValue({ count: 1 });
   mocks.db.appNotification.findFirst.mockResolvedValue(null);
   mocks.db.appNotification.create.mockResolvedValue({ id: "app-notification-1" });
+  mocks.db.appSetting.upsert.mockResolvedValue({ id: "setting-1" });
   mocks.db.replacementCensus.findMany.mockResolvedValue([]);
+  mocks.db.replacementCensusResponse.findMany.mockResolvedValue([]);
+  mocks.db.assignmentResponse.findMany.mockResolvedValue([]);
+  mocks.db.scheduleWeek.findMany.mockResolvedValue([]);
+  mocks.db.user.findFirst.mockResolvedValue({ id: "admin-1" });
+  mocks.tx.assignment.update.mockResolvedValue({ id: "assignment-1" });
+  mocks.tx.assignmentResponse.findUnique.mockResolvedValue(null);
   mocks.tx.assignmentActivity.findFirst.mockResolvedValue(null);
   mocks.tx.assignmentActivity.create.mockResolvedValue({ id: "activity-1" });
   mocks.tx.assignmentInvitation.update.mockResolvedValue({ id: "invitation-1" });
+  mocks.tx.assignmentInvitation.updateMany.mockResolvedValue({ count: 1 });
   mocks.tx.appNotification.findFirst.mockResolvedValue(null);
   mocks.tx.appNotification.create.mockResolvedValue({ id: "app-notification-1" });
+  mocks.tx.appNotification.updateMany.mockResolvedValue({ count: 0 });
+  mocks.tx.replacementCensus.updateMany.mockResolvedValue({ count: 1 });
+  mocks.tx.replacementCensusResponse.updateMany.mockResolvedValue({ count: 0 });
+  mocks.tx.volunteerProfile.update.mockResolvedValue({ id: "volunteer-1" });
 });
 
 afterEach(() => {
@@ -693,6 +735,10 @@ describe("assignment automation idempotency QA", () => {
     const firstRun = await processAssignmentAutomationRun();
     const secondRun = await processAssignmentAutomationRun();
 
+    expect(firstRun.failedStepCount).toBe(0);
+    expect(firstRun.summarySaved).toBe(true);
+    expect(secondRun.failedStepCount).toBe(0);
+    expect(secondRun.summarySaved).toBe(true);
     expect(firstRun.sendDueAssignmentReminders.sentCount).toBe(1);
     expect(secondRun.sendDueAssignmentReminders.duplicateCount).toBe(1);
     expect(mocks.db.notificationLog.create).toHaveBeenCalledTimes(1);
