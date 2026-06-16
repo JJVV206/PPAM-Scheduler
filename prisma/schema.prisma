@@ -299,6 +299,7 @@ model NotificationLog {
   assignment   Assignment?         @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
 
   @@index([userId, sentAt])
+  @@index([assignmentId, userId, type, status])
 }
 
 model AssignmentActivity {

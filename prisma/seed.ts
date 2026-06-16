@@ -316,7 +316,19 @@ async function main() {
       },
       {
         key: "reminderTimingDays",
-        value: [8, 3, 1]
+        value: [5, 1]
+      },
+      {
+        key: "finalReminderHours",
+        value: 3
+      },
+      {
+        key: "primaryResponseTimeoutHours",
+        value: 48
+      },
+      {
+        key: "replacementResponseTimeoutHours",
+        value: 12
       },
       {
         key: "notificationChannels",

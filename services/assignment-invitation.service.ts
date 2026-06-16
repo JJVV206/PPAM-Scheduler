@@ -14,12 +14,15 @@ import {
   DAY_LABELS,
   TIME_SLOT_DEFINITIONS
 } from "@/lib/constants/domain";
+import {
+  DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS,
+  DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
+} from "@/lib/constants/app";
 import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import { formatDisplayDate } from "@/lib/utils";
 import { sendEmailNotification } from "@/services/notification.service";
+import { getAssignmentAutomationSettings } from "@/services/setting.service";
 
-const PRIMARY_INVITATION_EXPIRATION_HOURS = 48;
-const REPLACEMENT_INVITATION_EXPIRATION_HOURS = 12;
 const TOKEN_BYTES = 32;
 const MAX_TOKEN_GENERATION_ATTEMPTS = 3;
 
@@ -261,8 +264,16 @@ export async function createPendingPrimaryInvitationsForAssignment(input: {
   const existingVolunteerIds = new Set(
     existingActiveInvitations.map((invitation) => invitation.volunteerId)
   );
+  const settings = input.expiresAt
+    ? null
+    : await getAssignmentAutomationSettings();
   const expiresAt =
-    input.expiresAt ?? addHours(new Date(), PRIMARY_INVITATION_EXPIRATION_HOURS);
+    input.expiresAt ??
+    addHours(
+      new Date(),
+      settings?.primaryResponseTimeoutHours ??
+        DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS
+    );
   const metadata = compactMetadata({
     source: input.source,
     actorUserId: input.actorUserId,
@@ -341,14 +352,23 @@ export async function createPendingReplacementInvitationForAssignment(input: {
     };
   }
 
+  const settings = input.expiresAt
+    ? null
+    : await getAssignmentAutomationSettings();
+  const expiresAt =
+    input.expiresAt ??
+    addHours(
+      new Date(),
+      settings?.replacementResponseTimeoutHours ??
+        DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
+    );
+
   await createInvitationWithUniqueToken({
     client,
     assignmentId: input.assignmentId,
     volunteerId: input.volunteerId,
     type: "REPLACEMENT",
-    expiresAt:
-      input.expiresAt ??
-      addHours(new Date(), REPLACEMENT_INVITATION_EXPIRATION_HOURS),
+    expiresAt,
     metadata: compactMetadata({
       source: "replacement_flow",
       actorUserId: input.actorUserId,

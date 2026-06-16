@@ -1,22 +1,38 @@
-import { startOfDay } from "date-fns";
+import { addHours, startOfDay, subDays, subHours } from "date-fns";
 import { Prisma } from "@prisma/client";
-import type { Assignment, AssignmentInvitation } from "@prisma/client";
+import type {
+  Assignment,
+  AssignmentInvitation,
+  AssignmentInvitationType,
+  NotificationType,
+  TimeSlot
+} from "@prisma/client";
 
 import { db } from "@/lib/db/prisma";
 import {
   DAY_LABELS,
   TIME_SLOT_DEFINITIONS
 } from "@/lib/constants/domain";
+import {
+  DEFAULT_FINAL_REMINDER_HOURS,
+  DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS,
+  DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
+} from "@/lib/constants/app";
 import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import { formatDisplayDate } from "@/lib/utils";
 import {
   ACTIVE_ASSIGNMENT_INVITATION_STATUSES,
+  buildAssignmentInvitationResponseUrl,
   createPendingReplacementInvitationForAssignment,
   sendPendingReplacementInvitationsForAssignment,
   sendPendingPrimaryInvitationsForAssignment
 } from "@/services/assignment-invitation.service";
 import { selectNextReplacementCandidateForAssignment } from "@/services/replacement-candidate.service";
 import { sendEmailNotification } from "@/services/notification.service";
+import {
+  getAssignmentAutomationSettings,
+  type AssignmentAutomationSettings
+} from "@/services/setting.service";
 
 const TERMINAL_ASSIGNMENT_STATUSES = ["CANCELLED", "COMPLETED"] as const;
 
@@ -65,6 +81,12 @@ export type ReplacementInvitationResult = {
   failedCount: number;
 };
 
+export type SendDueAssignmentRemindersResult = AssignmentAutomationStepResult & {
+  sentCount: number;
+  failedCount: number;
+  duplicateCount: number;
+};
+
 export type AssignmentAutomationRunResult = {
   startedAt: string;
   finishedAt: string;
@@ -72,12 +94,41 @@ export type AssignmentAutomationRunResult = {
   expireTimedOutInvitations: ExpireTimedOutInvitationsResult;
   processAssignmentsNeedingReplacement: ProcessAssignmentsNeedingReplacementResult;
   inviteNextAvailableReplacement: ReplacementCandidateSelectionResult;
-  sendDueAssignmentReminders: AssignmentAutomationStepResult;
+  sendDueAssignmentReminders: SendDueAssignmentRemindersResult;
   notifyAdminsForUnresolvedAssignments: AssignmentAutomationStepResult;
 };
 
 type ExpirableInvitation = AssignmentInvitation & {
   assignment: Pick<Assignment, "id" | "status">;
+};
+
+type AssignmentReminderKind =
+  | "DAYS_BEFORE"
+  | "FINAL_HOURS"
+  | "PENDING_CONFIRMATION";
+
+type DueAssignmentReminder = {
+  kind: AssignmentReminderKind;
+  reminderKey: string;
+  notificationType: NotificationType;
+  targetAt: Date;
+  offsetDays?: number;
+  offsetHours?: number;
+};
+
+type AssignmentReminderRecipient = {
+  assignmentId: string;
+  volunteerProfileId: string;
+  volunteerUserId: string;
+  volunteerName: string;
+  assignmentDate: Date;
+  assignmentStartAt: Date;
+  dayOfWeek: Assignment["dayOfWeek"];
+  timeSlot: TimeSlot;
+  reminder: DueAssignmentReminder;
+  responseUrl?: string;
+  invitationId?: string;
+  invitationType?: AssignmentInvitationType;
 };
 
 function asMetadataObject(value: Prisma.JsonValue | null) {
@@ -116,6 +167,156 @@ function skippedStep(detail: string): AssignmentAutomationStepResult {
     processedCount: 0,
     skippedCount: 0,
     detail
+  };
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export function normalizeReminderTimingDays(days: number[]) {
+  return [...new Set(days)]
+    .filter((daysBefore) => Number.isInteger(daysBefore) && daysBefore > 0)
+    .sort((left, right) => left - right);
+}
+
+export function buildAssignmentStartDate(input: {
+  date: Date;
+  timeSlot: TimeSlot;
+}) {
+  const [hour, minute] = TIME_SLOT_DEFINITIONS[input.timeSlot].start
+    .split(":")
+    .map(Number);
+  const assignmentStart = new Date(input.date);
+  assignmentStart.setHours(hour, minute, 0, 0);
+  return assignmentStart;
+}
+
+export function getDueConfirmedAssignmentReminder(input: {
+  assignmentDate: Date;
+  timeSlot: TimeSlot;
+  now: Date;
+  reminderTimingDays: number[];
+  finalReminderHours: number;
+}): DueAssignmentReminder | null {
+  const assignmentStartAt = buildAssignmentStartDate({
+    date: input.assignmentDate,
+    timeSlot: input.timeSlot
+  });
+
+  if (assignmentStartAt <= input.now) {
+    return null;
+  }
+
+  if (input.finalReminderHours > 0) {
+    const targetAt = subHours(assignmentStartAt, input.finalReminderHours);
+    if (targetAt <= input.now) {
+      return {
+        kind: "FINAL_HOURS",
+        reminderKey: `confirmed-final-${input.finalReminderHours}h`,
+        notificationType: "FINAL_REMINDER",
+        targetAt,
+        offsetHours: input.finalReminderHours
+      };
+    }
+  }
+
+  const dueDays = normalizeReminderTimingDays(input.reminderTimingDays).find(
+    (daysBefore) => subDays(assignmentStartAt, daysBefore) <= input.now
+  );
+
+  if (!dueDays) {
+    return null;
+  }
+
+  return {
+    kind: "DAYS_BEFORE",
+    reminderKey: `confirmed-${dueDays}d`,
+    notificationType: "REMINDER",
+    targetAt: subDays(assignmentStartAt, dueDays),
+    offsetDays: dueDays
+  };
+}
+
+export function getDuePendingConfirmationReminder(input: {
+  invitationId: string;
+  expiresAt: Date;
+  now: Date;
+  finalReminderHours: number;
+}): DueAssignmentReminder | null {
+  if (input.expiresAt <= input.now || input.finalReminderHours <= 0) {
+    return null;
+  }
+
+  const targetAt = subHours(input.expiresAt, input.finalReminderHours);
+  if (targetAt > input.now) {
+    return null;
+  }
+
+  return {
+    kind: "PENDING_CONFIRMATION",
+    reminderKey: `pending-confirmation-${input.invitationId}`,
+    notificationType: "REMINDER",
+    targetAt,
+    offsetHours: input.finalReminderHours
+  };
+}
+
+function buildAssignmentReminderEmail(input: {
+  reminder: DueAssignmentReminder;
+  volunteerName: string;
+  dateLabel: string;
+  timeSlotLabel: string;
+  pointName: string;
+  responseUrl?: string;
+}) {
+  const volunteerName = escapeHtml(input.volunteerName);
+  const dateLabel = escapeHtml(input.dateLabel);
+  const timeSlotLabel = escapeHtml(input.timeSlotLabel);
+  const pointName = escapeHtml(input.pointName);
+  const responseUrl = input.responseUrl ? escapeHtml(input.responseUrl) : null;
+
+  let subject: string;
+  let intro: string;
+  let action = "";
+
+  if (input.reminder.kind === "PENDING_CONFIRMATION") {
+    subject = "Pendiente: confirma tu asignación de PPAM";
+    intro =
+      "Tu invitación de PPAM sigue pendiente. Por favor confirma o rechaza antes de que expire.";
+    action = responseUrl
+      ? `<p><a href="${responseUrl}">Confirmar o rechazar asignación</a></p><p>Si el botón no funciona, copia y pega esta URL en tu navegador:<br>${responseUrl}</p>`
+      : "";
+  } else if (input.reminder.kind === "FINAL_HOURS") {
+    const hours = input.reminder.offsetHours ?? 0;
+    subject = `Recordatorio final: asignación PPAM en ${hours} horas`;
+    intro = "Este es un recordatorio final de tu asignación confirmada de PPAM.";
+  } else {
+    const days = input.reminder.offsetDays ?? 0;
+    subject =
+      days === 1
+        ? "Recordatorio: asignación PPAM mañana"
+        : `Recordatorio: asignación PPAM en ${days} días`;
+    intro = "Te recordamos tu próxima asignación confirmada de PPAM.";
+  }
+
+  return {
+    subject,
+    html: [
+      `<p>Hola ${volunteerName},</p>`,
+      `<p>${intro}</p>`,
+      "<ul>",
+      `<li><strong>Fecha:</strong> ${dateLabel}</li>`,
+      `<li><strong>Horario:</strong> ${timeSlotLabel}</li>`,
+      `<li><strong>Punto de predicación:</strong> ${pointName}</li>`,
+      "</ul>",
+      action
+    ].join("")
   };
 }
 
@@ -825,8 +1026,365 @@ export async function inviteNextAvailableReplacement(): Promise<ReplacementCandi
   };
 }
 
-export async function sendDueAssignmentReminders(): Promise<AssignmentAutomationStepResult> {
-  return skippedStep("Reminder timing and deduplication are implemented in module 7.");
+function getNormalizedReminderSettings(
+  settings: AssignmentAutomationSettings
+): AssignmentAutomationSettings {
+  return {
+    ...settings,
+    reminderTimingDays: normalizeReminderTimingDays(settings.reminderTimingDays),
+    finalReminderHours:
+      Number.isInteger(settings.finalReminderHours) &&
+      settings.finalReminderHours > 0
+        ? settings.finalReminderHours
+        : DEFAULT_FINAL_REMINDER_HOURS,
+    primaryResponseTimeoutHours:
+      Number.isInteger(settings.primaryResponseTimeoutHours) &&
+      settings.primaryResponseTimeoutHours > 0
+        ? settings.primaryResponseTimeoutHours
+        : DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS,
+    replacementResponseTimeoutHours:
+      Number.isInteger(settings.replacementResponseTimeoutHours) &&
+      settings.replacementResponseTimeoutHours > 0
+        ? settings.replacementResponseTimeoutHours
+        : DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
+  };
+}
+
+async function getDueConfirmedReminderRecipients(input: {
+  now: Date;
+  settings: AssignmentAutomationSettings;
+}): Promise<AssignmentReminderRecipient[]> {
+  const assignments = await db.assignment.findMany({
+    where: {
+      date: {
+        gte: startOfDay(input.now)
+      },
+      status: {
+        notIn: [...TERMINAL_ASSIGNMENT_STATUSES]
+      },
+      responses: {
+        some: {
+          responseStatus: "CONFIRMED"
+        }
+      }
+    },
+    include: {
+      responses: true,
+      volunteers: {
+        include: {
+          volunteer: {
+            include: {
+              user: true
+            }
+          }
+        }
+      }
+    },
+    orderBy: [
+      {
+        date: "asc"
+      },
+      {
+        timeSlot: "asc"
+      }
+    ]
+  });
+
+  const recipients: AssignmentReminderRecipient[] = [];
+
+  for (const assignment of assignments) {
+    const reminder = getDueConfirmedAssignmentReminder({
+      assignmentDate: assignment.date,
+      timeSlot: assignment.timeSlot,
+      now: input.now,
+      reminderTimingDays: input.settings.reminderTimingDays,
+      finalReminderHours: input.settings.finalReminderHours
+    });
+
+    if (!reminder) {
+      continue;
+    }
+
+    const confirmedVolunteerIds = new Set(
+      assignment.responses
+        .filter((response) => response.responseStatus === "CONFIRMED")
+        .map((response) => response.volunteerId)
+    );
+    const assignmentStartAt = buildAssignmentStartDate({
+      date: assignment.date,
+      timeSlot: assignment.timeSlot
+    });
+
+    for (const slot of assignment.volunteers) {
+      if (
+        !confirmedVolunteerIds.has(slot.volunteerId) ||
+        !slot.volunteer.active ||
+        !slot.volunteer.user.active
+      ) {
+        continue;
+      }
+
+      recipients.push({
+        assignmentId: assignment.id,
+        volunteerProfileId: slot.volunteerId,
+        volunteerUserId: slot.volunteer.userId,
+        volunteerName: slot.volunteer.user.name,
+        assignmentDate: assignment.date,
+        assignmentStartAt,
+        dayOfWeek: assignment.dayOfWeek,
+        timeSlot: assignment.timeSlot,
+        reminder
+      });
+    }
+  }
+
+  return recipients;
+}
+
+async function getDuePendingConfirmationReminderRecipients(input: {
+  now: Date;
+  settings: AssignmentAutomationSettings;
+}): Promise<AssignmentReminderRecipient[]> {
+  const invitations = await db.assignmentInvitation.findMany({
+    where: {
+      status: "SENT",
+      expiresAt: {
+        gt: input.now,
+        lte: addHours(input.now, input.settings.finalReminderHours)
+      },
+      assignment: {
+        date: {
+          gte: startOfDay(input.now)
+        },
+        status: {
+          notIn: [...TERMINAL_ASSIGNMENT_STATUSES]
+        }
+      }
+    },
+    include: {
+      assignment: {
+        include: {
+          responses: true
+        }
+      },
+      volunteer: {
+        include: {
+          user: true
+        }
+      }
+    },
+    orderBy: {
+      expiresAt: "asc"
+    }
+  });
+
+  const recipients: AssignmentReminderRecipient[] = [];
+
+  for (const invitation of invitations) {
+    if (!invitation.volunteer.active || !invitation.volunteer.user.active) {
+      continue;
+    }
+
+    const assignmentStartAt = buildAssignmentStartDate({
+      date: invitation.assignment.date,
+      timeSlot: invitation.assignment.timeSlot
+    });
+
+    if (assignmentStartAt <= input.now) {
+      continue;
+    }
+
+    const response = invitation.assignment.responses.find(
+      (item) => item.volunteerId === invitation.volunteerId
+    );
+
+    if (response && response.responseStatus !== "PENDING") {
+      continue;
+    }
+
+    const reminder = getDuePendingConfirmationReminder({
+      invitationId: invitation.id,
+      expiresAt: invitation.expiresAt,
+      now: input.now,
+      finalReminderHours: input.settings.finalReminderHours
+    });
+
+    if (!reminder) {
+      continue;
+    }
+
+    recipients.push({
+      assignmentId: invitation.assignmentId,
+      volunteerProfileId: invitation.volunteerId,
+      volunteerUserId: invitation.volunteer.userId,
+      volunteerName: invitation.volunteer.user.name,
+      assignmentDate: invitation.assignment.date,
+      assignmentStartAt,
+      dayOfWeek: invitation.assignment.dayOfWeek,
+      timeSlot: invitation.assignment.timeSlot,
+      reminder,
+      responseUrl: buildAssignmentInvitationResponseUrl(invitation.token),
+      invitationId: invitation.id,
+      invitationType: invitation.type
+    });
+  }
+
+  return recipients;
+}
+
+async function hasSentReminder(input: {
+  assignmentId: string;
+  userId: string;
+  notificationType: NotificationType;
+  reminderKey: string;
+}) {
+  const existingReminder = await db.notificationLog.findFirst({
+    where: {
+      assignmentId: input.assignmentId,
+      userId: input.userId,
+      type: input.notificationType,
+      channel: "EMAIL",
+      status: "SENT",
+      metadata: {
+        path: ["reminderKey"],
+        equals: input.reminderKey
+      }
+    },
+    select: {
+      id: true
+    }
+  });
+
+  return Boolean(existingReminder);
+}
+
+async function sendAssignmentReminder(
+  recipient: AssignmentReminderRecipient
+): Promise<"SENT" | "FAILED" | "DUPLICATE"> {
+  const alreadySent = await hasSentReminder({
+    assignmentId: recipient.assignmentId,
+    userId: recipient.volunteerUserId,
+    notificationType: recipient.reminder.notificationType,
+    reminderKey: recipient.reminder.reminderKey
+  });
+
+  if (alreadySent) {
+    return "DUPLICATE";
+  }
+
+  const dateLabel = `${DAY_LABELS[recipient.dayOfWeek]}, ${formatDisplayDate(
+    recipient.assignmentDate,
+    "d 'de' MMMM 'de' yyyy"
+  )}`;
+  const timeSlotLabel = TIME_SLOT_DEFINITIONS[recipient.timeSlot].label;
+  const email = buildAssignmentReminderEmail({
+    reminder: recipient.reminder,
+    volunteerName: recipient.volunteerName,
+    dateLabel,
+    timeSlotLabel,
+    pointName: FIXED_PREACHING_POINT_NAME,
+    responseUrl: recipient.responseUrl
+  });
+  const metadata = {
+    reminderKey: recipient.reminder.reminderKey,
+    reminderKind: recipient.reminder.kind,
+    reminderTargetAt: recipient.reminder.targetAt.toISOString(),
+    assignmentStartAt: recipient.assignmentStartAt.toISOString(),
+    volunteerProfileId: recipient.volunteerProfileId,
+    invitationId: recipient.invitationId,
+    invitationType: recipient.invitationType,
+    dayOfWeek: recipient.dayOfWeek,
+    timeSlot: recipient.timeSlot,
+    offsetDays: recipient.reminder.offsetDays,
+    offsetHours: recipient.reminder.offsetHours
+  };
+
+  try {
+    const notification = await sendEmailNotification({
+      userId: recipient.volunteerUserId,
+      assignmentId: recipient.assignmentId,
+      type: recipient.reminder.notificationType,
+      subject: email.subject,
+      html: email.html,
+      metadata
+    });
+
+    if (notification.status !== "SENT") {
+      return "FAILED";
+    }
+
+    await db.assignmentActivity.create({
+      data: {
+        assignmentId: recipient.assignmentId,
+        actionType: "REMINDER_SENT",
+        metadata: compactMetadata({
+          ...metadata,
+          notificationLogId: notification.id
+        })
+      }
+    });
+
+    return "SENT";
+  } catch {
+    return "FAILED";
+  }
+}
+
+export async function sendDueAssignmentReminders(input?: {
+  now?: Date;
+}): Promise<SendDueAssignmentRemindersResult> {
+  const now = input?.now ?? new Date();
+  const settings = getNormalizedReminderSettings(
+    await getAssignmentAutomationSettings()
+  );
+
+  if (!settings.notificationChannels.includes("EMAIL")) {
+    return {
+      status: "skipped",
+      processedCount: 0,
+      skippedCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+      duplicateCount: 0,
+      detail: "Email reminders are disabled in notification settings."
+    };
+  }
+
+  const [confirmedRecipients, pendingRecipients] = await Promise.all([
+    getDueConfirmedReminderRecipients({
+      now,
+      settings
+    }),
+    getDuePendingConfirmationReminderRecipients({
+      now,
+      settings
+    })
+  ]);
+  const recipients = [...pendingRecipients, ...confirmedRecipients];
+  let sentCount = 0;
+  let failedCount = 0;
+  let duplicateCount = 0;
+
+  for (const recipient of recipients) {
+    const result = await sendAssignmentReminder(recipient);
+
+    if (result === "SENT") {
+      sentCount += 1;
+    } else if (result === "FAILED") {
+      failedCount += 1;
+    } else {
+      duplicateCount += 1;
+    }
+  }
+
+  return {
+    status: "completed",
+    processedCount: recipients.length,
+    skippedCount: duplicateCount,
+    sentCount,
+    failedCount,
+    duplicateCount
+  };
 }
 
 export async function notifyAdminsForUnresolvedAssignments(): Promise<AssignmentAutomationStepResult> {
