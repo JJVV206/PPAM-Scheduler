@@ -27,6 +27,7 @@ import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import type {
   AdminDashboardStats,
   AssignmentDetailDto,
+  AssignmentInvitationDto,
   AssignmentVolunteerDto,
   OpenSlotDto,
   VolunteerSummary,
@@ -35,9 +36,7 @@ import type {
 } from "@/types/domain";
 import { AppError } from "@/services/errors";
 import { getAppSettings } from "@/services/setting.service";
-import {
-  resendConfirmationReminder
-} from "@/services/notification.service";
+import { resendConfirmationReminder } from "@/services/notification.service";
 import {
   ACTIVE_ASSIGNMENT_INVITATION_STATUSES,
   buildAssignmentInvitationResponseUrl,
@@ -53,6 +52,10 @@ import {
   toVolunteerSummary
 } from "@/services/replacement-candidate.service";
 import { inviteNextAvailableReplacementForAssignment } from "@/services/assignment-automation.service";
+import {
+  deriveAssignmentAutomationState,
+  isAssignmentRequiringAttention
+} from "@/services/assignment-ui-state.service";
 
 const assignmentInclude = {
   scheduleWeek: true,
@@ -74,6 +77,18 @@ const assignmentInclude = {
   activities: {
     include: {
       actorUser: true
+    },
+    orderBy: {
+      createdAt: "desc"
+    }
+  },
+  invitations: {
+    include: {
+      volunteer: {
+        include: {
+          user: true
+        }
+      }
     },
     orderBy: {
       createdAt: "desc"
@@ -153,6 +168,39 @@ function mapAssignmentDetail(
       };
     }
   );
+  const invitations: AssignmentInvitationDto[] = assignment.invitations.map(
+    (invitation) => ({
+      id: invitation.id,
+      volunteerId: invitation.volunteerId,
+      volunteerName: invitation.volunteer.user.name,
+      type: invitation.type,
+      status: invitation.status,
+      sentAt: invitation.sentAt,
+      respondedAt: invitation.respondedAt,
+      expiresAt: invitation.expiresAt,
+      emailAttempts: invitation.emailAttempts,
+      createdAt: invitation.createdAt
+    })
+  );
+  const timeline = assignment.activities.map((activity) => ({
+    id: activity.id,
+    actionType: activity.actionType,
+    createdAt: activity.createdAt,
+    actorName: activity.actorUser?.name ?? null,
+    metadata: activity.metadata as Record<string, unknown> | null
+  }));
+  const automationState = deriveAssignmentAutomationState({
+    status: assignment.status,
+    invitations,
+    volunteers,
+    timeline
+  });
+  const requiresAttention = isAssignmentRequiringAttention({
+    status: assignment.status,
+    invitations,
+    volunteers,
+    timeline
+  });
 
   return {
     id: assignment.id,
@@ -176,19 +224,16 @@ function mapAssignmentDetail(
       }))
     },
     volunteers,
-    timeline: assignment.activities.map((activity) => ({
-      id: activity.id,
-      actionType: activity.actionType,
-      createdAt: activity.createdAt,
-      actorName: activity.actorUser?.name ?? null,
-      metadata: activity.metadata as Record<string, unknown> | null
-    })),
+    invitations,
+    automationState,
+    timeline,
     warnings: calculateWarnings({
       volunteerCount: volunteers.length,
       hasDecline: volunteers.some(
         (volunteer) => volunteer.responseStatus === "DECLINED"
       )
-    })
+    }),
+    requiresAttention
   };
 }
 
@@ -381,7 +426,9 @@ export function selectReplacementAssignmentPosition(input: {
     (["FIRST", "SECOND"] as VolunteerPosition[]).find(
       (position) =>
         !input.volunteers.some((volunteer) => volunteer.position === position)
-    ) ?? input.volunteers[input.volunteers.length - 1]?.position ?? null
+    ) ??
+    input.volunteers[input.volunteers.length - 1]?.position ??
+    null
   );
 }
 
@@ -559,6 +606,10 @@ export async function updateAssignment(
     !isSameDay(nextDate, current.date) ||
     nextTimeSlot !== current.timeSlot ||
     nextPreachingPointId !== current.preachingPointId;
+  const statusChangedAt = input.status ? new Date() : undefined;
+  const updatedFields = Object.entries(input)
+    .filter(([field, value]) => field !== "actorUserId" && value !== undefined)
+    .map(([field]) => field);
 
   await assertPointSupportsSlot({
     preachingPointId: nextPreachingPointId,
@@ -592,7 +643,19 @@ export async function updateAssignment(
         preachingPointId: nextPreachingPointId,
         pairNumber,
         notes: input.notes,
-        status: input.status
+        status: input.status,
+        cancelledAt:
+          input.status === "CANCELLED"
+            ? statusChangedAt
+            : input.status && current.status === "CANCELLED"
+              ? null
+              : undefined,
+        completedAt:
+          input.status === "COMPLETED"
+            ? statusChangedAt
+            : input.status && current.status === "COMPLETED"
+              ? null
+              : undefined
       }
     });
 
@@ -618,14 +681,25 @@ export async function updateAssignment(
       data: {
         assignmentId,
         actorUserId: input.actorUserId,
-        actionType: "STATUS_OVERRIDDEN",
+        actionType:
+          input.status === "CANCELLED"
+            ? "CANCELLED"
+            : input.status === "COMPLETED"
+              ? "COMPLETED"
+              : updatedFields.length === 1 && updatedFields[0] === "notes"
+                ? "NOTES_UPDATED"
+                : "STATUS_OVERRIDDEN",
         metadata: {
-          updatedFields: Object.keys(input)
+          updatedFields,
+          previousStatus: current.status,
+          nextStatus: input.status
         }
       }
     });
 
-    await recalculateAssignmentStatus(assignmentId, tx);
+    if (!input.status) {
+      await recalculateAssignmentStatus(assignmentId, tx);
+    }
 
     return tx.assignment.findUniqueOrThrow({
       where: { id: updated.id },
@@ -1048,10 +1122,9 @@ export async function getAssignmentInvitationConfirmationContext(
   };
 }
 
-function getInvitationResponseError(state: Exclude<
-  AssignmentInvitationConfirmationContext["state"],
-  "READY"
->) {
+function getInvitationResponseError(
+  state: Exclude<AssignmentInvitationConfirmationContext["state"], "READY">
+) {
   switch (state) {
     case "NOT_FOUND":
       return new AppError("No se encontró esta invitación.", 404);
@@ -1279,8 +1352,7 @@ export async function respondToAssignmentInvitation(input: {
     await tx.assignmentInvitation.update({
       where: { id: invitation.id },
       data: {
-        status:
-          input.responseStatus === "CONFIRMED" ? "ACCEPTED" : "DECLINED",
+        status: input.responseStatus === "CONFIRMED" ? "ACCEPTED" : "DECLINED",
         respondedAt: now,
         metadata: mergeJsonMetadata(invitation.metadata, {
           responseStatus: input.responseStatus,
@@ -1671,13 +1743,17 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
           lte: weekEnd
         }
       },
-      include: assignmentInclude
+      include: assignmentInclude,
+      orderBy: [{ date: "asc" }, { timeSlot: "asc" }, { pairNumber: "asc" }]
     }),
     getOpenSlots()
   ]);
 
   const details = assignments.map(mapAssignmentDetail);
   const today = new Date();
+  const requiresAttention = details.filter(
+    (assignment) => assignment.requiresAttention
+  );
 
   return {
     weekLabel: `Semana del ${weekStart.toLocaleDateString("es-MX")}`,
@@ -1700,6 +1776,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
     pendingConfirmations: details.filter(
       (assignment) => assignment.status === "PENDING_CONFIRMATION"
     ),
+    requiresAttention,
     urgentReplacements: openSlots.filter(
       (slot) => slot.urgencyLabel === "Urgente"
     )

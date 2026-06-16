@@ -1,5 +1,7 @@
 import type {
   ASSIGNMENT_ACTIVITY_TYPES,
+  ASSIGNMENT_INVITATION_STATUSES,
+  ASSIGNMENT_INVITATION_TYPES,
   ASSIGNMENT_STATUSES,
   DAYS_OF_WEEK,
   NOTIFICATION_CHANNELS,
@@ -17,6 +19,10 @@ export type TimeSlot = (typeof TIME_SLOTS)[number];
 export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number];
 export type ResponseStatus = (typeof RESPONSE_STATUSES)[number];
 export type VolunteerPosition = (typeof VOLUNTEER_POSITIONS)[number];
+export type AssignmentInvitationType =
+  (typeof ASSIGNMENT_INVITATION_TYPES)[number];
+export type AssignmentInvitationStatus =
+  (typeof ASSIGNMENT_INVITATION_STATUSES)[number];
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number];
@@ -80,6 +86,37 @@ export type AssignmentTimelineEntry = {
   metadata?: Record<string, unknown> | null;
 };
 
+export type AssignmentAutomationStateKey =
+  | "INVITATION_PENDING"
+  | "EMAIL_SENT"
+  | "AWAITING_RESPONSE"
+  | "CONFIRMED"
+  | "DECLINED"
+  | "EXPIRED"
+  | "LOOKING_FOR_REPLACEMENT"
+  | "REPLACEMENT_INVITED"
+  | "REQUIRES_INTERVENTION";
+
+export type AssignmentAutomationState = {
+  key: AssignmentAutomationStateKey;
+  label: string;
+  description: string;
+  tone: "neutral" | "info" | "success" | "warning" | "danger";
+};
+
+export type AssignmentInvitationDto = {
+  id: string;
+  volunteerId: string;
+  volunteerName: string;
+  type: AssignmentInvitationType;
+  status: AssignmentInvitationStatus;
+  sentAt?: Date | null;
+  respondedAt?: Date | null;
+  expiresAt: Date;
+  emailAttempts: number;
+  createdAt: Date;
+};
+
 export type AssignmentDetailDto = {
   id: string;
   scheduleWeekId: string;
@@ -91,8 +128,11 @@ export type AssignmentDetailDto = {
   notes?: string | null;
   preachingPoint: PreachingPointSummary;
   volunteers: AssignmentVolunteerDto[];
+  invitations: AssignmentInvitationDto[];
+  automationState: AssignmentAutomationState;
   timeline: AssignmentTimelineEntry[];
   warnings: string[];
+  requiresAttention: boolean;
 };
 
 export type WeeklySchedulePair = {
@@ -142,6 +182,7 @@ export type AdminDashboardStats = {
   };
   todaysAssignments: AssignmentDetailDto[];
   pendingConfirmations: AssignmentDetailDto[];
+  requiresAttention: AssignmentDetailDto[];
   urgentReplacements: OpenSlotDto[];
 };
 

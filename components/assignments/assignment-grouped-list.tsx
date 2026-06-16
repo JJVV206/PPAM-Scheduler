@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { addDays, startOfWeek } from "date-fns";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
+import { AutomationStateBadge } from "@/components/assignments/automation-state-badge";
 import { AssignmentDetailModal } from "@/components/assignments/assignment-detail-modal";
 import { StatusBadge } from "@/components/assignments/status-badge";
 import { Button } from "@/components/ui/button";
@@ -100,10 +101,12 @@ function getAssignmentCounts(assignments: AssignmentDetailDto[]) {
   const confirmedCount = assignments.filter((assignment) =>
     ["CONFIRMED", "COMPLETED"].includes(assignment.status)
   ).length;
-  const attentionCount = assignments.filter((assignment) =>
-    ["PENDING_CONFIRMATION", "NEEDS_REPLACEMENT", "DECLINED"].includes(
-      assignment.status
-    )
+  const attentionCount = assignments.filter(
+    (assignment) =>
+      assignment.requiresAttention ||
+      ["PENDING_CONFIRMATION", "NEEDS_REPLACEMENT", "DECLINED"].includes(
+        assignment.status
+      )
   ).length;
 
   return {
@@ -243,7 +246,10 @@ export function AssignmentGroupedList({
 
             <div
               id={`assignment-week-${weekGroup.key}`}
-              className={cn("space-y-4 p-3 sm:p-4", isWeekCollapsed && "hidden")}
+              className={cn(
+                "space-y-4 p-3 sm:p-4",
+                isWeekCollapsed && "hidden"
+              )}
             >
               {weekGroup.days.map((dayGroup) => {
                 const dayCounts = getAssignmentCounts(dayGroup.assignments);
@@ -261,7 +267,8 @@ export function AssignmentGroupedList({
                         </h3>
                         <p className="mt-1 text-sm text-muted-foreground">
                           {dayGroup.assignments.length} pareja
-                          {dayGroup.assignments.length === 1 ? "" : "s"} programada
+                          {dayGroup.assignments.length === 1 ? "" : "s"}{" "}
+                          programada
                           {dayGroup.assignments.length === 1 ? "" : "s"}
                         </p>
                       </div>
@@ -305,6 +312,7 @@ export function AssignmentGroupedList({
                               <TableHead>Punto</TableHead>
                               <TableHead>Pareja</TableHead>
                               <TableHead>Estado</TableHead>
+                              <TableHead>Proceso</TableHead>
                               <TableHead />
                             </TableRow>
                           </TableHeader>
@@ -312,7 +320,10 @@ export function AssignmentGroupedList({
                             {dayGroup.assignments.map((assignment) => (
                               <TableRow key={assignment.id}>
                                 <TableCell className="whitespace-nowrap">
-                                  {TIME_SLOT_DEFINITIONS[assignment.timeSlot].label}
+                                  {
+                                    TIME_SLOT_DEFINITIONS[assignment.timeSlot]
+                                      .label
+                                  }
                                 </TableCell>
                                 <TableCell>
                                   {assignment.preachingPoint.name}
@@ -327,6 +338,11 @@ export function AssignmentGroupedList({
                                 </TableCell>
                                 <TableCell>
                                   <StatusBadge status={assignment.status} />
+                                </TableCell>
+                                <TableCell>
+                                  <AutomationStateBadge
+                                    state={assignment.automationState}
+                                  />
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <AssignmentDetailModal
@@ -357,6 +373,9 @@ export function AssignmentGroupedList({
                                     }
                                   </p>
                                   <StatusBadge status={assignment.status} />
+                                  <AutomationStateBadge
+                                    state={assignment.automationState}
+                                  />
                                 </div>
                                 <div>
                                   <p className="font-semibold text-foreground">

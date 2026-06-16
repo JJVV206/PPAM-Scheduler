@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
+import { AutomationStateBadge } from "@/components/assignments/automation-state-badge";
 import { AssignmentDetailContent } from "@/components/assignments/assignment-detail-content";
 import { StatusBadge } from "@/components/assignments/status-badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ export default async function AdminAssignmentDetailPage({
                     {assignment.preachingPoint.name}
                   </h1>
                   <StatusBadge status={assignment.status} />
+                  <AutomationStateBadge state={assignment.automationState} />
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Pareja {assignment.pairNumber} •{" "}

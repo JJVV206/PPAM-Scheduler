@@ -29,6 +29,15 @@ export const ASSIGNMENT_STATUSES = [
 ] as const;
 export const RESPONSE_STATUSES = ["PENDING", "CONFIRMED", "DECLINED"] as const;
 export const VOLUNTEER_POSITIONS = ["FIRST", "SECOND"] as const;
+export const ASSIGNMENT_INVITATION_TYPES = ["PRIMARY", "REPLACEMENT"] as const;
+export const ASSIGNMENT_INVITATION_STATUSES = [
+  "PENDING",
+  "SENT",
+  "ACCEPTED",
+  "DECLINED",
+  "EXPIRED",
+  "FAILED"
+] as const;
 export const NOTIFICATION_TYPES = [
   "CONFIRMATION_REQUEST",
   "REMINDER",
@@ -37,7 +46,12 @@ export const NOTIFICATION_TYPES = [
   "RESET_PASSWORD",
   "ASSIGNMENT_UPDATE"
 ] as const;
-export const NOTIFICATION_CHANNELS = ["EMAIL", "SMS", "WHATSAPP", "IN_APP"] as const;
+export const NOTIFICATION_CHANNELS = [
+  "EMAIL",
+  "SMS",
+  "WHATSAPP",
+  "IN_APP"
+] as const;
 export const NOTIFICATION_STATUSES = ["PENDING", "SENT", "FAILED"] as const;
 export const ASSIGNMENT_ACTIVITY_TYPES = [
   "ASSIGNED",
@@ -115,6 +129,20 @@ export const ROLE_LABELS = {
 export const VOLUNTEER_POSITION_LABELS = {
   FIRST: "Puesto 1",
   SECOND: "Puesto 2"
+} as const;
+
+export const ASSIGNMENT_INVITATION_TYPE_LABELS = {
+  PRIMARY: "Titular",
+  REPLACEMENT: "Suplente"
+} as const;
+
+export const ASSIGNMENT_INVITATION_STATUS_LABELS = {
+  PENDING: "Invitación pendiente",
+  SENT: "Email enviado",
+  ACCEPTED: "Confirmado",
+  DECLINED: "Rechazado",
+  EXPIRED: "Expirado",
+  FAILED: "Requiere intervención"
 } as const;
 
 export const NOTIFICATION_TYPE_LABELS = {

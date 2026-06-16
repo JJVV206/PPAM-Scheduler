@@ -1,5 +1,6 @@
 import { Clock3, MapPin, Users2 } from "lucide-react";
 
+import { AutomationStateBadge } from "@/components/assignments/automation-state-badge";
 import { StatusBadge } from "@/components/assignments/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
@@ -17,11 +18,15 @@ export function AssignmentCard({
   action,
   className
 }: AssignmentCardProps) {
-  const volunteerNames = assignment.volunteers.map((item) => item.volunteer.name);
+  const volunteerNames = assignment.volunteers.map(
+    (item) => item.volunteer.name
+  );
   const point = assignment.preachingPoint;
 
   return (
-    <Card className={cn("h-full border border-white/5 bg-white/[0.03]", className)}>
+    <Card
+      className={cn("h-full border border-white/5 bg-white/[0.03]", className)}
+    >
       <CardContent className="space-y-4 p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
@@ -34,7 +39,10 @@ export function AssignmentCard({
               Pareja {assignment.pairNumber}
             </p>
           </div>
-          <StatusBadge status={assignment.status} />
+          <div className="flex max-w-[11rem] flex-col items-end gap-2">
+            <StatusBadge status={assignment.status} />
+            <AutomationStateBadge state={assignment.automationState} />
+          </div>
         </div>
 
         <div className="space-y-2 text-sm text-muted-foreground">
@@ -44,7 +52,9 @@ export function AssignmentCard({
           </div>
           <div className="flex items-center gap-2">
             <Users2 className="h-4 w-4" />
-            {volunteerNames.length ? volunteerNames.join(" y ") : "Esperando pareja"}
+            {volunteerNames.length
+              ? volunteerNames.join(" y ")
+              : "Esperando pareja"}
           </div>
         </div>
 

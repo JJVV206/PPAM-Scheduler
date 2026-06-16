@@ -49,6 +49,39 @@ export default async function AdminDashboardPage() {
         />
       </section>
 
+      <Card className="surface-panel">
+        <CardHeader>
+          <CardTitle>Requiere atención</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {dashboard.requiresAttention.length ? (
+            dashboard.requiresAttention.slice(0, 6).map((assignment) => (
+              <Link
+                key={assignment.id}
+                href={`/admin/assignments/${assignment.id}`}
+                aria-label={`Resolver ${assignment.preachingPoint.name}, pareja ${assignment.pairNumber}`}
+                className="group block h-full rounded-[24px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                <AssignmentCard
+                  assignment={assignment}
+                  className="transition-all duration-200 group-hover:border-danger/35 group-hover:bg-danger/[0.04]"
+                  action={
+                    <div className="flex items-center justify-between border-t border-white/5 pt-3 text-sm font-medium text-danger">
+                      <span>Revisar intervención</span>
+                      <ArrowUpRight className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                    </div>
+                  }
+                />
+              </Link>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
+              El flujo automático no requiere acciones manuales ahora.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       <section className="grid gap-6 2xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.9fr)]">
         <Card className="surface-panel">
           <CardHeader>
@@ -69,7 +102,7 @@ export default async function AdminDashboardPage() {
                     action={
                       <div className="flex items-center justify-between border-t border-white/5 pt-3 text-sm font-medium text-primary">
                         <span>Ver especificaciones</span>
-                        <ArrowUpRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                        <ArrowUpRight className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                       </div>
                     }
                   />
@@ -103,7 +136,10 @@ export default async function AdminDashboardPage() {
             <CardContent className="grid gap-4 md:grid-cols-2 2xl:grid-cols-1">
               {dashboard.urgentReplacements.length ? (
                 dashboard.urgentReplacements.slice(0, 3).map((openSlot) => (
-                  <div key={openSlot.assignmentId} className="rounded-2xl bg-white/[0.03] p-4">
+                  <div
+                    key={openSlot.assignmentId}
+                    className="rounded-2xl bg-white/[0.03] p-4"
+                  >
                     <p className="font-medium">{openSlot.preachingPointName}</p>
                     <p className="text-sm text-muted-foreground">
                       {openSlot.urgencyLabel} •{" "}
@@ -114,7 +150,9 @@ export default async function AdminDashboardPage() {
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-muted-foreground">No hay reemplazos urgentes.</p>
+                <p className="text-sm text-muted-foreground">
+                  No hay reemplazos urgentes.
+                </p>
               )}
             </CardContent>
           </Card>

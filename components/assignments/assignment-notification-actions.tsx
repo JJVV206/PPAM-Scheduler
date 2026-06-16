@@ -41,9 +41,9 @@ export function AssignmentNotificationActions({
       tone: response.ok ? "success" : "error",
       text: response.ok
         ? kind === "request"
-          ? `Solicitudes enviadas (${result.sentCount}).`
-          : `Recordatorios reenviados (${result.sentCount}).`
-        : result.error ?? "No fue posible completar la acción."
+          ? `Invitaciones pendientes enviadas (${result.sentCount}).`
+          : `Emails reenviados (${result.sentCount}).`
+        : (result.error ?? "No fue posible completar la acción.")
     });
 
     if (response.ok) {
@@ -60,7 +60,9 @@ export function AssignmentNotificationActions({
           onClick={() => trigger("request")}
           disabled={disabled || loading !== null}
         >
-          {loading === "request" ? "Enviando..." : "Solicitar confirmación"}
+          {loading === "request"
+            ? "Enviando..."
+            : "Enviar invitación pendiente"}
         </Button>
         <Button
           type="button"
@@ -69,7 +71,7 @@ export function AssignmentNotificationActions({
           onClick={() => trigger("reminder")}
           disabled={disabled || loading !== null}
         >
-          {loading === "reminder" ? "Reenviando..." : "Reenviar recordatorio"}
+          {loading === "reminder" ? "Reenviando..." : "Reenviar email"}
         </Button>
       </div>
       <FeedbackMessage
