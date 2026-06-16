@@ -40,6 +40,10 @@ import {
   normalizePositiveHourSetting,
   normalizeReminderOffsetsHours
 } from "@/lib/assignments/invitation-timing";
+import {
+  compactJsonMetadata,
+  mergeJsonMetadata
+} from "@/lib/utils/safe-metadata";
 import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import { formatDisplayDate } from "@/lib/utils";
 import {
@@ -262,19 +266,14 @@ function asMetadataObject(value: Prisma.JsonValue | null) {
 }
 
 function compactMetadata(metadata: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(metadata).filter(([, value]) => value !== undefined)
-  ) as Prisma.InputJsonObject;
+  return compactJsonMetadata(metadata);
 }
 
 function mergeMetadata(
   current: Prisma.JsonValue | null,
   next: Record<string, unknown>
 ) {
-  return compactMetadata({
-    ...asMetadataObject(current),
-    ...next
-  });
+  return mergeJsonMetadata(current, next);
 }
 
 function getErrorMessage(error: unknown) {
@@ -527,17 +526,17 @@ async function createReplacementRequiredActivityOnce(input: {
     return false;
   }
 
-  await input.tx.assignmentActivity.create({
-    data: {
-      assignmentId: input.assignmentId,
-      actionType: "REPLACEMENT_REQUIRED",
-      metadata: compactMetadata({
-        reason: input.reason,
-        invitationId: input.invitationId,
-        volunteerProfileId: input.volunteerProfileId,
-        automationRunId: input.automationRunId,
-        automationModule: "assignment_automation"
-      })
+  await recordAssignmentAuditActivity({
+    client: input.tx,
+    assignmentId: input.assignmentId,
+    event: "REPLACEMENT_REQUIRED",
+    dedupeKey: `replacement-required:${input.assignmentId}`,
+    metadata: {
+      reason: input.reason,
+      invitationId: input.invitationId,
+      volunteerProfileId: input.volunteerProfileId,
+      automationRunId: input.automationRunId,
+      automationModule: "assignment_automation"
     }
   });
 

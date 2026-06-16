@@ -1,5 +1,4 @@
 import { startOfDay } from "date-fns";
-import { Prisma } from "@prisma/client";
 
 import { db } from "@/lib/db/prisma";
 import type {
@@ -16,35 +15,13 @@ import {
   isVolunteerAssignmentConfirmed,
   isVolunteerAssignmentPendingResponse
 } from "@/lib/volunteer-assignment";
+import { mergeJsonMetadata } from "@/lib/utils/safe-metadata";
+import { recordAssignmentAuditActivity } from "@/services/assignment-audit.service";
 
 const ACTIVE_INVITATION_STATUSES = ["PENDING", "SENT"] as const;
 const TERMINAL_ASSIGNMENT_STATUSES = ["CANCELLED", "COMPLETED"] as const;
 const VOLUNTEER_DELETED_RESPONSE_NOTE =
   "Voluntario eliminado por administrador.";
-
-function asJsonObject(value: Prisma.JsonValue | null) {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-
-  return {};
-}
-
-function compactJsonMetadata(metadata: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(metadata).filter(([, value]) => value !== undefined)
-  ) as Prisma.InputJsonObject;
-}
-
-function mergeJsonMetadata(
-  current: Prisma.JsonValue | null,
-  next: Record<string, unknown>
-) {
-  return compactJsonMetadata({
-    ...asJsonObject(current),
-    ...next
-  });
-}
 
 function mapVolunteer(record: {
   id: string;
@@ -339,36 +316,21 @@ export async function deactivateVolunteer(
         });
       }
 
-      const existingActivity = await tx.assignmentActivity.findFirst({
-        where: {
-          assignmentId: assignment.id,
-          actionType: "REPLACEMENT_REQUIRED",
-          metadata: {
-            path: ["dedupeKey"],
-            equals: dedupeKey
-          }
-        },
-        select: { id: true }
+      await recordAssignmentAuditActivity({
+        client: tx,
+        assignmentId: assignment.id,
+        actorUserId: input?.actorUserId,
+        event: "REPLACEMENT_REQUIRED",
+        dedupeKey,
+        metadata: {
+          reason: "volunteer_deleted",
+          volunteerProfileId: volunteerId,
+          volunteerUserId: volunteer.userId,
+          position: assignedSlot?.position,
+          previousStatus: assignment.status,
+          markedAt: now
+        }
       });
-
-      if (!existingActivity) {
-        await tx.assignmentActivity.create({
-          data: {
-            assignmentId: assignment.id,
-            actorUserId: input?.actorUserId,
-            actionType: "REPLACEMENT_REQUIRED",
-            metadata: {
-              dedupeKey,
-              reason: "volunteer_deleted",
-              volunteerProfileId: volunteerId,
-              volunteerUserId: volunteer.userId,
-              position: assignedSlot?.position,
-              previousStatus: assignment.status,
-              markedAt: now.toISOString()
-            }
-          }
-        });
-      }
     }
 
     return {

@@ -24,6 +24,10 @@ import {
   resolveReplacementInvitationTiming
 } from "@/lib/assignments/invitation-timing";
 import { formatDisplayDate } from "@/lib/utils";
+import {
+  compactJsonMetadata,
+  mergeJsonMetadata
+} from "@/lib/utils/safe-metadata";
 import { sendEmailNotification } from "@/services/notification.service";
 import { getAssignmentAutomationSettings } from "@/services/setting.service";
 import { recordAssignmentAuditActivity } from "@/services/assignment-audit.service";
@@ -114,27 +118,14 @@ function isUniqueTokenConflict(error: unknown) {
 }
 
 function compactMetadata(metadata: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(metadata).filter(([, value]) => value !== undefined)
-  );
-}
-
-function asMetadataObject(value: Prisma.JsonValue | null) {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-
-  return {};
+  return compactJsonMetadata(metadata);
 }
 
 function mergeInvitationMetadata(
   current: Prisma.JsonValue | null,
   next: Record<string, unknown>
 ) {
-  return compactMetadata({
-    ...asMetadataObject(current),
-    ...next
-  }) as Prisma.InputJsonObject;
+  return mergeJsonMetadata(current, next);
 }
 
 export function buildAssignmentInvitationResponseUrl(token: string) {

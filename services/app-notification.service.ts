@@ -13,6 +13,7 @@ import {
 } from "@/lib/constants/domain";
 import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import { formatDisplayDate } from "@/lib/utils";
+import { compactJsonMetadata } from "@/lib/utils/safe-metadata";
 
 type AppNotificationClient = Prisma.TransactionClient | typeof db;
 
@@ -31,12 +32,6 @@ const ADMIN_ATTENTION_NOTIFICATION_TYPES: AppNotificationType[] = [
   "EMAIL_FAILED",
   "REPLACEMENT_NEEDED"
 ];
-
-function compactJsonMetadata(metadata: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(metadata).filter(([, value]) => value !== undefined)
-  ) as Prisma.InputJsonObject;
-}
 
 function assignmentDateLabel(assignment: AssignmentSummary) {
   return `${DAY_LABELS[assignment.dayOfWeek]}, ${formatDisplayDate(

@@ -46,6 +46,7 @@ import {
 } from "@/services/assignment-invitation.service";
 import { prepareScheduleWeekAutomation } from "@/services/schedule-week-preparation.service";
 import { safePercentage } from "@/lib/utils";
+import { mergeJsonMetadata } from "@/lib/utils/safe-metadata";
 import { determineAssignmentStatus } from "@/services/assignment-engine";
 import { getSingletonPreachingPoint } from "@/services/point.service";
 import {
@@ -62,6 +63,7 @@ import {
   createVolunteerAssignmentConfirmedAppNotification,
   markAssignmentPendingAppNotificationsRead
 } from "@/services/app-notification.service";
+import { recordAutomationAuditLog } from "@/services/automation-audit-log.service";
 
 const assignmentInclude = {
   scheduleWeek: true,
@@ -389,33 +391,9 @@ async function getNextPairNumber(input: {
   return (result._max.pairNumber ?? 0) + 1;
 }
 
-function asJsonObject(value: Prisma.JsonValue | null) {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-
-  return {};
-}
-
 function difference(left: string[], right: string[]) {
   const rightSet = new Set(right);
   return left.filter((item) => !rightSet.has(item));
-}
-
-function compactJsonMetadata(metadata: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(metadata).filter(([, value]) => value !== undefined)
-  ) as Prisma.InputJsonObject;
-}
-
-function mergeJsonMetadata(
-  current: Prisma.JsonValue | null,
-  next: Record<string, unknown>
-) {
-  return compactJsonMetadata({
-    ...asJsonObject(current),
-    ...next
-  });
 }
 
 export function selectReplacementAssignmentPosition(input: {
@@ -557,14 +535,14 @@ export async function createWeeklyAssignment(input: {
       });
     }
 
-    await tx.assignmentActivity.create({
-      data: {
-        assignmentId: created.id,
-        actorUserId: input.actorUserId,
-        actionType: "ASSIGNED",
-        metadata: {
-          volunteers: uniqueVolunteerIds
-        }
+    await recordAssignmentAuditActivity({
+      client: tx,
+      assignmentId: created.id,
+      actorUserId: input.actorUserId,
+      event: "ASSIGNED",
+      metadata: {
+        volunteers: uniqueVolunteerIds,
+        source: "assignment_created"
       }
     });
 
@@ -763,27 +741,27 @@ export async function updateAssignment(
       });
     }
 
-    await tx.assignmentActivity.create({
-      data: {
-        assignmentId,
-        actorUserId: input.actorUserId,
-        actionType:
-          input.status === "CANCELLED"
-            ? "CANCELLED"
-            : input.status === "COMPLETED"
-              ? "COMPLETED"
-              : updatedFields.length === 1 && updatedFields[0] === "notes"
-                ? "NOTES_UPDATED"
-                : "STATUS_OVERRIDDEN",
-        metadata: {
-          updatedFields,
-          previousStatus: current.status,
-          nextStatus: input.status,
-          previousVolunteerIds: input.volunteers ? currentVolunteerIds : undefined,
-          nextVolunteerIds: input.volunteers ? nextVolunteerIds : undefined,
-          addedVolunteerIds: input.volunteers ? addedVolunteerIds : undefined,
-          removedVolunteerIds: input.volunteers ? removedVolunteerIds : undefined
-        }
+    await recordAssignmentAuditActivity({
+      client: tx,
+      assignmentId,
+      actorUserId: input.actorUserId,
+      event:
+        input.status === "CANCELLED"
+          ? "CANCELLED"
+          : input.status === "COMPLETED"
+            ? "ASSIGNMENT_COVERED"
+            : updatedFields.length === 1 && updatedFields[0] === "notes"
+              ? "NOTES_UPDATED"
+              : "MANUAL_OVERRIDE",
+      metadata: {
+        updatedFields,
+        previousStatus: current.status,
+        nextStatus: input.status,
+        previousVolunteerIds: input.volunteers ? currentVolunteerIds : undefined,
+        nextVolunteerIds: input.volunteers ? nextVolunteerIds : undefined,
+        addedVolunteerIds: input.volunteers ? addedVolunteerIds : undefined,
+        removedVolunteerIds: input.volunteers ? removedVolunteerIds : undefined,
+        source: "assignment_update"
       }
     });
 
@@ -968,6 +946,17 @@ export async function createScheduleWeek(input: {
     }
   });
 
+  await recordAutomationAuditLog({
+    eventType: "WEEK_CREATED",
+    scheduleWeekId: week.id,
+    actorUserId: input.actorUserId,
+    metadata: {
+      source: "manual_week_create",
+      startDate: week.startDate,
+      endDate: week.endDate
+    }
+  });
+
   await prepareScheduleWeekAutomation({
     scheduleWeekId: week.id,
     actorUserId: input.actorUserId
@@ -1002,6 +991,18 @@ export async function duplicateScheduleWeek(input: {
       endDate: addDays(weekStart, 6),
       label: `Semana del ${weekStart.toLocaleDateString("es-MX")}`,
       createdById: input.actorUserId
+    }
+  });
+
+  await recordAutomationAuditLog({
+    eventType: "WEEK_CREATED",
+    scheduleWeekId: targetWeek.id,
+    actorUserId: input.actorUserId,
+    metadata: {
+      source: "week_duplicate",
+      sourceWeekId: sourceWeek.id,
+      startDate: targetWeek.startDate,
+      endDate: targetWeek.endDate
     }
   });
 
@@ -1062,15 +1063,15 @@ export async function confirmAssignment(input: {
       }
     });
 
-    await tx.assignmentActivity.create({
-      data: {
-        assignmentId: input.assignmentId,
-        actionType: "RESPONSE_RECEIVED",
-        metadata: {
-          volunteerProfileId: input.volunteerProfileId,
-          responseStatus: "CONFIRMED",
-          note: input.note
-        }
+    await recordAssignmentAuditActivity({
+      client: tx,
+      assignmentId: input.assignmentId,
+      event: "RESPONSE_RECEIVED",
+      metadata: {
+        volunteerProfileId: input.volunteerProfileId,
+        responseStatus: "CONFIRMED",
+        note: input.note,
+        source: "assignment_response"
       }
     });
 
@@ -1143,15 +1144,15 @@ export async function declineAssignment(input: {
       data: { status: "NEEDS_REPLACEMENT" }
     });
 
-    await tx.assignmentActivity.create({
-      data: {
-        assignmentId: input.assignmentId,
-        actionType: "RESPONSE_RECEIVED",
-        metadata: {
-          volunteerProfileId: input.volunteerProfileId,
-          responseStatus: "DECLINED",
-          note: input.note
-        }
+    await recordAssignmentAuditActivity({
+      client: tx,
+      assignmentId: input.assignmentId,
+      event: "RESPONSE_RECEIVED",
+      metadata: {
+        volunteerProfileId: input.volunteerProfileId,
+        responseStatus: "DECLINED",
+        note: input.note,
+        source: "assignment_response"
       }
     });
 
@@ -1337,38 +1338,20 @@ async function markExpiredInvitationIfNeeded(input: {
       return;
     }
 
-    const dedupeKey = `replacement-required:${input.id}`;
-    const existingActivity = await tx.assignmentActivity.findFirst({
-      where: {
-        assignmentId: input.assignmentId,
-        actionType: "REPLACEMENT_REQUIRED",
-        metadata: {
-          path: ["dedupeKey"],
-          equals: dedupeKey
-        }
-      },
-      select: {
-        id: true
+    await recordAssignmentAuditActivity({
+      client: tx,
+      assignmentId: input.assignmentId,
+      event: "REPLACEMENT_REQUIRED",
+      dedupeKey: `replacement-required:${input.id}`,
+      metadata: {
+        reason: "invitation_expired",
+        invitationId: input.id,
+        invitationType: input.type,
+        volunteerProfileId: input.volunteerId,
+        source: "response_attempt_after_expiration",
+        expiredAt
       }
     });
-
-    if (!existingActivity) {
-      await tx.assignmentActivity.create({
-        data: {
-          assignmentId: input.assignmentId,
-          actionType: "REPLACEMENT_REQUIRED",
-          metadata: compactJsonMetadata({
-            dedupeKey,
-            reason: "invitation_expired",
-            invitationId: input.id,
-            invitationType: input.type,
-            volunteerProfileId: input.volunteerId,
-            source: "response_attempt_after_expiration",
-            expiredAt: expiredAt.toISOString()
-          })
-        }
-      });
-    }
 
     replacementRequired = true;
   });
@@ -1568,17 +1551,16 @@ export async function respondToAssignmentInvitation(input: {
         data: { status: "REASSIGNED" }
       });
 
-      await tx.assignmentActivity.create({
-        data: {
-          assignmentId: invitation.assignmentId,
-          actionType: "REPLACEMENT_ASSIGNED",
-          metadata: {
-            volunteerProfileId: invitation.volunteerId,
-            invitationId: invitation.id,
-            position: targetPosition,
-            source: "PUBLIC_INVITATION_LINK",
-            note: input.note
-          }
+      await recordAssignmentAuditActivity({
+        client: tx,
+        assignmentId: invitation.assignmentId,
+        event: "REPLACEMENT_ASSIGNED",
+        metadata: {
+          volunteerProfileId: invitation.volunteerId,
+          invitationId: invitation.id,
+          position: targetPosition,
+          source: "PUBLIC_INVITATION_LINK",
+          note: input.note
         }
       });
 
@@ -1675,19 +1657,18 @@ export async function respondToAssignmentInvitation(input: {
       });
     }
 
-    await tx.assignmentActivity.create({
-      data: {
-        assignmentId: invitation.assignmentId,
-        actionType: "RESPONSE_RECEIVED",
-        metadata: {
-          volunteerProfileId: invitation.volunteerId,
-          responseStatus: input.responseStatus,
-          note: input.note,
-          invitationId: invitation.id,
-          invitationType: invitation.type,
-          source: "PUBLIC_INVITATION_LINK",
-          replacementAutomationPending: input.responseStatus === "DECLINED"
-        }
+    await recordAssignmentAuditActivity({
+      client: tx,
+      assignmentId: invitation.assignmentId,
+      event: "RESPONSE_RECEIVED",
+      metadata: {
+        volunteerProfileId: invitation.volunteerId,
+        responseStatus: input.responseStatus,
+        note: input.note,
+        invitationId: invitation.id,
+        invitationType: invitation.type,
+        source: "PUBLIC_INVITATION_LINK",
+        replacementAutomationPending: input.responseStatus === "DECLINED"
       }
     });
 
@@ -2014,15 +1995,15 @@ export async function assignReplacementVolunteer(input: {
       }
     });
 
-    await tx.assignmentActivity.create({
-      data: {
-        assignmentId: input.assignmentId,
-        actorUserId: input.actorUserId,
-        actionType: "REPLACEMENT_ASSIGNED",
-        metadata: {
-          volunteerId: input.volunteerId,
-          position: targetPosition
-        }
+    await recordAssignmentAuditActivity({
+      client: tx,
+      assignmentId: input.assignmentId,
+      actorUserId: input.actorUserId,
+      event: "REPLACEMENT_ASSIGNED",
+      metadata: {
+        volunteerProfileId: input.volunteerId,
+        position: targetPosition,
+        source: "manual_replacement_assignment"
       }
     });
 

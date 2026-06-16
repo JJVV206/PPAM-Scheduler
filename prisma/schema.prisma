@@ -450,6 +450,32 @@ model AppSetting {
   createdAt DateTime @default(now())
 }
 
+model AutomationAuditLog {
+  id               String   @id @default(cuid())
+  eventType        String
+  eventCategory    String
+  status           String?
+  assignmentId     String?
+  scheduleWeekId   String?
+  censusId         String?
+  censusResponseId String?
+  invitationId     String?
+  notificationLogId String?
+  appNotificationId String?
+  actorUserId      String?
+  automationRunId  String?
+  metadata         Json?
+  createdAt        DateTime @default(now())
+
+  @@index([eventType, createdAt])
+  @@index([automationRunId, createdAt])
+  @@index([assignmentId, createdAt])
+  @@index([scheduleWeekId, createdAt])
+  @@index([censusId, createdAt])
+  @@index([censusResponseId, createdAt])
+  @@index([invitationId, createdAt])
+}
+
 model PasswordResetToken {
   id        String    @id @default(cuid())
   userId    String

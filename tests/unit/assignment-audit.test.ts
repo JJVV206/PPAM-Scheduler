@@ -10,16 +10,24 @@ import {
 describe("assignment audit helpers", () => {
   it("covers the automation events required by the email assignment plan", () => {
     expect(ASSIGNMENT_AUDIT_EVENTS).toEqual([
+      "ASSIGNED",
+      "REPLACEMENT_REQUIRED",
+      "RESPONSE_RECEIVED",
       "INVITATION_CREATED",
       "INVITATION_SENT",
       "INVITATION_FAILED",
       "INVITATION_ACCEPTED",
       "INVITATION_DECLINED",
       "INVITATION_EXPIRED",
+      "REPLACEMENT_ASSIGNED",
       "REPLACEMENT_SELECTED",
       "NO_REPLACEMENT_AVAILABLE",
       "ADMIN_ALERTED",
-      "REMINDER_SENT"
+      "REMINDER_SENT",
+      "ASSIGNMENT_COVERED",
+      "MANUAL_OVERRIDE",
+      "NOTES_UPDATED",
+      "CANCELLED"
     ]);
     expect(ASSIGNMENT_AUDIT_EVENT_ACTIONS.INVITATION_CREATED).toBe(
       "INVITATION_CREATED"
@@ -60,7 +68,9 @@ describe("assignment audit helpers", () => {
         kept: true,
         dropped: undefined
       },
-      list: ["ok", undefined, new Date("2026-06-16T13:00:00.000Z")]
+      list: ["ok", undefined, new Date("2026-06-16T13:00:00.000Z")],
+      token: "do-not-store",
+      responseUrl: "https://example.org/confirm/secret-token"
     });
 
     expect(metadata).toEqual({

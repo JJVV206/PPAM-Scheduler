@@ -9,6 +9,7 @@ import {
 import { db } from "@/lib/db/prisma";
 import { getAppBaseUrl, getSmtpConfig } from "@/lib/env/config";
 import { humanizeErrorMessage } from "@/lib/utils/error-message";
+import { safeJsonMetadata } from "@/lib/utils/safe-metadata";
 import { AppError } from "@/services/errors";
 import { buildAssignmentReminderEmail } from "@/services/email-template.service";
 
@@ -23,52 +24,10 @@ type NotificationPayload = {
   metadata?: Record<string, unknown>;
 };
 
-const SENSITIVE_METADATA_KEYS = new Set([
-  "confirmationLink",
-  "confirmationToken",
-  "invitationToken",
-  "password",
-  "passwordHash",
-  "resetUrl",
-  "resetToken",
-  "responseUrl",
-  "token"
-]);
-
-function sanitizeMetadataValue(key: string, value: unknown): unknown {
-  if (SENSITIVE_METADATA_KEYS.has(key)) {
-    return undefined;
-  }
-
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => sanitizeMetadataValue("", item))
-      .filter((item) => item !== undefined);
-  }
-
-  if (value && typeof value === "object") {
-    return sanitizeNotificationMetadata(value as Record<string, unknown>);
-  }
-
-  return value;
-}
-
 export function sanitizeNotificationMetadata(
   metadata?: Record<string, unknown>
 ): Record<string, unknown> | undefined {
-  if (!metadata) {
-    return undefined;
-  }
-
-  const sanitizedEntries = Object.entries(metadata)
-    .map(([key, value]) => [key, sanitizeMetadataValue(key, value)] as const)
-    .filter(([, value]) => value !== undefined);
-
-  if (!sanitizedEntries.length) {
-    return undefined;
-  }
-
-  return Object.fromEntries(sanitizedEntries);
+  return safeJsonMetadata(metadata) as Record<string, unknown> | undefined;
 }
 
 function createTransport() {

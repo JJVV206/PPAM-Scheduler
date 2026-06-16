@@ -12,10 +12,15 @@ import { db } from "@/lib/db/prisma";
 import { DEFAULT_CENSUS_RESPONSE_TIMEOUT_HOURS } from "@/lib/constants/app";
 import { getAppBaseUrl } from "@/lib/env/config";
 import { formatDisplayDate } from "@/lib/utils";
+import {
+  compactJsonMetadata,
+  mergeJsonMetadata
+} from "@/lib/utils/safe-metadata";
 import { sendEmailNotification } from "@/services/notification.service";
 import { getAssignmentAutomationSettings } from "@/services/setting.service";
 import { buildReplacementCensusInvitationEmail } from "@/services/email-template.service";
 import { AppError } from "@/services/errors";
+import { recordAutomationAuditLog } from "@/services/automation-audit-log.service";
 
 const TOKEN_BYTES = 32;
 const MAX_TOKEN_GENERATION_ATTEMPTS = 3;
@@ -87,27 +92,14 @@ function isUniqueTokenConflict(error: unknown) {
 }
 
 function compactMetadata(metadata: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(metadata).filter(([, value]) => value !== undefined)
-  ) as Prisma.InputJsonObject;
-}
-
-function asMetadataObject(value: Prisma.JsonValue | null) {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-
-  return {};
+  return compactJsonMetadata(metadata);
 }
 
 function mergeMetadata(
   current: Prisma.JsonValue | null,
   next: Record<string, unknown>
 ) {
-  return compactMetadata({
-    ...asMetadataObject(current),
-    ...next
-  });
+  return mergeJsonMetadata(current, next);
 }
 
 function buildWeekLabel(input: { startDate: Date; endDate: Date }) {
@@ -311,6 +303,7 @@ export async function openReplacementCensusForWeek(input: {
       openedAt: openedAt.toISOString(),
       ...input.metadata
     });
+    const createdNewCensus = !week.census;
     const census =
       week.census ??
       (await tx.replacementCensus.create({
@@ -393,6 +386,27 @@ export async function openReplacementCensusForWeek(input: {
       });
       createdResponseCount += 1;
     }
+
+    await recordAutomationAuditLog({
+      client: tx,
+      eventType: "CENSUS_CREATED",
+      status: createdNewCensus ? "SUCCESS" : "SKIPPED",
+      scheduleWeekId: week.id,
+      censusId: openedCensus.id,
+      actorUserId: input.actorUserId,
+      automationRunId:
+        typeof input.metadata?.automationRunId === "string"
+          ? input.metadata.automationRunId
+          : undefined,
+      metadata: {
+        source: "replacement_census",
+        openedStatus: openedCensus.status,
+        replacementCount: replacements.length,
+        createdResponseCount,
+        skippedResponseCount: existingResponses.length,
+        closesAt: openedCensus.closesAt
+      }
+    });
 
     return {
       census: openedCensus,
@@ -572,11 +586,28 @@ export async function sendPendingReplacementCensusInvitations(input: {
       await sendReplacementCensusResponseEmail(response, input.automationRunId)
     );
   }
+  const sentCount = results.filter((result) => result.status === "SENT").length;
+  const failedCount = results.filter(
+    (result) => result.status === "FAILED"
+  ).length;
+
+  await recordAutomationAuditLog({
+    eventType: "CENSUS_SENT",
+    status: failedCount > 0 ? "FAILED" : "SUCCESS",
+    censusId: input.censusId,
+    automationRunId: input.automationRunId,
+    metadata: {
+      totalCount: results.length,
+      sentCount,
+      failedCount,
+      responseIds: results.map((result) => result.responseId)
+    }
+  });
 
   return {
     totalCount: results.length,
-    sentCount: results.filter((result) => result.status === "SENT").length,
-    failedCount: results.filter((result) => result.status === "FAILED").length,
+    sentCount,
+    failedCount,
     results
   };
 }
@@ -728,6 +759,23 @@ async function saveReplacementCensusAvailability(input: {
     },
     data: {
       readAt: input.now
+    }
+  });
+
+  await recordAutomationAuditLog({
+    client: input.tx,
+    eventType: "CENSUS_RESPONDED",
+    status: "SUCCESS",
+    scheduleWeekId: input.response.census.scheduleWeekId,
+    censusId: input.response.censusId,
+    censusResponseId: input.response.id,
+    actorUserId: input.actorUserId,
+    metadata: {
+      source: input.source,
+      volunteerProfileId: input.response.volunteerId,
+      responseStatus,
+      availableDayCount: input.days.filter((day) => day.available).length,
+      savedAvailabilityCount: rows.length
     }
   });
 
