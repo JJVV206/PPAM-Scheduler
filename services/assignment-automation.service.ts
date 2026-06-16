@@ -33,6 +33,7 @@ import {
   getAssignmentAutomationSettings,
   type AssignmentAutomationSettings
 } from "@/services/setting.service";
+import { getAppBaseUrl } from "@/lib/env/config";
 
 const TERMINAL_ASSIGNMENT_STATUSES = ["CANCELLED", "COMPLETED"] as const;
 
@@ -87,6 +88,14 @@ export type SendDueAssignmentRemindersResult = AssignmentAutomationStepResult & 
   duplicateCount: number;
 };
 
+export type NotifyAdminsForUnresolvedAssignmentsResult =
+  AssignmentAutomationStepResult & {
+    alertedCount: number;
+    sentCount: number;
+    failedCount: number;
+    duplicateCount: number;
+  };
+
 export type AssignmentAutomationRunResult = {
   startedAt: string;
   finishedAt: string;
@@ -95,7 +104,7 @@ export type AssignmentAutomationRunResult = {
   processAssignmentsNeedingReplacement: ProcessAssignmentsNeedingReplacementResult;
   inviteNextAvailableReplacement: ReplacementCandidateSelectionResult;
   sendDueAssignmentReminders: SendDueAssignmentRemindersResult;
-  notifyAdminsForUnresolvedAssignments: AssignmentAutomationStepResult;
+  notifyAdminsForUnresolvedAssignments: NotifyAdminsForUnresolvedAssignmentsResult;
 };
 
 type ExpirableInvitation = AssignmentInvitation & {
@@ -131,6 +140,30 @@ type AssignmentReminderRecipient = {
   invitationType?: AssignmentInvitationType;
 };
 
+type AdminAssignmentAlertReason =
+  | "NO_REPLACEMENT_AVAILABLE"
+  | "INVITATION_EMAIL_FAILED";
+
+type AdminAssignmentAlertDeliveryResult = {
+  sentCount: number;
+  failedCount: number;
+  skipped: boolean;
+};
+
+export type AdminAssignmentAlertEmailInput = {
+  reason: AdminAssignmentAlertReason;
+  reasonLabel: string;
+  dateLabel: string;
+  timeSlotLabel: string;
+  pointName: string;
+  originalVolunteerNames: string[];
+  attemptedReplacementNames: string[];
+  assignmentUrl: string;
+  affectedVolunteerName?: string;
+  invitationType?: AssignmentInvitationType;
+  errorMessage?: string;
+};
+
 function asMetadataObject(value: Prisma.JsonValue | null) {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     return value as Record<string, unknown>;
@@ -159,15 +192,6 @@ function isTerminalAssignment(status: Assignment["status"]) {
   return TERMINAL_ASSIGNMENT_STATUSES.includes(
     status as (typeof TERMINAL_ASSIGNMENT_STATUSES)[number]
   );
-}
-
-function skippedStep(detail: string): AssignmentAutomationStepResult {
-  return {
-    status: "skipped",
-    processedCount: 0,
-    skippedCount: 0,
-    detail
-  };
 }
 
 function escapeHtml(value: string) {
@@ -320,6 +344,76 @@ function buildAssignmentReminderEmail(input: {
   };
 }
 
+function formatNameList(names: string[], fallback = "No registrado") {
+  return names.length ? names.join(", ") : fallback;
+}
+
+function uniqueNames(names: string[]) {
+  return [...new Set(names.filter((name) => name.trim().length > 0))];
+}
+
+function getAdminAssignmentUrl(assignmentId: string) {
+  return `${getAppBaseUrl()}/admin/assignments/${encodeURIComponent(
+    assignmentId
+  )}`;
+}
+
+function getInvitationTypeLabel(invitationType?: AssignmentInvitationType) {
+  if (!invitationType) {
+    return undefined;
+  }
+
+  return invitationType === "REPLACEMENT" ? "Suplente" : "Titular";
+}
+
+export function buildAdminAssignmentAlertEmail(
+  input: AdminAssignmentAlertEmailInput
+) {
+  const subject =
+    input.reason === "INVITATION_EMAIL_FAILED"
+      ? `Urgente: fallo de email para ${input.dateLabel}, ${input.timeSlotLabel}`
+      : `Urgente: asignación sin cobertura para ${input.dateLabel}, ${input.timeSlotLabel}`;
+  const escapedAssignmentUrl = escapeHtml(input.assignmentUrl);
+  const invitationTypeLabel = getInvitationTypeLabel(input.invitationType);
+  const optionalRows = [
+    input.affectedVolunteerName
+      ? `<li><strong>Voluntario afectado:</strong> ${escapeHtml(
+          input.affectedVolunteerName
+        )}</li>`
+      : "",
+    invitationTypeLabel
+      ? `<li><strong>Tipo de invitación:</strong> ${escapeHtml(
+          invitationTypeLabel
+        )}</li>`
+      : "",
+    input.errorMessage
+      ? `<li><strong>Error de email:</strong> ${escapeHtml(input.errorMessage)}</li>`
+      : ""
+  ].filter(Boolean);
+
+  return {
+    subject,
+    html: [
+      "<p>Se requiere intervención humana para una asignación de PPAM.</p>",
+      "<ul>",
+      `<li><strong>Fecha:</strong> ${escapeHtml(input.dateLabel)}</li>`,
+      `<li><strong>Horario:</strong> ${escapeHtml(input.timeSlotLabel)}</li>`,
+      `<li><strong>Punto:</strong> ${escapeHtml(input.pointName)}</li>`,
+      `<li><strong>Titular original:</strong> ${escapeHtml(
+        formatNameList(input.originalVolunteerNames)
+      )}</li>`,
+      `<li><strong>Suplentes intentados:</strong> ${escapeHtml(
+        formatNameList(input.attemptedReplacementNames, "Ninguno")
+      )}</li>`,
+      `<li><strong>Razón:</strong> ${escapeHtml(input.reasonLabel)}</li>`,
+      ...optionalRows,
+      "</ul>",
+      `<p><a href="${escapedAssignmentUrl}">Abrir detalle de la asignación</a></p>`,
+      `<p>URL directa: ${escapedAssignmentUrl}</p>`
+    ].join("")
+  };
+}
+
 async function hasReplacementRequiredActivity(
   assignmentId: string,
   tx: Prisma.TransactionClient
@@ -400,15 +494,68 @@ async function createNoReplacementAvailableActivityOnce(input: {
   return true;
 }
 
-async function alertAdminsForNoReplacementAvailable(assignmentId: string) {
-  const alreadyAlerted = await db.assignmentActivity.findFirst({
+async function hasAdminAlerted(input: {
+  assignmentId: string;
+  alertKey: string;
+  legacyReason?: AdminAssignmentAlertReason;
+}) {
+  const alert = await db.assignmentActivity.findFirst({
     where: {
-      assignmentId,
-      actionType: "ADMIN_ALERTED"
+      assignmentId: input.assignmentId,
+      actionType: "ADMIN_ALERTED",
+      metadata: {
+        path: ["alertKey"],
+        equals: input.alertKey
+      }
     },
     select: {
       id: true
     }
+  });
+
+  if (alert) {
+    return true;
+  }
+
+  if (!input.legacyReason) {
+    return false;
+  }
+
+  const legacyAlert = await db.assignmentActivity.findFirst({
+    where: {
+      assignmentId: input.assignmentId,
+      actionType: "ADMIN_ALERTED",
+      metadata: {
+        path: ["reason"],
+        equals: input.legacyReason
+      }
+    },
+    select: {
+      id: true
+    }
+  });
+
+  return Boolean(legacyAlert);
+}
+
+async function alertAdminsForAssignment(input: {
+  assignmentId: string;
+  alertKey: string;
+  reason: AdminAssignmentAlertReason;
+  reasonLabel: string;
+  failedInvitation?: {
+    id: string;
+    type: AssignmentInvitationType;
+    volunteerProfileId: string;
+    volunteerName: string;
+    errorMessage?: string;
+  };
+}): Promise<AdminAssignmentAlertDeliveryResult> {
+  const alreadyAlerted = await hasAdminAlerted({
+    assignmentId: input.assignmentId,
+    alertKey: input.alertKey,
+    legacyReason:
+      input.reason === "NO_REPLACEMENT_AVAILABLE" ? input.reason : undefined
   });
 
   if (alreadyAlerted) {
@@ -422,7 +569,7 @@ async function alertAdminsForNoReplacementAvailable(assignmentId: string) {
   const [assignment, admins] = await Promise.all([
     db.assignment.findUniqueOrThrow({
       where: {
-        id: assignmentId
+        id: input.assignmentId
       },
       include: {
         preachingPoint: true,
@@ -460,21 +607,42 @@ async function alertAdminsForNoReplacementAvailable(assignmentId: string) {
     })
   ]);
 
-  await db.$transaction(async (tx) => {
-    await createNoReplacementAvailableActivityOnce({
-      assignmentId,
-      tx
+  if (input.reason === "NO_REPLACEMENT_AVAILABLE") {
+    await db.$transaction(async (tx) => {
+      await createNoReplacementAvailableActivityOnce({
+        assignmentId: input.assignmentId,
+        tx
+      });
     });
-  });
+  }
 
   const dateLabel = formatDisplayDate(
     assignment.date,
     "EEEE d 'de' MMMM"
   );
   const timeSlotLabel = TIME_SLOT_DEFINITIONS[assignment.timeSlot].label;
-  const attemptedNames = assignment.invitations.map(
-    (invitation) => invitation.volunteer.user.name
+  const originalVolunteerNames = uniqueNames(
+    assignment.volunteers
+      .filter((slot) => !slot.isReplacement)
+      .map((slot) => slot.volunteer.user.name)
   );
+  const attemptedReplacementNames = uniqueNames(
+    assignment.invitations.map((invitation) => invitation.volunteer.user.name)
+  );
+  const assignmentUrl = getAdminAssignmentUrl(input.assignmentId);
+  const email = buildAdminAssignmentAlertEmail({
+    reason: input.reason,
+    reasonLabel: input.reasonLabel,
+    dateLabel,
+    timeSlotLabel,
+    pointName: assignment.preachingPoint.name ?? FIXED_PREACHING_POINT_NAME,
+    originalVolunteerNames,
+    attemptedReplacementNames,
+    assignmentUrl,
+    affectedVolunteerName: input.failedInvitation?.volunteerName,
+    invitationType: input.failedInvitation?.type,
+    errorMessage: input.failedInvitation?.errorMessage
+  });
   let sentCount = 0;
   let failedCount = 0;
 
@@ -482,23 +650,19 @@ async function alertAdminsForNoReplacementAvailable(assignmentId: string) {
     try {
       const notification = await sendEmailNotification({
         userId: admin.id,
-        assignmentId,
+        assignmentId: input.assignmentId,
         type: "ASSIGNMENT_UPDATE",
-        subject: `Urgente: asignación sin cobertura para ${dateLabel}, ${timeSlotLabel}`,
-        html: [
-          `<p>Se requiere intervención humana para una asignación de PPAM.</p>`,
-          "<ul>",
-          `<li><strong>Fecha:</strong> ${dateLabel}</li>`,
-          `<li><strong>Horario:</strong> ${timeSlotLabel}</li>`,
-          `<li><strong>Punto:</strong> ${FIXED_PREACHING_POINT_NAME}</li>`,
-          `<li><strong>Suplentes intentados:</strong> ${
-            attemptedNames.length ? attemptedNames.join(", ") : "Ninguno"
-          }</li>`,
-          "</ul>"
-        ].join(""),
+        subject: email.subject,
+        html: email.html,
         metadata: {
-          reason: "NO_REPLACEMENT_AVAILABLE",
-          attemptedReplacementCount: attemptedNames.length,
+          alertKey: input.alertKey,
+          reason: input.reason,
+          attemptedReplacementCount: attemptedReplacementNames.length,
+          originalVolunteerCount: originalVolunteerNames.length,
+          assignmentUrl,
+          failedInvitationId: input.failedInvitation?.id,
+          failedInvitationType: input.failedInvitation?.type,
+          failedVolunteerProfileId: input.failedInvitation?.volunteerProfileId,
           dayOfWeek: DAY_LABELS[assignment.dayOfWeek],
           timeSlot: assignment.timeSlot
         }
@@ -514,24 +678,43 @@ async function alertAdminsForNoReplacementAvailable(assignmentId: string) {
     }
   }
 
-  await db.assignmentActivity.create({
-    data: {
-      assignmentId,
-      actionType: "ADMIN_ALERTED",
-      metadata: {
-        reason: "NO_REPLACEMENT_AVAILABLE",
-        adminCount: admins.length,
-        sentCount,
-        failedCount
+  if (sentCount > 0) {
+    await db.assignmentActivity.create({
+      data: {
+        assignmentId: input.assignmentId,
+        actionType: "ADMIN_ALERTED",
+        metadata: compactMetadata({
+          alertKey: input.alertKey,
+          reason: input.reason,
+          adminCount: admins.length,
+          sentCount,
+          failedCount,
+          attemptedReplacementCount: attemptedReplacementNames.length,
+          originalVolunteerCount: originalVolunteerNames.length,
+          assignmentUrl,
+          failedInvitationId: input.failedInvitation?.id,
+          failedInvitationType: input.failedInvitation?.type,
+          failedVolunteerProfileId: input.failedInvitation?.volunteerProfileId
+        })
       }
-    }
-  });
+    });
+  }
 
   return {
     sentCount,
     failedCount,
     skipped: false
   };
+}
+
+async function alertAdminsForNoReplacementAvailable(assignmentId: string) {
+  return alertAdminsForAssignment({
+    assignmentId,
+    alertKey: `no-replacement-available:${assignmentId}`,
+    reason: "NO_REPLACEMENT_AVAILABLE",
+    reasonLabel:
+      "No hay suplentes disponibles o ya se intentaron todos los candidatos elegibles."
+  });
 }
 
 async function reconcileInvitationFromExistingResponse(input: {
@@ -1387,8 +1570,150 @@ export async function sendDueAssignmentReminders(input?: {
   };
 }
 
-export async function notifyAdminsForUnresolvedAssignments(): Promise<AssignmentAutomationStepResult> {
-  return skippedStep("Admin escalation emails are implemented in module 9.");
+function getInvitationFailureError(metadata: Prisma.JsonValue | null) {
+  const metadataObject = asMetadataObject(metadata);
+  const error = metadataObject.lastEmailError;
+
+  return typeof error === "string" && error.trim().length > 0
+    ? error
+    : undefined;
+}
+
+async function getAssignmentsWithoutReplacementCandidates(now: Date) {
+  const assignments = await db.assignment.findMany({
+    where: {
+      date: {
+        gte: startOfDay(now)
+      },
+      status: "NEEDS_REPLACEMENT",
+      invitations: {
+        none: {
+          type: "REPLACEMENT",
+          status: {
+            in: ACTIVE_ASSIGNMENT_INVITATION_STATUSES
+          }
+        }
+      }
+    },
+    select: {
+      id: true
+    },
+    orderBy: [
+      {
+        date: "asc"
+      },
+      {
+        timeSlot: "asc"
+      }
+    ]
+  });
+  const unresolvedAssignmentIds: string[] = [];
+
+  for (const assignment of assignments) {
+    const candidate = await selectNextReplacementCandidateForAssignment(
+      assignment.id
+    );
+
+    if (!candidate) {
+      unresolvedAssignmentIds.push(assignment.id);
+    }
+  }
+
+  return unresolvedAssignmentIds;
+}
+
+export async function notifyAdminsForUnresolvedAssignments(input?: {
+  now?: Date;
+}): Promise<NotifyAdminsForUnresolvedAssignmentsResult> {
+  const now = input?.now ?? new Date();
+  const failedInvitations = await db.assignmentInvitation.findMany({
+    where: {
+      status: "FAILED",
+      assignment: {
+        date: {
+          gte: startOfDay(now)
+        },
+        status: {
+          notIn: [...TERMINAL_ASSIGNMENT_STATUSES]
+        }
+      }
+    },
+    include: {
+      volunteer: {
+        include: {
+          user: true
+        }
+      }
+    },
+    orderBy: {
+      updatedAt: "asc"
+    }
+  });
+  const unresolvedAssignmentIds =
+    await getAssignmentsWithoutReplacementCandidates(now);
+  let sentCount = 0;
+  let failedCount = 0;
+  let duplicateCount = 0;
+  let alertedCount = 0;
+
+  for (const invitation of failedInvitations) {
+    const result = await alertAdminsForAssignment({
+      assignmentId: invitation.assignmentId,
+      alertKey: `invitation-email-failed:${invitation.id}`,
+      reason: "INVITATION_EMAIL_FAILED",
+      reasonLabel: `Falló el envío de email a ${
+        invitation.type === "REPLACEMENT" ? "un suplente" : "un titular"
+      }.`,
+      failedInvitation: {
+        id: invitation.id,
+        type: invitation.type,
+        volunteerProfileId: invitation.volunteerId,
+        volunteerName: invitation.volunteer.user.name,
+        errorMessage: getInvitationFailureError(invitation.metadata)
+      }
+    });
+
+    if (result.skipped) {
+      duplicateCount += 1;
+      continue;
+    }
+
+    if (result.sentCount > 0) {
+      alertedCount += 1;
+    }
+
+    sentCount += result.sentCount;
+    failedCount += result.failedCount;
+  }
+
+  for (const assignmentId of unresolvedAssignmentIds) {
+    const result = await alertAdminsForNoReplacementAvailable(assignmentId);
+
+    if (result.skipped) {
+      duplicateCount += 1;
+      continue;
+    }
+
+    if (result.sentCount > 0) {
+      alertedCount += 1;
+    }
+
+    sentCount += result.sentCount;
+    failedCount += result.failedCount;
+  }
+
+  const processedCount =
+    failedInvitations.length + unresolvedAssignmentIds.length;
+
+  return {
+    status: "completed",
+    processedCount,
+    skippedCount: duplicateCount,
+    alertedCount,
+    sentCount,
+    failedCount,
+    duplicateCount
+  };
 }
 
 export async function processAssignmentAutomationRun(): Promise<AssignmentAutomationRunResult> {

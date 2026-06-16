@@ -1,21 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildAdminAssignmentAlertEmail,
   buildAssignmentStartDate,
   getDueConfirmedAssignmentReminder,
   getDuePendingConfirmationReminder,
   normalizeReminderTimingDays,
-  notifyAdminsForUnresolvedAssignments,
 } from "@/services/assignment-automation.service";
-
-describe("assignment automation deferred steps", () => {
-  it("returns explicit skipped results for module-scoped future admin alerts", async () => {
-    await expect(notifyAdminsForUnresolvedAssignments()).resolves.toMatchObject({
-      status: "skipped",
-      processedCount: 0
-    });
-  });
-});
 
 describe("assignment reminder scheduling", () => {
   it("normalizes reminder timing days into a positive ascending cadence", () => {
@@ -79,5 +70,53 @@ describe("assignment reminder scheduling", () => {
       notificationType: "REMINDER",
       offsetHours: 3
     });
+  });
+});
+
+describe("admin assignment alert emails", () => {
+  it("includes the required operational context and assignment detail link", () => {
+    const email = buildAdminAssignmentAlertEmail({
+      reason: "NO_REPLACEMENT_AVAILABLE",
+      reasonLabel: "No hay suplentes disponibles.",
+      dateLabel: "viernes 12 de junio",
+      timeSlotLabel: "11:00 - 13:00",
+      pointName: "Hospital Dr Jose G. Parres",
+      originalVolunteerNames: ["Julia", "Marco"],
+      attemptedReplacementNames: ["Elena"],
+      assignmentUrl: "https://ppam.example.org/admin/assignments/assignment-1"
+    });
+
+    expect(email.subject).toContain("Urgente");
+    expect(email.html).toContain("viernes 12 de junio");
+    expect(email.html).toContain("11:00 - 13:00");
+    expect(email.html).toContain("Hospital Dr Jose G. Parres");
+    expect(email.html).toContain("Julia, Marco");
+    expect(email.html).toContain("Elena");
+    expect(email.html).toContain("No hay suplentes disponibles.");
+    expect(email.html).toContain(
+      "https://ppam.example.org/admin/assignments/assignment-1"
+    );
+  });
+
+  it("includes failed invitation details when a critical email fails", () => {
+    const email = buildAdminAssignmentAlertEmail({
+      reason: "INVITATION_EMAIL_FAILED",
+      reasonLabel: "Falló el envío de email a un suplente.",
+      dateLabel: "viernes 12 de junio",
+      timeSlotLabel: "11:00 - 13:00",
+      pointName: "Hospital Dr Jose G. Parres",
+      originalVolunteerNames: ["Julia"],
+      attemptedReplacementNames: [],
+      assignmentUrl: "https://ppam.example.org/admin/assignments/assignment-1",
+      affectedVolunteerName: "Elena",
+      invitationType: "REPLACEMENT",
+      errorMessage: "SMTP rejected recipient"
+    });
+
+    expect(email.subject).toContain("fallo de email");
+    expect(email.html).toContain("Elena");
+    expect(email.html).toContain("Suplente");
+    expect(email.html).toContain("SMTP rejected recipient");
+    expect(email.html).toContain("Ninguno");
   });
 });
