@@ -59,6 +59,7 @@ vi.mock("@/services/setting.service", () => ({
 
 import {
   buildReplacementCensusResponseUrl,
+  getReplacementCensusResponseContext,
   openReplacementCensusForWeek,
   sendPendingReplacementCensusInvitations,
   submitReplacementCensusResponse
@@ -198,6 +199,49 @@ describe("replacement census preparation", () => {
     );
   });
 
+  it("does not duplicate census responses when the weekly census is opened again", async () => {
+    const closesAt = new Date("2026-06-18T12:00:00.000Z");
+    mocks.tx.scheduleWeek.findUniqueOrThrow.mockResolvedValue({
+      ...week,
+      census: {
+        id: "census-1",
+        scheduleWeekId: "week-1",
+        status: "OPEN",
+        sentAt: null,
+        closesAt,
+        createdById: "admin-1",
+        metadata: {
+          openedBy: "week_preparation"
+        },
+        createdAt: new Date("2026-06-16T12:00:00.000Z"),
+        updatedAt: new Date("2026-06-16T12:00:00.000Z")
+      }
+    });
+    mocks.tx.volunteerProfile.findMany.mockResolvedValue([
+      { id: "volunteer-1", userId: "user-1" },
+      { id: "volunteer-2", userId: "user-2" }
+    ]);
+    mocks.tx.replacementCensusResponse.findMany.mockResolvedValue([
+      { volunteerId: "volunteer-1" },
+      { volunteerId: "volunteer-2" }
+    ]);
+
+    const result = await openReplacementCensusForWeek({
+      scheduleWeekId: "week-1",
+      actorUserId: "admin-1",
+      closesAt
+    });
+
+    expect(result).toMatchObject({
+      replacementCount: 2,
+      createdResponseCount: 0,
+      skippedResponseCount: 2
+    });
+    expect(mocks.tx.replacementCensus.create).not.toHaveBeenCalled();
+    expect(mocks.tx.replacementCensusResponse.create).not.toHaveBeenCalled();
+    expect(mocks.tx.appNotification.create).not.toHaveBeenCalled();
+  });
+
   it("sends pending census emails and marks responses as sent", async () => {
     mocks.db.replacementCensusResponse.findMany.mockResolvedValue([
       pendingCensusResponse()
@@ -247,6 +291,65 @@ describe("replacement census preparation", () => {
         })
       })
     );
+  });
+
+  it("loads public token census context with only minimum volunteer data", async () => {
+    mocks.db.replacementCensusResponse.findUnique.mockResolvedValue({
+      id: "response-1",
+      censusId: "census-1",
+      volunteerId: "volunteer-1",
+      status: "SENT",
+      token: "token-1",
+      sentAt: new Date("2026-06-16T12:00:00.000Z"),
+      respondedAt: null,
+      expiresAt: new Date("2099-06-18T12:00:00.000Z"),
+      emailAttempts: 1,
+      metadata: {},
+      createdAt: new Date("2026-06-16T12:00:00.000Z"),
+      updatedAt: new Date("2026-06-16T12:00:00.000Z"),
+      census: {
+        id: "census-1",
+        scheduleWeekId: "week-1",
+        scheduleWeek: week
+      },
+      volunteer: {
+        id: "volunteer-1",
+        userId: "user-1",
+        user: {
+          id: "user-1",
+          name: "Julia",
+          email: "julia@example.org"
+        }
+      },
+      availability: [
+        {
+          date: new Date("2026-06-15T12:00:00.000Z"),
+          dayOfWeek: "MONDAY",
+          timeSlot: null,
+          available: true,
+          notes: null
+        }
+      ]
+    });
+
+    const context = await getReplacementCensusResponseContext("token-1");
+
+    expect(context).toMatchObject({
+      state: "READY",
+      token: "token-1",
+      responseId: "response-1",
+      censusId: "census-1",
+      volunteerName: "Julia",
+      availability: [
+        expect.objectContaining({
+          dayOfWeek: "MONDAY",
+          timeSlot: null,
+          available: true
+        })
+      ]
+    });
+    expect(context).not.toHaveProperty("email");
+    expect(context).not.toHaveProperty("volunteerId");
   });
 
   it("stores weekly availability from a token response", async () => {
@@ -329,6 +432,11 @@ describe("replacement census preparation", () => {
           expect.objectContaining({
             dayOfWeek: "MONDAY",
             timeSlot: "SLOT_09_11",
+            available: true
+          }),
+          expect.objectContaining({
+            dayOfWeek: "MONDAY",
+            timeSlot: "SLOT_11_13",
             available: true
           }),
           expect.objectContaining({

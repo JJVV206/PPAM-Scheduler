@@ -102,6 +102,8 @@ vi.mock("@/services/setting.service", () => ({
 }));
 
 import {
+  expireTimedOutPrimaryInvitations,
+  expireTimedOutReplacementInvitations,
   inviteNextAvailableReplacementForAssignment,
   notifyAdminsForUnresolvedAssignments,
   processAssignmentAutomationRun,
@@ -563,6 +565,214 @@ describe("assignment automation idempotency QA", () => {
         status: "PENDING_CONFIRMATION"
       }
     });
+  });
+
+  it("expires titular invitations after the response window and marks the assignment for replacement", async () => {
+    const now = new Date(2026, 5, 18, 9, 0, 0);
+    mocks.db.assignmentInvitation.findMany.mockResolvedValue([
+      {
+        ...pendingPrimaryInvitation(),
+        expiresAt: new Date(2026, 5, 18, 9, 0, 0),
+        assignment: {
+          id: "assignment-1",
+          status: "PENDING_CONFIRMATION"
+        }
+      }
+    ]);
+    mocks.tx.assignmentResponse.findUnique.mockResolvedValue(null);
+    mocks.tx.assignmentInvitation.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await expireTimedOutPrimaryInvitations({ now });
+
+    expect(result).toMatchObject({
+      processedCount: 1,
+      expiredCount: 1,
+      replacementRequiredCount: 1
+    });
+    expect(mocks.db.assignmentInvitation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          type: {
+            in: ["PRIMARY"]
+          },
+          expiresAt: {
+            lte: now
+          }
+        })
+      })
+    );
+    expect(mocks.tx.assignmentInvitation.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "EXPIRED"
+        })
+      })
+    );
+    expect(mocks.tx.assignment.update).toHaveBeenCalledWith({
+      where: {
+        id: "assignment-1"
+      },
+      data: {
+        status: "NEEDS_REPLACEMENT"
+      }
+    });
+    expect(mocks.tx.volunteerProfile.update).toHaveBeenCalledWith({
+      where: {
+        id: "volunteer-1"
+      },
+      data: {
+        noResponseCount: {
+          increment: 1
+        }
+      }
+    });
+    expect(
+      mocks.tx.assignmentActivity.create.mock.calls.map(
+        ([call]) => call.data.actionType
+      )
+    ).toEqual(expect.arrayContaining(["INVITATION_EXPIRED", "REPLACEMENT_REQUIRED"]));
+  });
+
+  it("expires replacement invitations after their window so the next automation run can try another candidate", async () => {
+    const now = new Date(2026, 5, 16, 21, 0, 0);
+    mocks.db.assignmentInvitation.findMany.mockResolvedValue([
+      {
+        ...sentReplacementInvitation(),
+        expiresAt: now,
+        assignment: {
+          id: "assignment-1",
+          status: "PENDING_CONFIRMATION"
+        }
+      }
+    ]);
+    mocks.tx.assignmentResponse.findUnique.mockResolvedValue(null);
+    mocks.tx.assignmentInvitation.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await expireTimedOutReplacementInvitations({ now });
+
+    expect(result).toMatchObject({
+      processedCount: 1,
+      expiredCount: 1,
+      replacementRequiredCount: 1
+    });
+    expect(mocks.db.assignmentInvitation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          type: {
+            in: ["REPLACEMENT"]
+          },
+          expiresAt: {
+            lte: now
+          }
+        })
+      })
+    );
+    expect(mocks.tx.assignment.update).toHaveBeenCalledWith({
+      where: {
+        id: "assignment-1"
+      },
+      data: {
+        status: "NEEDS_REPLACEMENT"
+      }
+    });
+    expect(
+      mocks.tx.assignmentActivity.create.mock.calls.map(
+        ([call]) => call.data.actionType
+      )
+    ).toEqual(expect.arrayContaining(["INVITATION_EXPIRED", "REPLACEMENT_REQUIRED"]));
+  });
+
+  it("creates an internal admin alert when a critical invitation email fails", async () => {
+    mocks.db.assignmentInvitation.findMany.mockResolvedValue([
+      {
+        id: "failed-invitation-1",
+        assignmentId: "assignment-1",
+        volunteerId: "volunteer-1",
+        type: "PRIMARY",
+        status: "FAILED",
+        updatedAt: new Date("2026-06-16T12:00:00.000Z"),
+        metadata: {
+          lastEmailError: "SMTP rejected recipient"
+        },
+        volunteer: {
+          user: {
+            name: "Julia"
+          }
+        }
+      }
+    ]);
+    mocks.db.assignment.findMany.mockResolvedValue([]);
+    mocks.db.assignment.findUniqueOrThrow.mockResolvedValue({
+      ...replacementAssignment("PENDING_CONFIRMATION"),
+      date: new Date(2026, 5, 20),
+      dayOfWeek: "SATURDAY",
+      timeSlot: "SLOT_11_13",
+      volunteers: [
+        {
+          isReplacement: false,
+          volunteer: {
+            user: {
+              name: "Titular"
+            }
+          }
+        }
+      ],
+      invitations: [],
+      preachingPoint: {
+        name: "Hospital Dr Jose G. Parres"
+      }
+    });
+    mocks.db.user.findMany.mockResolvedValue([
+      {
+        id: "admin-1",
+        active: true,
+        role: "ADMIN",
+        email: "admin@example.org"
+      }
+    ]);
+    mocks.db.user.findUnique.mockResolvedValue({
+      id: "admin-1",
+      email: "admin@example.org"
+    });
+    mocks.db.notificationLog.create.mockResolvedValue({
+      id: "admin-notification-1",
+      status: "SENT",
+      sentAt: new Date("2026-06-16T12:00:00.000Z"),
+      errorMessage: null
+    });
+
+    const result = await notifyAdminsForUnresolvedAssignments({
+      now: new Date("2026-06-16T12:00:00.000Z")
+    });
+
+    expect(result).toMatchObject({
+      processedCount: 1,
+      alertedCount: 1,
+      sentCount: 1,
+      failedCount: 0
+    });
+    expect(mocks.db.appNotification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "admin-1",
+          assignmentId: "assignment-1",
+          type: "EMAIL_FAILED",
+          priority: "URGENT",
+          title: "Email crítico fallido"
+        })
+      })
+    );
+    expect(mocks.db.notificationLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "admin-1",
+          assignmentId: "assignment-1",
+          type: "ASSIGNMENT_UPDATE",
+          channel: "EMAIL",
+          status: "SENT"
+        })
+      })
+    );
   });
 
   it.each([
