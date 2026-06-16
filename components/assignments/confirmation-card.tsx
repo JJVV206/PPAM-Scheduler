@@ -13,6 +13,7 @@ import { formatDisplayDate } from "@/lib/utils";
 type ConfirmationCardProps = {
   assignmentId?: string;
   responseId?: string;
+  invitationToken?: string;
   pointName: string;
   date: Date;
   timeSlot: import("@/types/domain").TimeSlot;
@@ -21,6 +22,7 @@ type ConfirmationCardProps = {
 export function ConfirmationCard({
   assignmentId,
   responseId,
+  invitationToken,
   pointName,
   date,
   timeSlot
@@ -33,19 +35,23 @@ export function ConfirmationCard({
     tone: "success" | "error";
     text: string;
   } | null>(null);
+  const [completed, setCompleted] = useState(false);
 
   async function respond(intent: "confirm" | "decline") {
     setSubmitting(intent);
     setFeedback(null);
-    const endpoint = responseId
-      ? `/api/assignment-responses/${responseId}/${intent}`
-      : `/api/assignments/${assignmentId}/${intent}`;
+    const normalizedNote = note.trim();
+    const endpoint = invitationToken
+      ? `/api/assignment-invitations/${encodeURIComponent(invitationToken)}/${intent}`
+      : responseId
+        ? `/api/assignment-responses/${responseId}/${intent}`
+        : `/api/assignments/${assignmentId}/${intent}`;
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ note })
+      body: JSON.stringify({ note: normalizedNote || undefined })
     });
     const result = await response.json();
     setFeedback({
@@ -54,6 +60,7 @@ export function ConfirmationCard({
         ? `Respuesta guardada: ${intent === "confirm" ? "confirmada" : "rechazada"}.`
         : result.error
     });
+    setCompleted(response.ok);
     setSubmitting(null);
   }
 
@@ -84,17 +91,17 @@ export function ConfirmationCard({
             className="w-full"
             size="lg"
             onClick={() => respond("confirm")}
-            disabled={submitting !== null}
+            disabled={completed || submitting !== null}
           >
             <CheckCircle2 className="h-4 w-4" />
-            {submitting === "confirm" ? "Guardando..." : "Sí asistiré"}
+            {submitting === "confirm" ? "Guardando..." : "Sí podré asistir"}
           </Button>
           <Button
             variant="secondary"
             className="w-full"
             size="lg"
             onClick={() => respond("decline")}
-            disabled={submitting !== null}
+            disabled={completed || submitting !== null}
           >
             <CircleOff className="h-4 w-4" />
             {submitting === "decline" ? "Guardando..." : "No podré asistir"}

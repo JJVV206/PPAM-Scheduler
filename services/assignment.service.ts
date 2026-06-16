@@ -39,10 +39,12 @@ import {
   resendConfirmationReminder
 } from "@/services/notification.service";
 import {
+  ACTIVE_ASSIGNMENT_INVITATION_STATUSES,
+  buildAssignmentInvitationResponseUrl,
   createPendingPrimaryInvitationsForAssignment,
+  getAssignmentInvitationAvailability,
   sendPendingPrimaryInvitationsForAssignment
 } from "@/services/assignment-invitation.service";
-import { getAppBaseUrl } from "@/lib/env/config";
 import { safePercentage } from "@/lib/utils";
 import { determineAssignmentStatus } from "@/services/assignment-engine";
 import { getSingletonPreachingPoint } from "@/services/point.service";
@@ -237,10 +239,6 @@ async function assertPointSupportsSlot(input: {
   }
 }
 
-function buildConfirmationLink(responseId: string) {
-  return `${getAppBaseUrl()}/volunteer/confirm/${responseId}`;
-}
-
 async function assertNoVolunteerConflicts(input: {
   assignmentId?: string;
   date: Date;
@@ -331,6 +329,30 @@ async function getNextPairNumber(input: {
   });
 
   return (result._max.pairNumber ?? 0) + 1;
+}
+
+function asJsonObject(value: Prisma.JsonValue | null) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return {};
+}
+
+function compactJsonMetadata(metadata: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(metadata).filter(([, value]) => value !== undefined)
+  ) as Prisma.InputJsonObject;
+}
+
+function mergeJsonMetadata(
+  current: Prisma.JsonValue | null,
+  next: Record<string, unknown>
+) {
+  return compactJsonMetadata({
+    ...asJsonObject(current),
+    ...next
+  });
 }
 
 export async function recalculateAssignmentStatus(
@@ -920,6 +942,247 @@ export async function declineAssignment(input: {
   return mapAssignmentDetail(assignment);
 }
 
+export type AssignmentInvitationConfirmationContext =
+  | {
+      state: "READY";
+      token: string;
+      invitationType: "PRIMARY" | "REPLACEMENT";
+      date: Date;
+      timeSlot: TimeSlot;
+      pointName: string;
+      expiresAt: Date;
+    }
+  | {
+      state: "NOT_FOUND";
+    }
+  | {
+      state: "EXPIRED" | "RESPONDED" | "FAILED";
+      token: string;
+      invitationType: "PRIMARY" | "REPLACEMENT";
+      date: Date;
+      timeSlot: TimeSlot;
+      pointName: string;
+      expiresAt: Date;
+      respondedAt?: Date | null;
+    };
+
+export async function getAssignmentInvitationConfirmationContext(
+  token: string
+): Promise<AssignmentInvitationConfirmationContext> {
+  const invitation = await db.assignmentInvitation.findUnique({
+    where: { token },
+    include: {
+      assignment: {
+        include: {
+          preachingPoint: true
+        }
+      }
+    }
+  });
+
+  if (!invitation) {
+    return {
+      state: "NOT_FOUND"
+    };
+  }
+
+  const availability = getAssignmentInvitationAvailability({
+    status: invitation.status,
+    expiresAt: invitation.expiresAt,
+    respondedAt: invitation.respondedAt
+  });
+  const context = {
+    token: invitation.token,
+    invitationType: invitation.type,
+    date: invitation.assignment.date,
+    timeSlot: invitation.assignment.timeSlot,
+    pointName: FIXED_PREACHING_POINT_NAME,
+    expiresAt: invitation.expiresAt,
+    respondedAt: invitation.respondedAt
+  };
+
+  if (availability === "READY") {
+    return {
+      state: "READY",
+      ...context
+    };
+  }
+
+  return {
+    state: availability,
+    ...context
+  };
+}
+
+function getInvitationResponseError(state: Exclude<
+  AssignmentInvitationConfirmationContext["state"],
+  "READY"
+>) {
+  switch (state) {
+    case "NOT_FOUND":
+      return new AppError("No se encontró esta invitación.", 404);
+    case "EXPIRED":
+      return new AppError("Esta invitación ya expiró.", 410);
+    case "RESPONDED":
+      return new AppError("Esta invitación ya fue respondida.", 409);
+    case "FAILED":
+      return new AppError(
+        "Esta invitación no está disponible. Solicita una nueva invitación.",
+        409
+      );
+  }
+}
+
+async function markExpiredInvitationIfNeeded(input: {
+  id: string;
+  metadata: Prisma.JsonValue | null;
+}) {
+  await db.assignmentInvitation.update({
+    where: { id: input.id },
+    data: {
+      status: "EXPIRED",
+      metadata: mergeJsonMetadata(input.metadata, {
+        expiredAt: new Date().toISOString(),
+        expireReason: "response_attempt_after_expiration"
+      })
+    }
+  });
+}
+
+export async function respondToAssignmentInvitation(input: {
+  token: string;
+  responseStatus: "CONFIRMED" | "DECLINED";
+  note?: string;
+}) {
+  const preflightInvitation = await db.assignmentInvitation.findUnique({
+    where: { token: input.token }
+  });
+
+  if (!preflightInvitation) {
+    throw getInvitationResponseError("NOT_FOUND");
+  }
+
+  const preflightAvailability = getAssignmentInvitationAvailability({
+    status: preflightInvitation.status,
+    expiresAt: preflightInvitation.expiresAt,
+    respondedAt: preflightInvitation.respondedAt
+  });
+
+  if (preflightAvailability === "EXPIRED") {
+    if (preflightInvitation.status !== "EXPIRED") {
+      await markExpiredInvitationIfNeeded({
+        id: preflightInvitation.id,
+        metadata: preflightInvitation.metadata
+      });
+    }
+    throw getInvitationResponseError("EXPIRED");
+  }
+
+  if (preflightAvailability !== "READY") {
+    throw getInvitationResponseError(preflightAvailability);
+  }
+
+  const now = new Date();
+  const assignment = await db.$transaction(async (tx) => {
+    const invitation = await tx.assignmentInvitation.findUniqueOrThrow({
+      where: { token: input.token }
+    });
+    const availability = getAssignmentInvitationAvailability({
+      status: invitation.status,
+      expiresAt: invitation.expiresAt,
+      respondedAt: invitation.respondedAt,
+      now
+    });
+
+    if (availability !== "READY") {
+      throw getInvitationResponseError(availability);
+    }
+
+    await tx.assignmentInvitation.update({
+      where: { id: invitation.id },
+      data: {
+        status:
+          input.responseStatus === "CONFIRMED" ? "ACCEPTED" : "DECLINED",
+        respondedAt: now,
+        metadata: mergeJsonMetadata(invitation.metadata, {
+          responseStatus: input.responseStatus,
+          respondedVia: "PUBLIC_INVITATION_LINK",
+          responseRecordedAt: now.toISOString()
+        })
+      }
+    });
+
+    await tx.assignmentResponse.upsert({
+      where: {
+        assignmentId_volunteerId: {
+          assignmentId: invitation.assignmentId,
+          volunteerId: invitation.volunteerId
+        }
+      },
+      update: {
+        responseStatus: input.responseStatus,
+        note: input.note,
+        respondedAt: now
+      },
+      create: {
+        assignmentId: invitation.assignmentId,
+        volunteerId: invitation.volunteerId,
+        responseStatus: input.responseStatus,
+        note: input.note,
+        respondedAt: now
+      }
+    });
+
+    if (input.responseStatus === "DECLINED") {
+      await tx.assignment.update({
+        where: { id: invitation.assignmentId },
+        data: { status: "NEEDS_REPLACEMENT" }
+      });
+    }
+
+    await tx.assignmentActivity.create({
+      data: {
+        assignmentId: invitation.assignmentId,
+        actionType: "RESPONSE_RECEIVED",
+        metadata: {
+          volunteerProfileId: invitation.volunteerId,
+          responseStatus: input.responseStatus,
+          note: input.note,
+          invitationId: invitation.id,
+          invitationType: invitation.type,
+          source: "PUBLIC_INVITATION_LINK",
+          replacementAutomationPending: input.responseStatus === "DECLINED"
+        }
+      }
+    });
+
+    await tx.volunteerProfile.update({
+      where: { id: invitation.volunteerId },
+      data:
+        input.responseStatus === "CONFIRMED"
+          ? {
+              confirmationCount: {
+                increment: 1
+              }
+            }
+          : {
+              declineCount: {
+                increment: 1
+              }
+            }
+    });
+
+    await recalculateAssignmentStatus(invitation.assignmentId, tx);
+
+    return tx.assignment.findUniqueOrThrow({
+      where: { id: invitation.assignmentId },
+      include: assignmentInclude
+    });
+  });
+
+  return mapAssignmentDetail(assignment);
+}
+
 async function getAssignmentResponseContext(responseId: string) {
   const response = await db.assignmentResponse.findUnique({
     where: { id: responseId }
@@ -934,9 +1197,17 @@ async function getAssignmentResponseContext(responseId: string) {
 
 export async function confirmAssignmentResponseById(input: {
   responseId: string;
+  volunteerProfileId?: string;
   note?: string;
 }) {
   const response = await getAssignmentResponseContext(input.responseId);
+
+  if (
+    input.volunteerProfileId &&
+    response.volunteerId !== input.volunteerProfileId
+  ) {
+    throw new AppError("No puedes responder esta asignación.", 403);
+  }
 
   return confirmAssignment({
     assignmentId: response.assignmentId,
@@ -947,9 +1218,17 @@ export async function confirmAssignmentResponseById(input: {
 
 export async function declineAssignmentResponseById(input: {
   responseId: string;
+  volunteerProfileId?: string;
   note?: string;
 }) {
   const response = await getAssignmentResponseContext(input.responseId);
+
+  if (
+    input.volunteerProfileId &&
+    response.volunteerId !== input.volunteerProfileId
+  ) {
+    throw new AppError("No puedes responder esta asignación.", 403);
+  }
 
   return declineAssignment({
     assignmentId: response.assignmentId,
@@ -1323,13 +1602,29 @@ export async function resendAssignmentConfirmation(assignmentId: string) {
     throw new AppError("No hay confirmaciones pendientes para reenviar.", 400);
   }
 
+  const activeInvitations = await db.assignmentInvitation.findMany({
+    where: {
+      assignmentId,
+      volunteerId: {
+        in: pendingVolunteers.map((slot) => slot.volunteerId)
+      },
+      type: "PRIMARY",
+      status: {
+        in: ACTIVE_ASSIGNMENT_INVITATION_STATUSES
+      }
+    },
+    orderBy: {
+      createdAt: "desc"
+    }
+  });
+
   await Promise.all(
     pendingVolunteers.map(async (slot) => {
-      const response = assignment.responses.find(
+      const invitation = activeInvitations.find(
         (item) => item.volunteerId === slot.volunteerId
       );
-      const confirmationLink = response
-        ? buildConfirmationLink(response.id)
+      const confirmationLink = invitation
+        ? buildAssignmentInvitationResponseUrl(invitation.token)
         : null;
 
       await resendConfirmationReminder({

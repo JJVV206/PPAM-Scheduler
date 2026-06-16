@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   ACTIVE_ASSIGNMENT_INVITATION_STATUSES,
   buildAssignmentInvitationResponseUrl,
-  buildPrimaryAssignmentInvitationEmail
+  buildPrimaryAssignmentInvitationEmail,
+  getAssignmentInvitationAvailability
 } from "@/services/assignment-invitation.service";
 
 const originalNextAuthUrl = process.env.NEXTAUTH_URL;
@@ -48,5 +49,39 @@ describe("assignment invitation helpers", () => {
     expect(email.html).toContain(
       "https://ppam.example.org/confirm-assignment/token"
     );
+  });
+
+  it("detects expired, responded, failed, and ready invitation states", () => {
+    const now = new Date("2026-06-12T12:00:00.000Z");
+
+    expect(
+      getAssignmentInvitationAvailability({
+        status: "SENT",
+        expiresAt: new Date("2026-06-12T11:59:59.000Z"),
+        now
+      })
+    ).toBe("EXPIRED");
+    expect(
+      getAssignmentInvitationAvailability({
+        status: "ACCEPTED",
+        expiresAt: new Date("2026-06-13T12:00:00.000Z"),
+        respondedAt: new Date("2026-06-12T10:00:00.000Z"),
+        now
+      })
+    ).toBe("RESPONDED");
+    expect(
+      getAssignmentInvitationAvailability({
+        status: "FAILED",
+        expiresAt: new Date("2026-06-13T12:00:00.000Z"),
+        now
+      })
+    ).toBe("FAILED");
+    expect(
+      getAssignmentInvitationAvailability({
+        status: "SENT",
+        expiresAt: new Date("2026-06-13T12:00:00.000Z"),
+        now
+      })
+    ).toBe("READY");
   });
 });

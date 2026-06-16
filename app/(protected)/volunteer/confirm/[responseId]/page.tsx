@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { ConfirmationCard } from "@/components/assignments/confirmation-card";
+import { getServerAuthSession } from "@/lib/auth/auth";
 import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import { db } from "@/lib/db/prisma";
 
@@ -12,6 +13,7 @@ export default async function VolunteerConfirmPage({
   params
 }: VolunteerConfirmPageProps) {
   const { responseId } = await params;
+  const session = await getServerAuthSession();
 
   const response = await db.assignmentResponse.findUnique({
     where: { id: responseId },
@@ -24,7 +26,11 @@ export default async function VolunteerConfirmPage({
     }
   });
 
-  if (!response) {
+  if (
+    !response ||
+    !session?.user.volunteerProfileId ||
+    response.volunteerId !== session.user.volunteerProfileId
+  ) {
     notFound();
   }
 

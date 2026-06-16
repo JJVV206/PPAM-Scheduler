@@ -46,6 +46,37 @@ type SendInvitationResult = {
   errorMessage?: string;
 };
 
+export type AssignmentInvitationAvailability =
+  | "READY"
+  | "EXPIRED"
+  | "RESPONDED"
+  | "FAILED";
+
+export function getAssignmentInvitationAvailability(input: {
+  status: AssignmentInvitationStatus;
+  expiresAt: Date;
+  respondedAt?: Date | null;
+  now?: Date;
+}): AssignmentInvitationAvailability {
+  if (
+    input.respondedAt ||
+    input.status === "ACCEPTED" ||
+    input.status === "DECLINED"
+  ) {
+    return "RESPONDED";
+  }
+
+  if (input.status === "FAILED") {
+    return "FAILED";
+  }
+
+  if (input.status === "EXPIRED" || input.expiresAt <= (input.now ?? new Date())) {
+    return "EXPIRED";
+  }
+
+  return "READY";
+}
+
 function createInvitationToken() {
   return randomBytes(TOKEN_BYTES).toString("base64url");
 }
