@@ -5,6 +5,9 @@ const mocks = vi.hoisted(() => {
     assignmentActivity: {
       create: vi.fn(),
       findFirst: vi.fn()
+    },
+    assignmentInvitation: {
+      update: vi.fn()
     }
   };
   const db = {
@@ -13,7 +16,8 @@ const mocks = vi.hoisted(() => {
     ),
     assignment: {
       findMany: vi.fn(),
-      findUniqueOrThrow: vi.fn()
+      findUniqueOrThrow: vi.fn(),
+      updateMany: vi.fn()
     },
     assignmentActivity: {
       create: vi.fn(),
@@ -114,6 +118,7 @@ function confirmedAssignment() {
 function replacementAssignment(status = "NEEDS_REPLACEMENT") {
   return {
     id: "assignment-1",
+    scheduleWeekId: "week-1",
     status,
     date: new Date(2026, 5, 20),
     dayOfWeek: "SATURDAY",
@@ -124,6 +129,113 @@ function replacementAssignment(status = "NEEDS_REPLACEMENT") {
     preachingPoint: {
       name: "Hospital Dr Jose G. Parres",
       area: "North"
+    }
+  };
+}
+
+function replacementVolunteer(input: {
+  id: string;
+  name: string;
+  email: string;
+  weeklyAvailability?: Array<{
+    timeSlot: "SLOT_11_13" | null;
+    available: boolean;
+  }>;
+  confirmationCount?: number;
+  futureAssignmentCount?: number;
+}) {
+  return {
+    id: input.id,
+    userId: `user-${input.id}`,
+    notes: null,
+    transportationNotes: null,
+    preferredAreas: ["North"],
+    reliabilityScore: 90,
+    confirmationCount: input.confirmationCount ?? 3,
+    declineCount: 0,
+    noResponseCount: 0,
+    active: true,
+    temporaryUnavailable: false,
+    canServeAsReplacement: true,
+    user: {
+      id: `user-${input.id}`,
+      name: input.name,
+      email: input.email,
+      active: true
+    },
+    availability: [
+      {
+        id: `availability-${input.id}`,
+        volunteerId: input.id,
+        dayOfWeek: "SATURDAY",
+        timeSlot: "SLOT_11_13",
+        areaPreference: "North",
+        available: true,
+        recurring: true
+      }
+    ],
+    weeklyAvailability: (input.weeklyAvailability ?? []).map((item, index) => ({
+      id: `weekly-${input.id}-${index}`,
+      censusResponseId: `response-${input.id}`,
+      volunteerId: input.id,
+      scheduleWeekId: "week-1",
+      date: new Date(2026, 5, 20),
+      dayOfWeek: "SATURDAY",
+      timeSlot: item.timeSlot,
+      available: item.available,
+      notes: null,
+      createdAt: new Date(2026, 5, 16),
+      updatedAt: new Date(2026, 5, 16)
+    })),
+    assignments: Array.from({
+      length: input.futureAssignmentCount ?? 0
+    }).map((_, index) => ({
+      id: `future-${input.id}-${index}`,
+      assignmentId: `future-assignment-${index}`,
+      volunteerId: input.id,
+      position: "FIRST",
+      isReplacement: false
+    }))
+  };
+}
+
+function pendingReplacementInvitation(input: {
+  id: string;
+  volunteerId: string;
+  userId: string;
+  userName: string;
+}) {
+  return {
+    id: input.id,
+    assignmentId: "assignment-1",
+    volunteerId: input.volunteerId,
+    type: "REPLACEMENT",
+    status: "PENDING",
+    token: `${input.id}-token`,
+    sentAt: null,
+    respondedAt: null,
+    expiresAt: new Date(2026, 5, 20, 23, 0, 0),
+    emailAttempts: 0,
+    metadata: {},
+    createdAt: new Date(2026, 5, 16, 12, 0, 0),
+    updatedAt: new Date(2026, 5, 16, 12, 0, 0),
+    assignment: {
+      id: "assignment-1",
+      date: new Date(2026, 5, 20),
+      dayOfWeek: "SATURDAY",
+      timeSlot: "SLOT_11_13",
+      preachingPoint: {
+        name: "Hospital Dr Jose G. Parres"
+      }
+    },
+    volunteer: {
+      id: input.volunteerId,
+      userId: input.userId,
+      user: {
+        id: input.userId,
+        name: input.userName,
+        email: `${input.userId}@example.org`
+      }
     }
   };
 }
@@ -197,8 +309,10 @@ beforeEach(() => {
   mocks.getAppSettings.mockResolvedValue({ confirmationLeadDays: 7 });
   mocks.db.assignmentActivity.findFirst.mockResolvedValue(null);
   mocks.db.assignmentActivity.create.mockResolvedValue({ id: "activity-1" });
+  mocks.db.assignment.updateMany.mockResolvedValue({ count: 1 });
   mocks.tx.assignmentActivity.findFirst.mockResolvedValue(null);
   mocks.tx.assignmentActivity.create.mockResolvedValue({ id: "activity-1" });
+  mocks.tx.assignmentInvitation.update.mockResolvedValue({ id: "invitation-1" });
 });
 
 afterEach(() => {
@@ -253,6 +367,101 @@ describe("assignment automation idempotency QA", () => {
         })
       })
     );
+  });
+
+  it("tries the next replacement candidate when the first invitation email fails", async () => {
+    mocks.db.assignment.findUniqueOrThrow
+      .mockResolvedValueOnce(replacementAssignment())
+      .mockResolvedValueOnce(replacementAssignment());
+    mocks.db.volunteerProfile.findMany.mockResolvedValue([
+      replacementVolunteer({
+        id: "replacement-1",
+        name: "Ana",
+        email: "ana@example.org",
+        weeklyAvailability: [
+          {
+            timeSlot: "SLOT_11_13",
+            available: true
+          }
+        ]
+      }),
+      replacementVolunteer({
+        id: "replacement-2",
+        name: "Bea",
+        email: "bea@example.org",
+        weeklyAvailability: [
+          {
+            timeSlot: null,
+            available: true
+          }
+        ]
+      })
+    ]);
+    mocks.db.assignmentInvitation.findFirst.mockResolvedValue(null);
+    mocks.db.assignmentInvitation.create.mockImplementation(async ({ data }) => ({
+      id: `invitation-${data.volunteerId}`,
+      ...data,
+      metadata: data.metadata ?? {}
+    }));
+    mocks.db.assignmentInvitation.update.mockResolvedValue({
+      emailAttempts: 1,
+      metadata: {}
+    });
+    mocks.db.assignmentInvitation.findMany
+      .mockResolvedValueOnce([
+        pendingReplacementInvitation({
+          id: "invitation-replacement-1",
+          volunteerId: "replacement-1",
+          userId: "user-replacement-1",
+          userName: "Ana"
+        })
+      ])
+      .mockResolvedValueOnce([
+        pendingReplacementInvitation({
+          id: "invitation-replacement-2",
+          volunteerId: "replacement-2",
+          userId: "user-replacement-2",
+          userName: "Bea"
+        })
+      ]);
+    mocks.db.user.findUnique.mockResolvedValue({
+      id: "user-replacement",
+      email: "replacement@example.org"
+    });
+    mocks.db.notificationLog.create
+      .mockResolvedValueOnce({
+        id: "notification-failed",
+        status: "FAILED",
+        sentAt: null,
+        errorMessage: "SMTP rejected recipient"
+      })
+      .mockResolvedValueOnce({
+        id: "notification-sent",
+        status: "SENT",
+        sentAt: new Date("2026-06-16T12:00:00.000Z"),
+        errorMessage: null
+      });
+
+    const result = await inviteNextAvailableReplacementForAssignment({
+      assignmentId: "assignment-1"
+    });
+
+    expect(result).toMatchObject({
+      status: "invited",
+      candidateId: "replacement-2",
+      sentCount: 1,
+      failedCount: 1
+    });
+    expect(mocks.db.assignmentInvitation.create).toHaveBeenCalledTimes(2);
+    expect(mocks.db.assignment.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "assignment-1",
+        status: "NEEDS_REPLACEMENT"
+      },
+      data: {
+        status: "PENDING_CONFIRMATION"
+      }
+    });
   });
 
   it.each([

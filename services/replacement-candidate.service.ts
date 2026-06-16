@@ -1,12 +1,25 @@
 import { startOfDay } from "date-fns";
 import { Prisma } from "@prisma/client";
+import type { TimeSlot } from "@prisma/client";
 
 import { db } from "@/lib/db/prisma";
 import type { VolunteerSummary } from "@/types/domain";
 
 const TERMINAL_ASSIGNMENT_STATUSES = ["CANCELLED", "COMPLETED"] as const;
 
+export type ReplacementAvailabilitySource =
+  | "WEEKLY_EXACT"
+  | "WEEKLY_DAY"
+  | "RECURRING_EXACT"
+  | "UNCONFIRMED"
+  | "UNAVAILABLE";
+
 export type ReplacementCandidatePriority = {
+  availabilitySource: ReplacementAvailabilitySource;
+  availabilityRank: number;
+  weeklyExactAvailability: boolean;
+  weeklyDayAvailability: boolean;
+  recurringAvailability: boolean;
   exactAvailability: boolean;
   markedAsReplacement: boolean;
   areaCompatible: boolean;
@@ -30,8 +43,20 @@ type VolunteerCandidateRecord = Prisma.VolunteerProfileGetPayload<{
     user: true;
     availability: true;
     assignments: true;
+    weeklyAvailability: true;
   };
 }>;
+
+type AvailabilityRecord = {
+  timeSlot: TimeSlot | null;
+  available: boolean;
+};
+
+type RecurringAvailabilityRecord = {
+  timeSlot: TimeSlot;
+  available: boolean;
+  recurring: boolean;
+};
 
 function calculateConfirmationRate(input: {
   confirmationCount: number;
@@ -60,15 +85,87 @@ function isAreaCompatible(input: {
   );
 }
 
+export function getReplacementAvailabilityMatch(input: {
+  weeklyAvailability: readonly AvailabilityRecord[];
+  recurringAvailability: readonly RecurringAvailabilityRecord[];
+  timeSlot: TimeSlot;
+}): {
+  source: ReplacementAvailabilitySource;
+  rank: number;
+  unavailable: boolean;
+} {
+  const explicitlyUnavailable = input.weeklyAvailability.some(
+    (item) =>
+      !item.available &&
+      (item.timeSlot === null || item.timeSlot === input.timeSlot)
+  );
+
+  if (explicitlyUnavailable) {
+    return {
+      source: "UNAVAILABLE",
+      rank: -1,
+      unavailable: true
+    };
+  }
+
+  const weeklyExact = input.weeklyAvailability.some(
+    (item) => item.available && item.timeSlot === input.timeSlot
+  );
+
+  if (weeklyExact) {
+    return {
+      source: "WEEKLY_EXACT",
+      rank: 3,
+      unavailable: false
+    };
+  }
+
+  const weeklyDay = input.weeklyAvailability.some(
+    (item) => item.available && item.timeSlot === null
+  );
+
+  if (weeklyDay) {
+    return {
+      source: "WEEKLY_DAY",
+      rank: 2,
+      unavailable: false
+    };
+  }
+
+  const recurringExact = input.recurringAvailability.some(
+    (item) =>
+      item.available && item.recurring && item.timeSlot === input.timeSlot
+  );
+
+  if (recurringExact) {
+    return {
+      source: "RECURRING_EXACT",
+      rank: 1,
+      unavailable: false
+    };
+  }
+
+  return {
+    source: "UNCONFIRMED",
+    rank: 0,
+    unavailable: false
+  };
+}
+
 function mapCandidate(
   volunteer: VolunteerCandidateRecord,
   input: {
     area: string;
     attemptedVolunteerIds: Set<string>;
+    timeSlot: TimeSlot;
   }
 ): ReplacementCandidateDto {
   const active = volunteer.active && volunteer.user.active;
-  const exactAvailability = volunteer.availability.some((item) => item.available);
+  const availabilityMatch = getReplacementAvailabilityMatch({
+    weeklyAvailability: volunteer.weeklyAvailability,
+    recurringAvailability: volunteer.availability,
+    timeSlot: input.timeSlot
+  });
   const areaCompatible = isAreaCompatible({
     preferredAreas: volunteer.preferredAreas,
     availability: volunteer.availability,
@@ -90,7 +187,14 @@ function mapCandidate(
     noResponseCount: volunteer.noResponseCount,
     temporaryUnavailable: volunteer.temporaryUnavailable,
     replacementPriority: {
-      exactAvailability,
+      availabilitySource: availabilityMatch.source,
+      availabilityRank: availabilityMatch.rank,
+      weeklyExactAvailability: availabilityMatch.source === "WEEKLY_EXACT",
+      weeklyDayAvailability: availabilityMatch.source === "WEEKLY_DAY",
+      recurringAvailability: availabilityMatch.source === "RECURRING_EXACT",
+      exactAvailability:
+        availabilityMatch.source === "WEEKLY_EXACT" ||
+        availabilityMatch.source === "RECURRING_EXACT",
       markedAsReplacement: volunteer.canServeAsReplacement,
       areaCompatible,
       confirmationRate: calculateConfirmationRate(volunteer),
@@ -109,10 +213,7 @@ export function rankReplacementCandidates<T extends ReplacementCandidateRankingI
     const rightPriority = right.replacementPriority;
 
     return (
-      Number(rightPriority.exactAvailability) -
-        Number(leftPriority.exactAvailability) ||
-      Number(rightPriority.markedAsReplacement) -
-        Number(leftPriority.markedAsReplacement) ||
+      rightPriority.availabilityRank - leftPriority.availabilityRank ||
       Number(rightPriority.areaCompatible) -
         Number(leftPriority.areaCompatible) ||
       rightPriority.confirmationRate - leftPriority.confirmationRate ||
@@ -121,6 +222,13 @@ export function rankReplacementCandidates<T extends ReplacementCandidateRankingI
       left.name.localeCompare(right.name, "es-MX")
     );
   });
+}
+
+export function excludeAlreadyAttemptedCandidates<T extends { id: string }>(
+  candidates: T[],
+  attemptedVolunteerIds: Set<string>
+) {
+  return candidates.filter((candidate) => !attemptedVolunteerIds.has(candidate.id));
 }
 
 export async function getReplacementCandidatesForAssignment(input: {
@@ -174,13 +282,6 @@ export async function getReplacementCandidatesForAssignment(input: {
       id: {
         notIn: excludedVolunteerIds
       },
-      availability: {
-        some: {
-          dayOfWeek: assignment.dayOfWeek,
-          timeSlot: assignment.timeSlot,
-          available: true
-        }
-      },
       availabilityBlocks: {
         none: {
           startDate: {
@@ -208,8 +309,21 @@ export async function getReplacementCandidatesForAssignment(input: {
       availability: {
         where: {
           dayOfWeek: assignment.dayOfWeek,
-          timeSlot: assignment.timeSlot,
           available: true
+        }
+      },
+      weeklyAvailability: {
+        where: {
+          scheduleWeekId: assignment.scheduleWeekId,
+          date: assignment.date,
+          OR: [
+            {
+              timeSlot: assignment.timeSlot
+            },
+            {
+              timeSlot: null
+            }
+          ]
         }
       },
       assignments: {
@@ -227,19 +341,29 @@ export async function getReplacementCandidatesForAssignment(input: {
     }
   });
 
-  const candidates = rankReplacementCandidates(
-    volunteers.map((volunteer) =>
+  const eligibleCandidates = volunteers
+    .map((volunteer) =>
       mapCandidate(volunteer, {
         area: assignment.preachingPoint.area,
-        attemptedVolunteerIds
+        attemptedVolunteerIds,
+        timeSlot: assignment.timeSlot
       })
     )
+    .filter(
+      (candidate) =>
+        candidate.replacementPriority.availabilitySource !== "UNAVAILABLE"
+    );
+  const candidates = rankReplacementCandidates(
+    excludeAlreadyAttemptedCandidates(eligibleCandidates, attemptedVolunteerIds)
   );
 
   return typeof input.take === "number"
     ? candidates.slice(0, input.take)
     : candidates;
 }
+
+export const findReplacementCandidatesForAssignment =
+  getReplacementCandidatesForAssignment;
 
 export async function selectNextReplacementCandidateForAssignment(
   assignmentId: string

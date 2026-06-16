@@ -36,7 +36,10 @@ import {
   sendPendingReplacementInvitationsForAssignment,
   sendPendingPrimaryInvitationsForAssignment
 } from "@/services/assignment-invitation.service";
-import { selectNextReplacementCandidateForAssignment } from "@/services/replacement-candidate.service";
+import {
+  getReplacementCandidatesForAssignment,
+  selectNextReplacementCandidateForAssignment
+} from "@/services/replacement-candidate.service";
 import { sendEmailNotification } from "@/services/notification.service";
 import {
   buildAdminAssignmentAlertEmail,
@@ -1058,11 +1061,11 @@ export async function inviteNextAvailableReplacementForAssignment(input: {
     };
   }
 
-  const candidate = await selectNextReplacementCandidateForAssignment(
-    input.assignmentId
-  );
+  const candidates = await getReplacementCandidatesForAssignment({
+    assignmentId: input.assignmentId
+  });
 
-  if (!candidate) {
+  if (!candidates.length) {
     await alertAdminsForNoReplacementAvailable(input.assignmentId);
     return {
       assignmentId: input.assignmentId,
@@ -1072,43 +1075,76 @@ export async function inviteNextAvailableReplacementForAssignment(input: {
     };
   }
 
-  await recordAssignmentAuditActivity({
-    assignmentId: input.assignmentId,
-    actorUserId: input.actorUserId,
-    event: "REPLACEMENT_SELECTED",
-    dedupeKey: `replacement-selected:${input.assignmentId}:${candidate.id}`,
-    metadata: {
+  let failedCount = 0;
+
+  for (const [attemptIndex, candidate] of candidates.entries()) {
+    const candidateMetadata = {
       volunteerProfileId: candidate.id,
       selectedBy: "replacement_candidate_rules",
+      replacementAttemptNumber: attemptIndex + 1,
+      availabilitySource: candidate.replacementPriority.availabilitySource,
+      availabilityRank: candidate.replacementPriority.availabilityRank,
       confirmationRate: candidate.replacementPriority.confirmationRate,
       futureAssignmentCount: candidate.replacementPriority.futureAssignmentCount,
       areaCompatible: candidate.replacementPriority.areaCompatible
-    }
-  });
+    };
 
-  await createPendingReplacementInvitationForAssignment({
-    assignmentId: input.assignmentId,
-    volunteerId: candidate.id,
-    actorUserId: input.actorUserId,
-    metadata: {
-      selectedBy: "replacement_candidate_rules",
-      confirmationRate: candidate.replacementPriority.confirmationRate,
-      futureAssignmentCount: candidate.replacementPriority.futureAssignmentCount,
-      areaCompatible: candidate.replacementPriority.areaCompatible
-    }
-  });
+    await recordAssignmentAuditActivity({
+      assignmentId: input.assignmentId,
+      actorUserId: input.actorUserId,
+      event: "REPLACEMENT_SELECTED",
+      dedupeKey: `replacement-selected:${input.assignmentId}:${candidate.id}`,
+      metadata: candidateMetadata
+    });
 
-  const delivery = await sendPendingReplacementInvitationsForAssignment({
-    assignmentId: input.assignmentId,
-    actorUserId: input.actorUserId
-  });
+    const creation = await createPendingReplacementInvitationForAssignment({
+      assignmentId: input.assignmentId,
+      volunteerId: candidate.id,
+      actorUserId: input.actorUserId,
+      metadata: candidateMetadata
+    });
+
+    if (creation.createdCount !== 1) {
+      continue;
+    }
+
+    const delivery = await sendPendingReplacementInvitationsForAssignment({
+      assignmentId: input.assignmentId,
+      actorUserId: input.actorUserId
+    });
+
+    failedCount += delivery.failedCount;
+
+    if (delivery.sentCount <= 0) {
+      continue;
+    }
+
+    await db.assignment.updateMany({
+      where: {
+        id: input.assignmentId,
+        status: "NEEDS_REPLACEMENT"
+      },
+      data: {
+        status: "PENDING_CONFIRMATION"
+      }
+    });
+
+    return {
+      assignmentId: input.assignmentId,
+      status: "invited",
+      candidateId: candidate.id,
+      sentCount: delivery.sentCount,
+      failedCount
+    };
+  }
+
+  await alertAdminsForNoReplacementAvailable(input.assignmentId);
 
   return {
     assignmentId: input.assignmentId,
-    status: "invited",
-    candidateId: candidate.id,
-    sentCount: delivery.sentCount,
-    failedCount: delivery.failedCount
+    status: "no_candidate",
+    sentCount: 0,
+    failedCount
   };
 }
 
