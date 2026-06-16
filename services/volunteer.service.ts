@@ -1,7 +1,18 @@
 import { db } from "@/lib/db/prisma";
-import type { VolunteerDashboardData, VolunteerSummary } from "@/types/domain";
-import { getOpenSlots, getVolunteerHistory } from "@/services/assignment.service";
+import type {
+  VolunteerAssignmentReminderDto,
+  VolunteerDashboardData,
+  VolunteerSummary
+} from "@/types/domain";
+import {
+  getOpenSlots,
+  getVolunteerHistory
+} from "@/services/assignment.service";
 import { AppError } from "@/services/errors";
+import {
+  isVolunteerAssignmentConfirmed,
+  isVolunteerAssignmentPendingResponse
+} from "@/lib/volunteer-assignment";
 
 function mapVolunteer(record: {
   id: string;
@@ -208,22 +219,39 @@ export async function getVolunteerDashboardData(
     getVolunteerHistory(volunteerProfileId),
     getOpenSlots()
   ]);
+  const now = new Date();
+  const futureAssignments = assignments.filter(
+    (assignment) => assignment.date >= now
+  );
+  const remindersByAssignmentId = await getVolunteerAssignmentRemindersById({
+    userId: volunteer.userId,
+    assignmentIds: assignments.map((assignment) => assignment.id)
+  });
 
   return {
     volunteer,
-    upcomingAssignments: assignments.filter(
-      (assignment) => assignment.date >= new Date()
+    upcomingAssignments: futureAssignments,
+    pendingConfirmations: futureAssignments.filter((assignment) =>
+      isVolunteerAssignmentPendingResponse(assignment, volunteerProfileId)
     ),
-    pendingConfirmations: assignments.filter(
-      (assignment) => assignment.status === "PENDING_CONFIRMATION"
+    confirmedAssignments: futureAssignments.filter((assignment) =>
+      isVolunteerAssignmentConfirmed(assignment, volunteerProfileId)
     ),
+    assignmentHistory: assignments.filter(
+      (assignment) => assignment.date < now
+    ),
+    remindersByAssignmentId,
     openSlots: openSlots.filter((slot) =>
-      slot.suggestedVolunteers.some((candidate) => candidate.id === volunteerProfileId)
+      slot.suggestedVolunteers.some(
+        (candidate) => candidate.id === volunteerProfileId
+      )
     ),
     weeklyAvailabilitySummary: volunteer.availability.reduce<
       VolunteerDashboardData["weeklyAvailabilitySummary"]
     >((accumulator, item) => {
-      const existing = accumulator.find((entry) => entry.dayOfWeek === item.dayOfWeek);
+      const existing = accumulator.find(
+        (entry) => entry.dayOfWeek === item.dayOfWeek
+      );
       if (existing) {
         existing.slots.push(item.timeSlot);
       } else {
@@ -235,4 +263,48 @@ export async function getVolunteerDashboardData(
       return accumulator;
     }, [])
   };
+}
+
+export async function getVolunteerAssignmentRemindersById(input: {
+  userId: string;
+  assignmentIds: string[];
+}): Promise<Record<string, VolunteerAssignmentReminderDto[]>> {
+  if (!input.assignmentIds.length) {
+    return {};
+  }
+
+  const reminders = await db.notificationLog.findMany({
+    where: {
+      userId: input.userId,
+      assignmentId: {
+        in: input.assignmentIds
+      },
+      type: {
+        in: ["REMINDER", "FINAL_REMINDER"]
+      },
+      status: "SENT"
+    },
+    orderBy: {
+      createdAt: "desc"
+    }
+  });
+
+  return reminders.reduce<Record<string, VolunteerAssignmentReminderDto[]>>(
+    (accumulator, reminder) => {
+      if (!reminder.assignmentId) return accumulator;
+
+      accumulator[reminder.assignmentId] ??= [];
+      accumulator[reminder.assignmentId].push({
+        id: reminder.id,
+        assignmentId: reminder.assignmentId,
+        type: reminder.type as VolunteerAssignmentReminderDto["type"],
+        status: reminder.status,
+        sentAt: reminder.sentAt,
+        createdAt: reminder.createdAt
+      });
+
+      return accumulator;
+    },
+    {}
+  );
 }

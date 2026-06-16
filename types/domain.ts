@@ -186,10 +186,22 @@ export type AdminDashboardStats = {
   urgentReplacements: OpenSlotDto[];
 };
 
+export type VolunteerAssignmentReminderDto = {
+  id: string;
+  assignmentId: string;
+  type: Extract<NotificationType, "REMINDER" | "FINAL_REMINDER">;
+  status: NotificationStatus;
+  sentAt?: Date | null;
+  createdAt: Date;
+};
+
 export type VolunteerDashboardData = {
   volunteer: VolunteerSummary;
   upcomingAssignments: AssignmentDetailDto[];
   pendingConfirmations: AssignmentDetailDto[];
+  confirmedAssignments: AssignmentDetailDto[];
+  assignmentHistory: AssignmentDetailDto[];
+  remindersByAssignmentId: Record<string, VolunteerAssignmentReminderDto[]>;
   openSlots: OpenSlotDto[];
   weeklyAvailabilitySummary: Array<{
     dayOfWeek: DayOfWeek;

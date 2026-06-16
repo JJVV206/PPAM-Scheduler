@@ -1,9 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 
-import { AssignmentCard } from "@/components/assignments/assignment-card";
 import { ConfirmationCard } from "@/components/assignments/confirmation-card";
+import { VolunteerAssignmentCard } from "@/components/volunteer/volunteer-assignment-card";
 import { getServerAuthSession } from "@/lib/auth/auth";
 import { getAssignmentDetail } from "@/services/assignment.service";
+import { getVolunteerAssignmentRemindersById } from "@/services/volunteer.service";
 
 type VolunteerAssignmentDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -29,10 +30,19 @@ export default async function VolunteerAssignmentDetailPage({
     if (!isParticipant) {
       redirect("/volunteer/assignments");
     }
+    const remindersByAssignmentId = await getVolunteerAssignmentRemindersById({
+      userId: session.user.id,
+      assignmentIds: [assignment.id]
+    });
 
     return (
       <div className="space-y-6">
-        <AssignmentCard assignment={assignment} />
+        <VolunteerAssignmentCard
+          assignment={assignment}
+          volunteerProfileId={session.user.volunteerProfileId}
+          reminders={remindersByAssignmentId[assignment.id]}
+          showDetailLink={false}
+        />
         {currentVolunteer?.responseId ? (
           <ConfirmationCard
             responseId={currentVolunteer.responseId}
