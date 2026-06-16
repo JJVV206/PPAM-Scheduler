@@ -7,9 +7,10 @@ import {
 } from "@prisma/client";
 
 import { db } from "@/lib/db/prisma";
-import { getSmtpConfig } from "@/lib/env/config";
+import { getAppBaseUrl, getSmtpConfig } from "@/lib/env/config";
 import { humanizeErrorMessage } from "@/lib/utils/error-message";
 import { AppError } from "@/services/errors";
+import { buildAssignmentReminderEmail } from "@/services/email-template.service";
 
 type NotificationPayload = {
   userId: string;
@@ -193,12 +194,26 @@ export async function resendConfirmationReminder(input: {
   timeSlotLabel: string;
   confirmationLink?: string | null;
 }) {
+  const responseUrl =
+    input.confirmationLink ??
+    `${getAppBaseUrl()}/volunteer/assignments/${encodeURIComponent(
+      input.assignmentId
+    )}`;
+  const email = buildAssignmentReminderEmail({
+    kind: "PENDING_CONFIRMATION",
+    volunteerName: input.volunteerName,
+    pointName: input.pointName,
+    dateLabel: input.dateLabel,
+    timeSlotLabel: input.timeSlotLabel,
+    responseUrl
+  });
+
   return sendEmailNotification({
     userId: input.volunteerUserId,
     assignmentId: input.assignmentId,
     type: "REMINDER",
-    subject: "Recordatorio: confirma tu asignación de PPAM",
-    html: `<p>Hola ${input.volunteerName},</p><p>Confirma tu asignación de PPAM para ${input.dateLabel} a las ${input.timeSlotLabel} en ${input.pointName}.</p>${input.confirmationLink ? `<p><a href="${input.confirmationLink}">Abrir confirmación directa</a></p>` : ""}`,
+    subject: email.subject,
+    html: email.html,
     metadata: {
       pointName: input.pointName,
       confirmationLink: input.confirmationLink

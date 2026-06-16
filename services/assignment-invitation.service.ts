@@ -22,6 +22,15 @@ import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import { formatDisplayDate } from "@/lib/utils";
 import { sendEmailNotification } from "@/services/notification.service";
 import { getAssignmentAutomationSettings } from "@/services/setting.service";
+import {
+  buildPrimaryAssignmentInvitationEmail,
+  buildReplacementAssignmentInvitationEmail
+} from "@/services/email-template.service";
+
+export {
+  buildPrimaryAssignmentInvitationEmail,
+  buildReplacementAssignmentInvitationEmail
+} from "@/services/email-template.service";
 
 const TOKEN_BYTES = 32;
 const MAX_TOKEN_GENERATION_ATTEMPTS = 3;
@@ -122,75 +131,8 @@ function mergeInvitationMetadata(
   }) as Prisma.InputJsonObject;
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 export function buildAssignmentInvitationResponseUrl(token: string) {
   return `${getAppBaseUrl()}/confirm-assignment/${encodeURIComponent(token)}`;
-}
-
-export function buildPrimaryAssignmentInvitationEmail(input: {
-  volunteerName: string;
-  dateLabel: string;
-  timeSlotLabel: string;
-  pointName: string;
-  responseUrl: string;
-}) {
-  const volunteerName = escapeHtml(input.volunteerName);
-  const dateLabel = escapeHtml(input.dateLabel);
-  const timeSlotLabel = escapeHtml(input.timeSlotLabel);
-  const pointName = escapeHtml(input.pointName);
-  const responseUrl = escapeHtml(input.responseUrl);
-
-  return {
-    subject: "Confirma tu asignación de PPAM",
-    html: [
-      `<p>Hola ${volunteerName},</p>`,
-      "<p>Tienes una asignación de PPAM pendiente de confirmación.</p>",
-      "<ul>",
-      `<li><strong>Fecha:</strong> ${dateLabel}</li>`,
-      `<li><strong>Horario:</strong> ${timeSlotLabel}</li>`,
-      `<li><strong>Punto de predicación:</strong> ${pointName}</li>`,
-      "</ul>",
-      `<p><a href="${responseUrl}">Confirmar o rechazar asignación</a></p>`,
-      `<p>Si el botón no funciona, copia y pega esta URL en tu navegador:<br>${responseUrl}</p>`
-    ].join("")
-  };
-}
-
-export function buildReplacementAssignmentInvitationEmail(input: {
-  volunteerName: string;
-  dateLabel: string;
-  timeSlotLabel: string;
-  pointName: string;
-  responseUrl: string;
-}) {
-  const volunteerName = escapeHtml(input.volunteerName);
-  const dateLabel = escapeHtml(input.dateLabel);
-  const timeSlotLabel = escapeHtml(input.timeSlotLabel);
-  const pointName = escapeHtml(input.pointName);
-  const responseUrl = escapeHtml(input.responseUrl);
-
-  return {
-    subject: "Oportunidad de reemplazo PPAM",
-    html: [
-      `<p>Hola ${volunteerName},</p>`,
-      "<p>Hay una asignación de PPAM que necesita suplente.</p>",
-      "<ul>",
-      `<li><strong>Fecha:</strong> ${dateLabel}</li>`,
-      `<li><strong>Horario:</strong> ${timeSlotLabel}</li>`,
-      `<li><strong>Punto de predicación:</strong> ${pointName}</li>`,
-      "</ul>",
-      `<p><a href="${responseUrl}">Responder si puedes cubrirla</a></p>`,
-      `<p>Si el botón no funciona, copia y pega esta URL en tu navegador:<br>${responseUrl}</p>`
-    ].join("")
-  };
 }
 
 async function createInvitationWithUniqueToken(input: {

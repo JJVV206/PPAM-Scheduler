@@ -30,10 +30,24 @@ import {
 import { selectNextReplacementCandidateForAssignment } from "@/services/replacement-candidate.service";
 import { sendEmailNotification } from "@/services/notification.service";
 import {
+  buildAdminAssignmentAlertEmail,
+  buildAssignmentReminderEmail,
+  type AdminAssignmentAlertEmailInput,
+  type AdminAssignmentAlertReason
+} from "@/services/email-template.service";
+import {
   getAssignmentAutomationSettings,
   type AssignmentAutomationSettings
 } from "@/services/setting.service";
 import { getAppBaseUrl } from "@/lib/env/config";
+
+export {
+  buildAdminAssignmentAlertEmail
+} from "@/services/email-template.service";
+export type {
+  AdminAssignmentAlertEmailInput,
+  AdminAssignmentAlertReason
+} from "@/services/email-template.service";
 
 const TERMINAL_ASSIGNMENT_STATUSES = ["CANCELLED", "COMPLETED"] as const;
 
@@ -140,28 +154,10 @@ type AssignmentReminderRecipient = {
   invitationType?: AssignmentInvitationType;
 };
 
-type AdminAssignmentAlertReason =
-  | "NO_REPLACEMENT_AVAILABLE"
-  | "INVITATION_EMAIL_FAILED";
-
 type AdminAssignmentAlertDeliveryResult = {
   sentCount: number;
   failedCount: number;
   skipped: boolean;
-};
-
-export type AdminAssignmentAlertEmailInput = {
-  reason: AdminAssignmentAlertReason;
-  reasonLabel: string;
-  dateLabel: string;
-  timeSlotLabel: string;
-  pointName: string;
-  originalVolunteerNames: string[];
-  attemptedReplacementNames: string[];
-  assignmentUrl: string;
-  affectedVolunteerName?: string;
-  invitationType?: AssignmentInvitationType;
-  errorMessage?: string;
 };
 
 function asMetadataObject(value: Prisma.JsonValue | null) {
@@ -192,15 +188,6 @@ function isTerminalAssignment(status: Assignment["status"]) {
   return TERMINAL_ASSIGNMENT_STATUSES.includes(
     status as (typeof TERMINAL_ASSIGNMENT_STATUSES)[number]
   );
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 export function normalizeReminderTimingDays(days: number[]) {
@@ -291,63 +278,6 @@ export function getDuePendingConfirmationReminder(input: {
   };
 }
 
-function buildAssignmentReminderEmail(input: {
-  reminder: DueAssignmentReminder;
-  volunteerName: string;
-  dateLabel: string;
-  timeSlotLabel: string;
-  pointName: string;
-  responseUrl?: string;
-}) {
-  const volunteerName = escapeHtml(input.volunteerName);
-  const dateLabel = escapeHtml(input.dateLabel);
-  const timeSlotLabel = escapeHtml(input.timeSlotLabel);
-  const pointName = escapeHtml(input.pointName);
-  const responseUrl = input.responseUrl ? escapeHtml(input.responseUrl) : null;
-
-  let subject: string;
-  let intro: string;
-  let action = "";
-
-  if (input.reminder.kind === "PENDING_CONFIRMATION") {
-    subject = "Pendiente: confirma tu asignación de PPAM";
-    intro =
-      "Tu invitación de PPAM sigue pendiente. Por favor confirma o rechaza antes de que expire.";
-    action = responseUrl
-      ? `<p><a href="${responseUrl}">Confirmar o rechazar asignación</a></p><p>Si el botón no funciona, copia y pega esta URL en tu navegador:<br>${responseUrl}</p>`
-      : "";
-  } else if (input.reminder.kind === "FINAL_HOURS") {
-    const hours = input.reminder.offsetHours ?? 0;
-    subject = `Recordatorio final: asignación PPAM en ${hours} horas`;
-    intro = "Este es un recordatorio final de tu asignación confirmada de PPAM.";
-  } else {
-    const days = input.reminder.offsetDays ?? 0;
-    subject =
-      days === 1
-        ? "Recordatorio: asignación PPAM mañana"
-        : `Recordatorio: asignación PPAM en ${days} días`;
-    intro = "Te recordamos tu próxima asignación confirmada de PPAM.";
-  }
-
-  return {
-    subject,
-    html: [
-      `<p>Hola ${volunteerName},</p>`,
-      `<p>${intro}</p>`,
-      "<ul>",
-      `<li><strong>Fecha:</strong> ${dateLabel}</li>`,
-      `<li><strong>Horario:</strong> ${timeSlotLabel}</li>`,
-      `<li><strong>Punto de predicación:</strong> ${pointName}</li>`,
-      "</ul>",
-      action
-    ].join("")
-  };
-}
-
-function formatNameList(names: string[], fallback = "No registrado") {
-  return names.length ? names.join(", ") : fallback;
-}
-
 function uniqueNames(names: string[]) {
   return [...new Set(names.filter((name) => name.trim().length > 0))];
 }
@@ -356,62 +286,6 @@ function getAdminAssignmentUrl(assignmentId: string) {
   return `${getAppBaseUrl()}/admin/assignments/${encodeURIComponent(
     assignmentId
   )}`;
-}
-
-function getInvitationTypeLabel(invitationType?: AssignmentInvitationType) {
-  if (!invitationType) {
-    return undefined;
-  }
-
-  return invitationType === "REPLACEMENT" ? "Suplente" : "Titular";
-}
-
-export function buildAdminAssignmentAlertEmail(
-  input: AdminAssignmentAlertEmailInput
-) {
-  const subject =
-    input.reason === "INVITATION_EMAIL_FAILED"
-      ? `Urgente: fallo de email para ${input.dateLabel}, ${input.timeSlotLabel}`
-      : `Urgente: asignación sin cobertura para ${input.dateLabel}, ${input.timeSlotLabel}`;
-  const escapedAssignmentUrl = escapeHtml(input.assignmentUrl);
-  const invitationTypeLabel = getInvitationTypeLabel(input.invitationType);
-  const optionalRows = [
-    input.affectedVolunteerName
-      ? `<li><strong>Voluntario afectado:</strong> ${escapeHtml(
-          input.affectedVolunteerName
-        )}</li>`
-      : "",
-    invitationTypeLabel
-      ? `<li><strong>Tipo de invitación:</strong> ${escapeHtml(
-          invitationTypeLabel
-        )}</li>`
-      : "",
-    input.errorMessage
-      ? `<li><strong>Error de email:</strong> ${escapeHtml(input.errorMessage)}</li>`
-      : ""
-  ].filter(Boolean);
-
-  return {
-    subject,
-    html: [
-      "<p>Se requiere intervención humana para una asignación de PPAM.</p>",
-      "<ul>",
-      `<li><strong>Fecha:</strong> ${escapeHtml(input.dateLabel)}</li>`,
-      `<li><strong>Horario:</strong> ${escapeHtml(input.timeSlotLabel)}</li>`,
-      `<li><strong>Punto:</strong> ${escapeHtml(input.pointName)}</li>`,
-      `<li><strong>Titular original:</strong> ${escapeHtml(
-        formatNameList(input.originalVolunteerNames)
-      )}</li>`,
-      `<li><strong>Suplentes intentados:</strong> ${escapeHtml(
-        formatNameList(input.attemptedReplacementNames, "Ninguno")
-      )}</li>`,
-      `<li><strong>Razón:</strong> ${escapeHtml(input.reasonLabel)}</li>`,
-      ...optionalRows,
-      "</ul>",
-      `<p><a href="${escapedAssignmentUrl}">Abrir detalle de la asignación</a></p>`,
-      `<p>URL directa: ${escapedAssignmentUrl}</p>`
-    ].join("")
-  };
 }
 
 async function hasReplacementRequiredActivity(
@@ -1460,13 +1334,20 @@ async function sendAssignmentReminder(
     "d 'de' MMMM 'de' yyyy"
   )}`;
   const timeSlotLabel = TIME_SLOT_DEFINITIONS[recipient.timeSlot].label;
+  const responseUrl =
+    recipient.responseUrl ??
+    `${getAppBaseUrl()}/volunteer/assignments/${encodeURIComponent(
+      recipient.assignmentId
+    )}`;
   const email = buildAssignmentReminderEmail({
-    reminder: recipient.reminder,
+    kind: recipient.reminder.kind,
+    offsetDays: recipient.reminder.offsetDays,
+    offsetHours: recipient.reminder.offsetHours,
     volunteerName: recipient.volunteerName,
     dateLabel,
     timeSlotLabel,
     pointName: FIXED_PREACHING_POINT_NAME,
-    responseUrl: recipient.responseUrl
+    responseUrl
   });
   const metadata = {
     reminderKey: recipient.reminder.reminderKey,
