@@ -59,5 +59,10 @@ if (isProductionDeployment && !skipMigrations) {
 console.log("Generating Prisma client...");
 run("prisma", ["generate"]);
 
+if (isProductionDeployment) {
+  console.log("Running production account maintenance...");
+  run("node", ["scripts/delete-user-account.mjs"]);
+}
+
 console.log("Building Next.js application...");
 run("next", ["build"]);
