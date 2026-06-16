@@ -19,6 +19,7 @@ import {
   DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
 } from "@/lib/constants/app";
 import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
+import { resolvePrimaryInvitationTiming } from "@/lib/assignments/invitation-timing";
 import { formatDisplayDate } from "@/lib/utils";
 import { sendEmailNotification } from "@/services/notification.service";
 import { getAssignmentAutomationSettings } from "@/services/setting.service";
@@ -211,22 +212,45 @@ export async function createPendingPrimaryInvitationsForAssignment(input: {
   const existingVolunteerIds = new Set(
     existingActiveInvitations.map((invitation) => invitation.volunteerId)
   );
-  const settings = input.expiresAt
-    ? null
-    : await getAssignmentAutomationSettings();
+  const now = new Date();
+  const [settings, assignment] = input.expiresAt
+    ? [null, null]
+    : await Promise.all([
+        getAssignmentAutomationSettings(),
+        client.assignment.findUniqueOrThrow({
+          where: {
+            id: input.assignmentId
+          },
+          select: {
+            date: true,
+            timeSlot: true
+          }
+        })
+      ]);
+  const timing =
+    settings && assignment
+      ? resolvePrimaryInvitationTiming({
+          assignmentDate: assignment.date,
+          timeSlot: assignment.timeSlot,
+          now,
+          settings
+        })
+      : null;
   const expiresAt =
     input.expiresAt ??
-    addHours(
-      new Date(),
-      settings?.primaryResponseTimeoutHours ??
-        DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS
-    );
+    timing?.expiresAt ??
+    addHours(now, DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS);
   const metadata = compactMetadata({
     source: input.source,
     actorUserId: input.actorUserId,
     createdAutomatically:
       input.source === "assignment_created" ||
       input.source === "week_preparation",
+    assignmentStartAt: timing?.assignmentStartAt.toISOString(),
+    primaryResponseTimeoutHours: timing?.timeoutHours,
+    primaryReminderOffsetsHours: timing?.reminderOffsetsHours,
+    urgentPrimaryWindow: timing?.urgent,
+    urgentThresholdHours: timing?.urgentThresholdHours,
     ...input.metadata
   }) as Prisma.InputJsonObject;
 

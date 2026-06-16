@@ -59,16 +59,32 @@ describe("assignment reminder scheduling", () => {
   it("schedules pending confirmation reminders before invitation expiration", () => {
     const reminder = getDuePendingConfirmationReminder({
       invitationId: "invitation-1",
-      expiresAt: new Date("2026-06-16T18:00:00.000Z"),
-      now: new Date("2026-06-16T15:30:00.000Z"),
-      finalReminderHours: 3
+      sentAt: new Date("2026-06-16T00:00:00.000Z"),
+      expiresAt: new Date("2026-06-18T00:00:00.000Z"),
+      now: new Date("2026-06-16T12:30:00.000Z"),
+      reminderOffsetsHours: [12, 24, 40]
     });
 
     expect(reminder).toMatchObject({
       kind: "PENDING_CONFIRMATION",
-      reminderKey: "pending-confirmation-invitation-1",
+      reminderKey: "pending-confirmation-invitation-1-12h",
       notificationType: "REMINDER",
-      offsetHours: 3
+      offsetHours: 12
+    });
+  });
+
+  it("selects the latest due pending confirmation offset", () => {
+    const reminder = getDuePendingConfirmationReminder({
+      invitationId: "invitation-1",
+      sentAt: new Date("2026-06-16T00:00:00.000Z"),
+      expiresAt: new Date("2026-06-18T00:00:00.000Z"),
+      now: new Date("2026-06-17T01:00:00.000Z"),
+      reminderOffsetsHours: [12, 24, 40]
+    });
+
+    expect(reminder).toMatchObject({
+      reminderKey: "pending-confirmation-invitation-1-24h",
+      offsetHours: 24
     });
   });
 });

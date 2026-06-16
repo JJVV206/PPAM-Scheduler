@@ -15,9 +15,18 @@ import {
 } from "@/lib/constants/domain";
 import {
   DEFAULT_FINAL_REMINDER_HOURS,
+  DEFAULT_PRIMARY_REMINDER_OFFSETS_HOURS,
   DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS,
-  DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
+  DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS,
+  DEFAULT_URGENT_PRIMARY_REMINDER_OFFSETS_HOURS,
+  DEFAULT_URGENT_PRIMARY_RESPONSE_TIMEOUT_HOURS,
+  DEFAULT_URGENT_THRESHOLD_HOURS
 } from "@/lib/constants/app";
+import { buildAssignmentStartDate } from "@/lib/assignments/time";
+import {
+  normalizePositiveHourSetting,
+  normalizeReminderOffsetsHours
+} from "@/lib/assignments/invitation-timing";
 import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import { formatDisplayDate } from "@/lib/utils";
 import {
@@ -45,6 +54,7 @@ import { recordAssignmentAuditActivity } from "@/services/assignment-audit.servi
 export {
   buildAdminAssignmentAlertEmail
 } from "@/services/email-template.service";
+export { buildAssignmentStartDate } from "@/lib/assignments/time";
 export type {
   AdminAssignmentAlertEmailInput,
   AdminAssignmentAlertReason
@@ -185,6 +195,33 @@ function mergeMetadata(
   });
 }
 
+function getMetadataNumberArray(value: unknown) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const numbers = value.filter(
+    (item): item is number => typeof item === "number"
+  );
+
+  return numbers.length ? numbers : null;
+}
+
+function getPrimaryPendingReminderOffsets(input: {
+  invitationMetadata: Prisma.JsonValue | null;
+  settings: AssignmentAutomationSettings;
+}) {
+  const metadata = asMetadataObject(input.invitationMetadata);
+  const metadataOffsets = getMetadataNumberArray(
+    metadata.primaryReminderOffsetsHours
+  );
+
+  return normalizeReminderOffsetsHours(
+    metadataOffsets ?? input.settings.primaryReminderOffsetsHours,
+    DEFAULT_PRIMARY_REMINDER_OFFSETS_HOURS
+  );
+}
+
 function isTerminalAssignment(status: Assignment["status"]) {
   return TERMINAL_ASSIGNMENT_STATUSES.includes(
     status as (typeof TERMINAL_ASSIGNMENT_STATUSES)[number]
@@ -195,18 +232,6 @@ export function normalizeReminderTimingDays(days: number[]) {
   return [...new Set(days)]
     .filter((daysBefore) => Number.isInteger(daysBefore) && daysBefore > 0)
     .sort((left, right) => left - right);
-}
-
-export function buildAssignmentStartDate(input: {
-  date: Date;
-  timeSlot: TimeSlot;
-}) {
-  const [hour, minute] = TIME_SLOT_DEFINITIONS[input.timeSlot].start
-    .split(":")
-    .map(Number);
-  const assignmentStart = new Date(input.date);
-  assignmentStart.setHours(hour, minute, 0, 0);
-  return assignmentStart;
 }
 
 export function getDueConfirmedAssignmentReminder(input: {
@@ -256,6 +281,41 @@ export function getDueConfirmedAssignmentReminder(input: {
 }
 
 export function getDuePendingConfirmationReminder(input: {
+  invitationId: string;
+  sentAt: Date;
+  expiresAt: Date;
+  now: Date;
+  reminderOffsetsHours: number[];
+}): DueAssignmentReminder | null {
+  if (input.expiresAt <= input.now) {
+    return null;
+  }
+
+  const dueOffsets = normalizeReminderOffsetsHours(
+    input.reminderOffsetsHours,
+    DEFAULT_PRIMARY_REMINDER_OFFSETS_HOURS
+  ).filter((offsetHours) => {
+    const targetAt = addHours(input.sentAt, offsetHours);
+    return targetAt <= input.now && targetAt < input.expiresAt;
+  });
+  const offsetHours = dueOffsets[dueOffsets.length - 1];
+
+  if (!offsetHours) {
+    return null;
+  }
+
+  const targetAt = addHours(input.sentAt, offsetHours);
+
+  return {
+    kind: "PENDING_CONFIRMATION",
+    reminderKey: `pending-confirmation-${input.invitationId}-${offsetHours}h`,
+    notificationType: "REMINDER",
+    targetAt,
+    offsetHours
+  };
+}
+
+function getDueFinalPendingConfirmationReminder(input: {
   invitationId: string;
   expiresAt: Date;
   now: Date;
@@ -1130,16 +1190,30 @@ function getNormalizedReminderSettings(
       settings.finalReminderHours > 0
         ? settings.finalReminderHours
         : DEFAULT_FINAL_REMINDER_HOURS,
-    primaryResponseTimeoutHours:
-      Number.isInteger(settings.primaryResponseTimeoutHours) &&
-      settings.primaryResponseTimeoutHours > 0
-        ? settings.primaryResponseTimeoutHours
-        : DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS,
-    replacementResponseTimeoutHours:
-      Number.isInteger(settings.replacementResponseTimeoutHours) &&
-      settings.replacementResponseTimeoutHours > 0
-        ? settings.replacementResponseTimeoutHours
-        : DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
+    primaryResponseTimeoutHours: normalizePositiveHourSetting(
+      settings.primaryResponseTimeoutHours,
+      DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS
+    ),
+    primaryReminderOffsetsHours: normalizeReminderOffsetsHours(
+      settings.primaryReminderOffsetsHours,
+      DEFAULT_PRIMARY_REMINDER_OFFSETS_HOURS
+    ),
+    urgentPrimaryResponseTimeoutHours: normalizePositiveHourSetting(
+      settings.urgentPrimaryResponseTimeoutHours,
+      DEFAULT_URGENT_PRIMARY_RESPONSE_TIMEOUT_HOURS
+    ),
+    urgentPrimaryReminderOffsetsHours: normalizeReminderOffsetsHours(
+      settings.urgentPrimaryReminderOffsetsHours,
+      DEFAULT_URGENT_PRIMARY_REMINDER_OFFSETS_HOURS
+    ),
+    urgentThresholdHours: normalizePositiveHourSetting(
+      settings.urgentThresholdHours,
+      DEFAULT_URGENT_THRESHOLD_HOURS
+    ),
+    replacementResponseTimeoutHours: normalizePositiveHourSetting(
+      settings.replacementResponseTimeoutHours,
+      DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
+    )
   };
 }
 
@@ -1242,8 +1316,7 @@ async function getDuePendingConfirmationReminderRecipients(input: {
     where: {
       status: "SENT",
       expiresAt: {
-        gt: input.now,
-        lte: addHours(input.now, input.settings.finalReminderHours)
+        gt: input.now
       },
       assignment: {
         date: {
@@ -1295,12 +1368,24 @@ async function getDuePendingConfirmationReminderRecipients(input: {
       continue;
     }
 
-    const reminder = getDuePendingConfirmationReminder({
-      invitationId: invitation.id,
-      expiresAt: invitation.expiresAt,
-      now: input.now,
-      finalReminderHours: input.settings.finalReminderHours
-    });
+    const reminder =
+      invitation.type === "PRIMARY"
+        ? getDuePendingConfirmationReminder({
+            invitationId: invitation.id,
+            sentAt: invitation.sentAt ?? invitation.createdAt,
+            expiresAt: invitation.expiresAt,
+            now: input.now,
+            reminderOffsetsHours: getPrimaryPendingReminderOffsets({
+              invitationMetadata: invitation.metadata,
+              settings: input.settings
+            })
+          })
+        : getDueFinalPendingConfirmationReminder({
+            invitationId: invitation.id,
+            expiresAt: invitation.expiresAt,
+            now: input.now,
+            finalReminderHours: input.settings.finalReminderHours
+          });
 
     if (!reminder) {
       continue;

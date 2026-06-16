@@ -6,10 +6,12 @@ const mocks = vi.hoisted(() => {
       aggregate: vi.fn(),
       create: vi.fn(),
       findUniqueOrThrow: vi.fn(),
-      update: vi.fn()
+      update: vi.fn(),
+      updateMany: vi.fn()
     },
     assignmentActivity: {
-      create: vi.fn()
+      create: vi.fn(),
+      findFirst: vi.fn()
     },
     assignmentInvitation: {
       findMany: vi.fn(),
@@ -264,6 +266,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   setupAssignmentDefaults();
   mocks.getAssignmentInvitationAvailability.mockReturnValue("READY");
+  mocks.tx.assignment.updateMany.mockResolvedValue({ count: 1 });
+  mocks.tx.assignmentActivity.findFirst.mockResolvedValue(null);
   mocks.inviteNextAvailableReplacementForAssignment.mockResolvedValue({
     assignmentId: "assignment-1",
     status: "invited",
@@ -662,6 +666,20 @@ describe("assignment automation orchestration", () => {
     ).rejects.toMatchObject({ statusCode: 410 });
 
     expect(mocks.tx.assignmentResponse.upsert).not.toHaveBeenCalled();
+    expect(mocks.tx.assignment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "assignment-1",
+          status: {
+            notIn: ["CANCELLED", "COMPLETED"]
+          }
+        }),
+        data: { status: "NEEDS_REPLACEMENT" }
+      })
+    );
+    expect(mocks.inviteNextAvailableReplacementForAssignment).toHaveBeenCalledWith({
+      assignmentId: "assignment-1"
+    });
   });
 
   it("rejects an already responded token without changing the response", async () => {

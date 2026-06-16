@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const tx = {
@@ -14,6 +14,9 @@ const mocks = vi.hoisted(() => {
     $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) =>
       callback(tx)
     ),
+    assignment: {
+      findUniqueOrThrow: vi.fn()
+    },
     assignmentActivity: {
       create: vi.fn(),
       findFirst: vi.fn()
@@ -92,12 +95,28 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.getAssignmentAutomationSettings.mockResolvedValue({
     primaryResponseTimeoutHours: 48,
-    replacementResponseTimeoutHours: 12
+    primaryReminderOffsetsHours: [12, 24, 40],
+    urgentPrimaryResponseTimeoutHours: 12,
+    urgentPrimaryReminderOffsetsHours: [4, 8],
+    urgentThresholdHours: 72,
+    replacementResponseTimeoutHours: 12,
+    censusResponseTimeoutHours: 72,
+    finalReminderHours: 3,
+    reminderTimingDays: [5, 1],
+    notificationChannels: ["EMAIL"]
+  });
+  mocks.db.assignment.findUniqueOrThrow.mockResolvedValue({
+    date: new Date(2026, 5, 20),
+    timeSlot: "SLOT_11_13"
   });
   mocks.db.assignmentActivity.findFirst.mockResolvedValue(null);
   mocks.db.assignmentActivity.create.mockResolvedValue({ id: "activity-1" });
   mocks.tx.assignmentActivity.findFirst.mockResolvedValue(null);
   mocks.tx.assignmentActivity.create.mockResolvedValue({ id: "activity-1" });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("assignment invitation delivery QA", () => {
@@ -132,6 +151,41 @@ describe("assignment invitation delivery QA", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           actionType: "INVITATION_CREATED"
+        })
+      })
+    );
+  });
+
+  it("compresses titular response windows when the assignment is close", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 16, 12, 0, 0));
+    mocks.db.assignment.findUniqueOrThrow.mockResolvedValue({
+      date: new Date(2026, 5, 17),
+      timeSlot: "SLOT_11_13"
+    });
+    mocks.db.assignmentInvitation.findMany.mockResolvedValue([]);
+    mocks.db.assignmentInvitation.create.mockImplementation(async ({ data }) => ({
+      id: `invitation-${data.volunteerId}`,
+      ...data
+    }));
+
+    await createPendingPrimaryInvitationsForAssignment({
+      assignmentId: "assignment-1",
+      volunteerIds: ["volunteer-1"],
+      actorUserId: "admin-1",
+      source: "week_preparation"
+    });
+
+    expect(mocks.db.assignmentInvitation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          expiresAt: new Date(2026, 5, 17, 0, 0, 0),
+          metadata: expect.objectContaining({
+            primaryResponseTimeoutHours: 12,
+            primaryReminderOffsetsHours: [4, 8],
+            urgentPrimaryWindow: true,
+            urgentThresholdHours: 72
+          })
         })
       })
     );

@@ -1252,6 +1252,7 @@ async function markExpiredInvitationIfNeeded(input: {
   metadata: Prisma.JsonValue | null;
 }) {
   const expiredAt = new Date();
+  let replacementRequired = false;
 
   await db.$transaction(async (tx) => {
     await tx.assignmentInvitation.update({
@@ -1278,7 +1279,73 @@ async function markExpiredInvitationIfNeeded(input: {
         source: "response_attempt_after_expiration"
       }
     });
+
+    await tx.volunteerProfile.update({
+      where: {
+        id: input.volunteerId
+      },
+      data: {
+        noResponseCount: {
+          increment: 1
+        }
+      }
+    });
+
+    const updatedAssignment = await tx.assignment.updateMany({
+      where: {
+        id: input.assignmentId,
+        status: {
+          notIn: ["CANCELLED", "COMPLETED"]
+        }
+      },
+      data: {
+        status: "NEEDS_REPLACEMENT"
+      }
+    });
+
+    if (updatedAssignment.count !== 1) {
+      return;
+    }
+
+    const dedupeKey = `replacement-required:${input.id}`;
+    const existingActivity = await tx.assignmentActivity.findFirst({
+      where: {
+        assignmentId: input.assignmentId,
+        actionType: "REPLACEMENT_REQUIRED",
+        metadata: {
+          path: ["dedupeKey"],
+          equals: dedupeKey
+        }
+      },
+      select: {
+        id: true
+      }
+    });
+
+    if (!existingActivity) {
+      await tx.assignmentActivity.create({
+        data: {
+          assignmentId: input.assignmentId,
+          actionType: "REPLACEMENT_REQUIRED",
+          metadata: compactJsonMetadata({
+            dedupeKey,
+            reason: "invitation_expired",
+            invitationId: input.id,
+            invitationType: input.type,
+            volunteerProfileId: input.volunteerId,
+            source: "response_attempt_after_expiration",
+            expiredAt: expiredAt.toISOString()
+          })
+        }
+      });
+    }
+
+    replacementRequired = true;
   });
+
+  return {
+    replacementRequired
+  };
 }
 
 export async function respondToAssignmentInvitation(input: {
@@ -1301,8 +1368,10 @@ export async function respondToAssignmentInvitation(input: {
   });
 
   if (preflightAvailability === "EXPIRED") {
+    let expirationResult: { replacementRequired: boolean } | undefined;
+
     if (preflightInvitation.status !== "EXPIRED") {
-      await markExpiredInvitationIfNeeded({
+      expirationResult = await markExpiredInvitationIfNeeded({
         id: preflightInvitation.id,
         assignmentId: preflightInvitation.assignmentId,
         volunteerId: preflightInvitation.volunteerId,
@@ -1311,6 +1380,13 @@ export async function respondToAssignmentInvitation(input: {
         metadata: preflightInvitation.metadata
       });
     }
+
+    if (expirationResult?.replacementRequired) {
+      await inviteNextAvailableReplacementForAssignment({
+        assignmentId: preflightInvitation.assignmentId
+      });
+    }
+
     throw getInvitationResponseError("EXPIRED");
   }
 

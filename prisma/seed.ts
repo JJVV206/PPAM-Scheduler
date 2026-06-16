@@ -327,6 +327,22 @@ async function main() {
         value: 48
       },
       {
+        key: "primaryReminderOffsetsHours",
+        value: [12, 24, 40]
+      },
+      {
+        key: "urgentPrimaryResponseTimeoutHours",
+        value: 12
+      },
+      {
+        key: "urgentPrimaryReminderOffsetsHours",
+        value: [4, 8]
+      },
+      {
+        key: "urgentThresholdHours",
+        value: 72
+      },
+      {
         key: "replacementResponseTimeoutHours",
         value: 12
       },
