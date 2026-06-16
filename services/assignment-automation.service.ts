@@ -261,6 +261,7 @@ export function getDueConfirmedAssignmentReminder(input: {
   now: Date;
   reminderTimingDays: number[];
   finalReminderHours: number;
+  confirmedAt?: Date | null;
 }): DueAssignmentReminder | null {
   const assignmentStartAt = buildAssignmentStartDate({
     date: input.assignmentDate,
@@ -271,34 +272,43 @@ export function getDueConfirmedAssignmentReminder(input: {
     return null;
   }
 
+  const activeFrom = input.confirmedAt;
+  const dueReminders: DueAssignmentReminder[] = [];
+
   if (input.finalReminderHours > 0) {
     const targetAt = subHours(assignmentStartAt, input.finalReminderHours);
-    if (targetAt <= input.now) {
-      return {
+    if (targetAt <= input.now && (!activeFrom || targetAt >= activeFrom)) {
+      dueReminders.push({
         kind: "FINAL_HOURS",
         reminderKey: `confirmed-final-${input.finalReminderHours}h`,
         notificationType: "FINAL_REMINDER",
         targetAt,
         offsetHours: input.finalReminderHours
-      };
+      });
     }
   }
 
-  const dueDays = normalizeReminderTimingDays(input.reminderTimingDays).find(
-    (daysBefore) => subDays(assignmentStartAt, daysBefore) <= input.now
-  );
+  for (const daysBefore of normalizeReminderTimingDays(input.reminderTimingDays)) {
+    const targetAt = subDays(assignmentStartAt, daysBefore);
 
-  if (!dueDays) {
+    if (targetAt <= input.now && (!activeFrom || targetAt >= activeFrom)) {
+      dueReminders.push({
+        kind: "DAYS_BEFORE",
+        reminderKey: `confirmed-${daysBefore}d`,
+        notificationType: "REMINDER",
+        targetAt,
+        offsetDays: daysBefore
+      });
+    }
+  }
+
+  if (!dueReminders.length) {
     return null;
   }
 
-  return {
-    kind: "DAYS_BEFORE",
-    reminderKey: `confirmed-${dueDays}d`,
-    notificationType: "REMINDER",
-    targetAt: subDays(assignmentStartAt, dueDays),
-    offsetDays: dueDays
-  };
+  return dueReminders.sort(
+    (left, right) => right.targetAt.getTime() - left.targetAt.getTime()
+  )[0];
 }
 
 export function getDuePendingConfirmationReminder(input: {
@@ -1303,22 +1313,10 @@ async function getDueConfirmedReminderRecipients(input: {
   const recipients: AssignmentReminderRecipient[] = [];
 
   for (const assignment of assignments) {
-    const reminder = getDueConfirmedAssignmentReminder({
-      assignmentDate: assignment.date,
-      timeSlot: assignment.timeSlot,
-      now: input.now,
-      reminderTimingDays: input.settings.reminderTimingDays,
-      finalReminderHours: input.settings.finalReminderHours
-    });
-
-    if (!reminder) {
-      continue;
-    }
-
-    const confirmedVolunteerIds = new Set(
+    const confirmedResponsesByVolunteerId = new Map(
       assignment.responses
         .filter((response) => response.responseStatus === "CONFIRMED")
-        .map((response) => response.volunteerId)
+        .map((response) => [response.volunteerId, response])
     );
     const assignmentStartAt = buildAssignmentStartDate({
       date: assignment.date,
@@ -1326,11 +1324,26 @@ async function getDueConfirmedReminderRecipients(input: {
     });
 
     for (const slot of assignment.volunteers) {
+      const response = confirmedResponsesByVolunteerId.get(slot.volunteerId);
+
       if (
-        !confirmedVolunteerIds.has(slot.volunteerId) ||
+        !response ||
         !slot.volunteer.active ||
         !slot.volunteer.user.active
       ) {
+        continue;
+      }
+
+      const reminder = getDueConfirmedAssignmentReminder({
+        assignmentDate: assignment.date,
+        timeSlot: assignment.timeSlot,
+        now: input.now,
+        reminderTimingDays: input.settings.reminderTimingDays,
+        finalReminderHours: input.settings.finalReminderHours,
+        confirmedAt: response.respondedAt
+      });
+
+      if (!reminder) {
         continue;
       }
 

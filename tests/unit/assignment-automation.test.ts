@@ -56,6 +56,37 @@ describe("assignment reminder scheduling", () => {
     });
   });
 
+  it("does not backfill reminders that were due before confirmation", () => {
+    const reminder = getDueConfirmedAssignmentReminder({
+      assignmentDate: new Date(2026, 5, 20),
+      timeSlot: "SLOT_11_13",
+      now: new Date(2026, 5, 18, 11, 0, 0),
+      reminderTimingDays: [5, 1],
+      finalReminderHours: 3,
+      confirmedAt: new Date(2026, 5, 18, 10, 0, 0)
+    });
+
+    expect(reminder).toBeNull();
+  });
+
+  it("sends the next applicable reminder after a late confirmation", () => {
+    const reminder = getDueConfirmedAssignmentReminder({
+      assignmentDate: new Date(2026, 5, 20),
+      timeSlot: "SLOT_11_13",
+      now: new Date(2026, 5, 19, 11, 0, 0),
+      reminderTimingDays: [5, 1],
+      finalReminderHours: 3,
+      confirmedAt: new Date(2026, 5, 18, 10, 0, 0)
+    });
+
+    expect(reminder).toMatchObject({
+      kind: "DAYS_BEFORE",
+      reminderKey: "confirmed-1d",
+      notificationType: "REMINDER",
+      offsetDays: 1
+    });
+  });
+
   it("schedules pending confirmation reminders before invitation expiration", () => {
     const reminder = getDuePendingConfirmationReminder({
       invitationId: "invitation-1",
