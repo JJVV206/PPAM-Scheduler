@@ -1,13 +1,26 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardList, LifeBuoy } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  ClipboardList,
+  LifeBuoy
+} from "lucide-react";
 
 import { AssignmentCard } from "@/components/assignments/assignment-card";
 import { EmptyState } from "@/components/forms/empty-state";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
 import { formatDisplayDate } from "@/lib/utils";
 import { VolunteerProfileCard } from "@/components/volunteers/volunteer-profile-card";
+import { DeleteVolunteerButton } from "@/features/volunteers/delete-volunteer-button";
 import { getVolunteer } from "@/services/volunteer.service";
 import { getVolunteerHistory } from "@/services/assignment.service";
 
@@ -42,12 +55,19 @@ export default async function AdminVolunteerProfilePage({
         <div className="surface-panel rounded-[28px] px-5 py-3.5">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-2.5">
-              <Button variant="ghost" size="sm" asChild className="w-fit">
-                <Link href="/admin/volunteers">
-                  <ArrowLeft className="h-4 w-4" />
-                  Volver a voluntarios
-                </Link>
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="ghost" size="sm" asChild className="w-fit">
+                  <Link href="/admin/volunteers">
+                    <ArrowLeft className="h-4 w-4" />
+                    Volver a voluntarios
+                  </Link>
+                </Button>
+                <DeleteVolunteerButton
+                  volunteerId={volunteer.id}
+                  volunteerName={volunteer.name}
+                  disabled={!volunteer.active}
+                />
+              </div>
               <div>
                 <h1 className="font-heading text-3xl font-semibold">
                   {volunteer.name}
@@ -95,8 +115,8 @@ export default async function AdminVolunteerProfilePage({
               <CardHeader className="p-5 pb-3">
                 <CardTitle>Historial de asignaciones</CardTitle>
                 <CardDescription>
-                  Accede al detalle de cada asignación y revisa el seguimiento del
-                  voluntario en el tiempo.
+                  Accede al detalle de cada asignación y revisa el seguimiento
+                  del voluntario en el tiempo.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-5 pt-0">
@@ -120,7 +140,9 @@ export default async function AdminVolunteerProfilePage({
                               </p>
                             </div>
                             <Button variant="secondary" size="sm" asChild>
-                              <Link href={`/admin/assignments/${assignment.id}`}>
+                              <Link
+                                href={`/admin/assignments/${assignment.id}`}
+                              >
                                 Ver detalle
                               </Link>
                             </Button>
@@ -161,14 +183,10 @@ function VolunteerMetricCard({
   tone = "default"
 }: VolunteerMetricCardProps) {
   const toneMap = {
-    default:
-      "border-white/5 bg-white/[0.03] text-primary",
-    success:
-      "border-success/15 bg-success/10 text-success",
-    warning:
-      "border-warning/15 bg-warning/10 text-warning",
-    danger:
-      "border-danger/15 bg-danger/10 text-danger"
+    default: "border-white/5 bg-white/[0.03] text-primary",
+    success: "border-success/15 bg-success/10 text-success",
+    warning: "border-warning/15 bg-warning/10 text-warning",
+    danger: "border-danger/15 bg-danger/10 text-danger"
   } as const;
 
   return (
@@ -182,9 +200,7 @@ function VolunteerMetricCard({
             {value}
           </p>
         </div>
-        <div
-          className={`rounded-2xl border p-2.5 ${toneMap[tone]}`}
-        >
+        <div className={`rounded-2xl border p-2.5 ${toneMap[tone]}`}>
           <Icon className="h-4 w-4" />
         </div>
       </div>

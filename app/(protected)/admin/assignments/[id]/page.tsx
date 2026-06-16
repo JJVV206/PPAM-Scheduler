@@ -24,7 +24,7 @@ export default async function AdminAssignmentDetailPage({
     const [assignment, preachingPoints, volunteers] = await Promise.all([
       getAssignmentDetail(id),
       getPreachingPoints(),
-      getVolunteers()
+      getVolunteers({ activeOnly: true })
     ]);
 
     return (

@@ -20,7 +20,7 @@ export default async function AdminAssignmentsPage() {
     await Promise.all([
       getAssignments(),
       getPreachingPoints(),
-      getVolunteers(),
+      getVolunteers({ activeOnly: true }),
       db.scheduleWeek.findFirst({
         where: {
           startDate: schedule.startDate

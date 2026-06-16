@@ -84,6 +84,21 @@ export function AssignmentAdminActions({
     tone: "success" | "error";
     text: string;
   } | null>(null);
+  const volunteerOptions = useMemo(() => {
+    const options = new Map<string, VolunteerSummary>();
+
+    for (const volunteer of volunteers) {
+      options.set(volunteer.id, volunteer);
+    }
+
+    for (const slot of assignment.volunteers) {
+      options.set(slot.volunteer.id, slot.volunteer);
+    }
+
+    return [...options.values()].sort((left, right) =>
+      left.name.localeCompare(right.name, "es-MX")
+    );
+  }, [assignment.volunteers, volunteers]);
 
   const selectedDayOfWeek = useMemo(
     () => getDayOfWeekFromDate(assignmentDate),
@@ -267,9 +282,10 @@ export function AssignmentAdminActions({
               <SelectValue placeholder="Primer puesto" />
             </SelectTrigger>
             <SelectContent>
-              {volunteers.map((volunteer) => (
+              {volunteerOptions.map((volunteer) => (
                 <SelectItem key={volunteer.id} value={volunteer.id}>
                   {volunteer.name}
+                  {volunteer.active ? "" : " (inactivo)"}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -283,9 +299,10 @@ export function AssignmentAdminActions({
               <SelectValue placeholder="Segundo puesto" />
             </SelectTrigger>
             <SelectContent>
-              {volunteers.map((volunteer) => (
+              {volunteerOptions.map((volunteer) => (
                 <SelectItem key={volunteer.id} value={volunteer.id}>
                   {volunteer.name}
+                  {volunteer.active ? "" : " (inactivo)"}
                 </SelectItem>
               ))}
             </SelectContent>

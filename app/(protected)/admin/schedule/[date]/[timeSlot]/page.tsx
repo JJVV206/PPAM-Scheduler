@@ -45,7 +45,7 @@ export default async function AdminScheduleSlotPage({
         timeSlot
       }),
       getPreachingPoints(),
-      getVolunteers(),
+      getVolunteers({ activeOnly: true }),
       db.scheduleWeek.findFirst({
         where: {
           startDate: { lte: slotDate },

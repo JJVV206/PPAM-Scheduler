@@ -59,7 +59,7 @@ export default async function AdminSchedulePage({
   const [preachingPoints, volunteers, currentWeek, availableWeeks] =
     await Promise.all([
       getPreachingPoints(),
-      getVolunteers(),
+      getVolunteers({ activeOnly: true }),
       db.scheduleWeek.findFirst({
         where: {
           startDate: schedule.startDate
@@ -87,8 +87,8 @@ export default async function AdminSchedulePage({
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <section className="surface-panel shrink-0 px-4 py-4 sm:px-5 sm:py-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="min-w-0">
-            <h1 className="font-heading text-3xl font-semibold sm:text-4xl">
+          <div className="min-w-0 xl:shrink-0">
+            <h1 className="font-heading text-3xl font-semibold leading-tight sm:text-4xl lg:whitespace-nowrap">
               Horario semanal
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">

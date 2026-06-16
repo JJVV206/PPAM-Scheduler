@@ -1,3 +1,6 @@
+import { startOfDay } from "date-fns";
+import { Prisma } from "@prisma/client";
+
 import { db } from "@/lib/db/prisma";
 import type {
   VolunteerAssignmentReminderDto,
@@ -13,6 +16,35 @@ import {
   isVolunteerAssignmentConfirmed,
   isVolunteerAssignmentPendingResponse
 } from "@/lib/volunteer-assignment";
+
+const ACTIVE_INVITATION_STATUSES = ["PENDING", "SENT"] as const;
+const TERMINAL_ASSIGNMENT_STATUSES = ["CANCELLED", "COMPLETED"] as const;
+const VOLUNTEER_DELETED_RESPONSE_NOTE =
+  "Voluntario eliminado por administrador.";
+
+function asJsonObject(value: Prisma.JsonValue | null) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return {};
+}
+
+function compactJsonMetadata(metadata: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(metadata).filter(([, value]) => value !== undefined)
+  ) as Prisma.InputJsonObject;
+}
+
+function mergeJsonMetadata(
+  current: Prisma.JsonValue | null,
+  next: Record<string, unknown>
+) {
+  return compactJsonMetadata({
+    ...asJsonObject(current),
+    ...next
+  });
+}
 
 function mapVolunteer(record: {
   id: string;
@@ -51,8 +83,16 @@ function mapVolunteer(record: {
   };
 }
 
-export async function getVolunteers() {
+export async function getVolunteers(input?: { activeOnly?: boolean }) {
   const volunteers = await db.volunteerProfile.findMany({
+    where: input?.activeOnly
+      ? {
+          active: true,
+          user: {
+            active: true
+          }
+        }
+      : undefined,
     include: { user: true, availability: true },
     orderBy: { user: { name: "asc" } }
   });
@@ -194,21 +234,147 @@ export async function updateVolunteer(
   });
 }
 
-export async function deactivateVolunteer(volunteerId: string) {
+export async function deactivateVolunteer(
+  volunteerId: string,
+  input?: { actorUserId?: string }
+) {
   const volunteer = await db.volunteerProfile.findUniqueOrThrow({
-    where: { id: volunteerId }
+    where: { id: volunteerId },
+    include: { user: true }
   });
+  const now = new Date();
+  const activeFromToday = startOfDay(now);
 
-  await db.$transaction([
-    db.volunteerProfile.update({
+  return db.$transaction(async (tx) => {
+    await tx.volunteerProfile.update({
       where: { id: volunteerId },
       data: { active: false }
-    }),
-    db.user.update({
+    });
+    await tx.user.update({
       where: { id: volunteer.userId },
       data: { active: false }
-    })
-  ]);
+    });
+
+    const activeInvitations = await tx.assignmentInvitation.findMany({
+      where: {
+        volunteerId,
+        status: {
+          in: [...ACTIVE_INVITATION_STATUSES]
+        }
+      },
+      select: {
+        id: true,
+        metadata: true
+      }
+    });
+
+    for (const invitation of activeInvitations) {
+      await tx.assignmentInvitation.update({
+        where: { id: invitation.id },
+        data: {
+          status: "EXPIRED",
+          metadata: mergeJsonMetadata(invitation.metadata, {
+            expiredBy: "ADMIN_VOLUNTEER_DELETION",
+            expiredAt: now.toISOString(),
+            actorUserId: input?.actorUserId
+          })
+        }
+      });
+    }
+
+    const affectedAssignments = await tx.assignment.findMany({
+      where: {
+        date: {
+          gte: activeFromToday
+        },
+        status: {
+          notIn: [...TERMINAL_ASSIGNMENT_STATUSES]
+        },
+        volunteers: {
+          some: {
+            volunteerId
+          }
+        }
+      },
+      include: {
+        volunteers: {
+          where: {
+            volunteerId
+          }
+        }
+      }
+    });
+
+    for (const assignment of affectedAssignments) {
+      const assignedSlot = assignment.volunteers[0];
+      const dedupeKey = `volunteer-deleted:${assignment.id}:${volunteerId}`;
+
+      await tx.assignmentResponse.upsert({
+        where: {
+          assignmentId_volunteerId: {
+            assignmentId: assignment.id,
+            volunteerId
+          }
+        },
+        update: {
+          responseStatus: "DECLINED",
+          note: VOLUNTEER_DELETED_RESPONSE_NOTE,
+          respondedAt: now
+        },
+        create: {
+          assignmentId: assignment.id,
+          volunteerId,
+          responseStatus: "DECLINED",
+          note: VOLUNTEER_DELETED_RESPONSE_NOTE,
+          respondedAt: now
+        }
+      });
+
+      if (assignment.status !== "NEEDS_REPLACEMENT") {
+        await tx.assignment.update({
+          where: { id: assignment.id },
+          data: { status: "NEEDS_REPLACEMENT" }
+        });
+      }
+
+      const existingActivity = await tx.assignmentActivity.findFirst({
+        where: {
+          assignmentId: assignment.id,
+          actionType: "REPLACEMENT_REQUIRED",
+          metadata: {
+            path: ["dedupeKey"],
+            equals: dedupeKey
+          }
+        },
+        select: { id: true }
+      });
+
+      if (!existingActivity) {
+        await tx.assignmentActivity.create({
+          data: {
+            assignmentId: assignment.id,
+            actorUserId: input?.actorUserId,
+            actionType: "REPLACEMENT_REQUIRED",
+            metadata: {
+              dedupeKey,
+              reason: "volunteer_deleted",
+              volunteerProfileId: volunteerId,
+              volunteerUserId: volunteer.userId,
+              position: assignedSlot?.position,
+              previousStatus: assignment.status,
+              markedAt: now.toISOString()
+            }
+          }
+        });
+      }
+    }
+
+    return {
+      success: true,
+      affectedAssignmentCount: affectedAssignments.length,
+      expiredInvitationCount: activeInvitations.length
+    };
+  });
 }
 
 export async function getVolunteerDashboardData(
