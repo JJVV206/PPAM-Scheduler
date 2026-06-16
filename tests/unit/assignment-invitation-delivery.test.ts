@@ -110,6 +110,8 @@ beforeEach(() => {
     urgentReplacementResponseTimeoutHours: 4,
     urgentReplacementReminderOffsetsHours: [2],
     censusResponseTimeoutHours: 72,
+    censusReminderOffsetsHours: [24, 48],
+    adminAlertEmail: "admin@ppam.local",
     finalReminderHours: 3,
     reminderTimingDays: [5, 1],
     notificationChannels: ["EMAIL"]

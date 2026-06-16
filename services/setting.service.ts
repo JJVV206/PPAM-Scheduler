@@ -1,5 +1,10 @@
+import { Prisma } from "@prisma/client";
+
+import { NOTIFICATION_CHANNELS } from "@/lib/constants/domain";
 import { db } from "@/lib/db/prisma";
 import {
+  DEFAULT_ADMIN_ALERT_EMAIL,
+  DEFAULT_CENSUS_REMINDER_OFFSETS_HOURS,
   DEFAULT_CENSUS_RESPONSE_TIMEOUT_HOURS,
   DEFAULT_CONFIRMATION_LEAD_DAYS,
   DEFAULT_FINAL_REMINDER_HOURS,
@@ -17,6 +22,8 @@ import {
 import type { SettingsDto } from "@/types/domain";
 
 const ASSIGNMENT_AUTOMATION_LAST_RUN_SETTING_KEY = "assignmentAutomationLastRun";
+const SETTINGS_CHANGE_HISTORY_SETTING_KEY = "settingsChangeHistory";
+const SETTINGS_CHANGE_HISTORY_LIMIT = 50;
 
 export type AssignmentAutomationSettings = {
   reminderTimingDays: number[];
@@ -31,6 +38,8 @@ export type AssignmentAutomationSettings = {
   urgentReplacementResponseTimeoutHours: number;
   urgentReplacementReminderOffsetsHours: number[];
   censusResponseTimeoutHours: number;
+  censusReminderOffsetsHours: number[];
+  adminAlertEmail: string;
   notificationChannels: SettingsDto["notificationChannels"];
 };
 
@@ -44,10 +53,146 @@ export type AssignmentAutomationLastRunSummary = {
   summarySaved: boolean;
 };
 
+export type SettingsChangeHistoryEntry = {
+  version: number;
+  changedAt: string;
+  actorUserId: string | null;
+  changedKeys: string[];
+  previous: SettingsDto;
+  next: SettingsDto;
+};
+
 function asRecord(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function normalizePositiveInteger(value: unknown, fallback: number): number {
+  return isPositiveInteger(value) ? value : fallback;
+}
+
+function normalizeNumberList(
+  value: unknown,
+  fallback: readonly number[],
+  options?: {
+    sort?: boolean;
+  }
+): number[] {
+  const values = Array.isArray(value) ? value : [];
+  const normalized = [
+    ...new Set(values.filter((item): item is number => isPositiveInteger(item)))
+  ];
+
+  if (options?.sort) {
+    normalized.sort((left, right) => left - right);
+  }
+
+  return normalized.length ? normalized : [...fallback];
+}
+
+function normalizeNotificationChannels(
+  value: unknown
+): SettingsDto["notificationChannels"] {
+  const allowedChannels = new Set<string>(NOTIFICATION_CHANNELS);
+  const values = Array.isArray(value) ? value : [];
+  const channels = values.filter(
+    (channel): channel is SettingsDto["notificationChannels"][number] =>
+      typeof channel === "string" && allowedChannels.has(channel)
+  );
+
+  return channels.length
+    ? ([...new Set(channels)] as SettingsDto["notificationChannels"])
+    : (["EMAIL"] as SettingsDto["notificationChannels"]);
+}
+
+function normalizeAdminAlertEmail(value: unknown): string {
+  if (typeof value !== "string") {
+    return DEFAULT_ADMIN_ALERT_EMAIL;
+  }
+
+  const email = value.trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    ? email
+    : DEFAULT_ADMIN_ALERT_EMAIL;
+}
+
+function normalizeSettings(input: SettingsDto): SettingsDto {
+  return {
+    confirmationLeadDays: normalizePositiveInteger(
+      input.confirmationLeadDays,
+      DEFAULT_CONFIRMATION_LEAD_DAYS
+    ),
+    reminderTimingDays: normalizeNumberList(
+      input.reminderTimingDays,
+      DEFAULT_REMINDER_TIMING_DAYS
+    ),
+    finalReminderHours: normalizePositiveInteger(
+      input.finalReminderHours,
+      DEFAULT_FINAL_REMINDER_HOURS
+    ),
+    primaryResponseTimeoutHours: normalizePositiveInteger(
+      input.primaryResponseTimeoutHours,
+      DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS
+    ),
+    primaryReminderOffsetsHours: normalizeNumberList(
+      input.primaryReminderOffsetsHours,
+      DEFAULT_PRIMARY_REMINDER_OFFSETS_HOURS,
+      { sort: true }
+    ),
+    replacementResponseTimeoutHours: normalizePositiveInteger(
+      input.replacementResponseTimeoutHours,
+      DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
+    ),
+    replacementReminderOffsetsHours: normalizeNumberList(
+      input.replacementReminderOffsetsHours,
+      DEFAULT_REPLACEMENT_REMINDER_OFFSETS_HOURS,
+      { sort: true }
+    ),
+    censusResponseTimeoutHours: normalizePositiveInteger(
+      input.censusResponseTimeoutHours,
+      DEFAULT_CENSUS_RESPONSE_TIMEOUT_HOURS
+    ),
+    censusReminderOffsetsHours: normalizeNumberList(
+      input.censusReminderOffsetsHours,
+      DEFAULT_CENSUS_REMINDER_OFFSETS_HOURS,
+      { sort: true }
+    ),
+    urgentThresholdHours: normalizePositiveInteger(
+      input.urgentThresholdHours,
+      DEFAULT_URGENT_THRESHOLD_HOURS
+    ),
+    adminAlertEmail: normalizeAdminAlertEmail(input.adminAlertEmail),
+    notificationChannels: normalizeNotificationChannels(input.notificationChannels)
+  };
+}
+
+function parseSettingsChangeHistory(value: unknown): SettingsChangeHistoryEntry[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((entry): entry is SettingsChangeHistoryEntry => {
+    const record = asRecord(entry);
+
+    return Boolean(
+      record &&
+        typeof record.version === "number" &&
+        typeof record.changedAt === "string" &&
+        Array.isArray(record.changedKeys) &&
+        record.changedKeys.every((key) => typeof key === "string")
+    );
+  });
+}
+
+function getChangedSettingKeys(previous: SettingsDto, next: SettingsDto) {
+  return (Object.keys(next) as (keyof SettingsDto)[]).filter(
+    (key) => JSON.stringify(previous[key]) !== JSON.stringify(next[key])
+  );
 }
 
 function isAssignmentAutomationLastRunSummary(
@@ -75,40 +220,25 @@ export async function getSettingValue<T>(key: string, fallback: T): Promise<T> {
 }
 
 export async function getAppSettings(): Promise<SettingsDto> {
-  const [confirmationLeadDays, reminderTimingDays, notificationChannels] =
-    await Promise.all([
-      getSettingValue("confirmationLeadDays", DEFAULT_CONFIRMATION_LEAD_DAYS),
-      getSettingValue<number[]>(
-        "reminderTimingDays",
-        [...DEFAULT_REMINDER_TIMING_DAYS]
-      ),
-      getSettingValue<SettingsDto["notificationChannels"]>("notificationChannels", [
-        "EMAIL"
-      ])
-    ]);
-
-  return {
+  const [
     confirmationLeadDays,
     reminderTimingDays,
-    notificationChannels
-  };
-}
-
-export async function getAssignmentAutomationSettings(): Promise<AssignmentAutomationSettings> {
-  const appSettings = await getAppSettings();
-  const [
     finalReminderHours,
     primaryResponseTimeoutHours,
     primaryReminderOffsetsHours,
-    urgentPrimaryResponseTimeoutHours,
-    urgentPrimaryReminderOffsetsHours,
-    urgentThresholdHours,
     replacementResponseTimeoutHours,
     replacementReminderOffsetsHours,
-    urgentReplacementResponseTimeoutHours,
-    urgentReplacementReminderOffsetsHours,
-    censusResponseTimeoutHours
+    censusResponseTimeoutHours,
+    censusReminderOffsetsHours,
+    urgentThresholdHours,
+    adminAlertEmail,
+    notificationChannels
   ] = await Promise.all([
+    getSettingValue("confirmationLeadDays", DEFAULT_CONFIRMATION_LEAD_DAYS),
+    getSettingValue<number[]>(
+      "reminderTimingDays",
+      [...DEFAULT_REMINDER_TIMING_DAYS]
+    ),
     getSettingValue("finalReminderHours", DEFAULT_FINAL_REMINDER_HOURS),
     getSettingValue(
       "primaryResponseTimeoutHours",
@@ -119,15 +249,6 @@ export async function getAssignmentAutomationSettings(): Promise<AssignmentAutom
       [...DEFAULT_PRIMARY_REMINDER_OFFSETS_HOURS]
     ),
     getSettingValue(
-      "urgentPrimaryResponseTimeoutHours",
-      DEFAULT_URGENT_PRIMARY_RESPONSE_TIMEOUT_HOURS
-    ),
-    getSettingValue<number[]>(
-      "urgentPrimaryReminderOffsetsHours",
-      [...DEFAULT_URGENT_PRIMARY_REMINDER_OFFSETS_HOURS]
-    ),
-    getSettingValue("urgentThresholdHours", DEFAULT_URGENT_THRESHOLD_HOURS),
-    getSettingValue(
       "replacementResponseTimeoutHours",
       DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
     ),
@@ -136,32 +257,77 @@ export async function getAssignmentAutomationSettings(): Promise<AssignmentAutom
       [...DEFAULT_REPLACEMENT_REMINDER_OFFSETS_HOURS]
     ),
     getSettingValue(
+      "censusResponseTimeoutHours",
+      DEFAULT_CENSUS_RESPONSE_TIMEOUT_HOURS
+    ),
+    getSettingValue<number[]>(
+      "censusReminderOffsetsHours",
+      [...DEFAULT_CENSUS_REMINDER_OFFSETS_HOURS]
+    ),
+    getSettingValue("urgentThresholdHours", DEFAULT_URGENT_THRESHOLD_HOURS),
+    getSettingValue("adminAlertEmail", DEFAULT_ADMIN_ALERT_EMAIL),
+    getSettingValue<SettingsDto["notificationChannels"]>("notificationChannels", [
+      "EMAIL"
+    ])
+  ]);
+
+  return normalizeSettings({
+    confirmationLeadDays,
+    reminderTimingDays,
+    finalReminderHours,
+    primaryResponseTimeoutHours,
+    primaryReminderOffsetsHours,
+    replacementResponseTimeoutHours,
+    replacementReminderOffsetsHours,
+    censusResponseTimeoutHours,
+    censusReminderOffsetsHours,
+    urgentThresholdHours,
+    adminAlertEmail,
+    notificationChannels
+  });
+}
+
+export async function getAssignmentAutomationSettings(): Promise<AssignmentAutomationSettings> {
+  const appSettings = await getAppSettings();
+  const [
+    urgentPrimaryResponseTimeoutHours,
+    urgentPrimaryReminderOffsetsHours,
+    urgentReplacementResponseTimeoutHours,
+    urgentReplacementReminderOffsetsHours
+  ] = await Promise.all([
+    getSettingValue(
+      "urgentPrimaryResponseTimeoutHours",
+      DEFAULT_URGENT_PRIMARY_RESPONSE_TIMEOUT_HOURS
+    ),
+    getSettingValue<number[]>(
+      "urgentPrimaryReminderOffsetsHours",
+      [...DEFAULT_URGENT_PRIMARY_REMINDER_OFFSETS_HOURS]
+    ),
+    getSettingValue(
       "urgentReplacementResponseTimeoutHours",
       DEFAULT_URGENT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
     ),
     getSettingValue<number[]>(
       "urgentReplacementReminderOffsetsHours",
       [...DEFAULT_URGENT_REPLACEMENT_REMINDER_OFFSETS_HOURS]
-    ),
-    getSettingValue(
-      "censusResponseTimeoutHours",
-      DEFAULT_CENSUS_RESPONSE_TIMEOUT_HOURS
     )
   ]);
 
   return {
     reminderTimingDays: appSettings.reminderTimingDays,
-    finalReminderHours,
-    primaryResponseTimeoutHours,
-    primaryReminderOffsetsHours,
+    finalReminderHours: appSettings.finalReminderHours,
+    primaryResponseTimeoutHours: appSettings.primaryResponseTimeoutHours,
+    primaryReminderOffsetsHours: appSettings.primaryReminderOffsetsHours,
     urgentPrimaryResponseTimeoutHours,
     urgentPrimaryReminderOffsetsHours,
-    urgentThresholdHours,
-    replacementResponseTimeoutHours,
-    replacementReminderOffsetsHours,
+    urgentThresholdHours: appSettings.urgentThresholdHours,
+    replacementResponseTimeoutHours: appSettings.replacementResponseTimeoutHours,
+    replacementReminderOffsetsHours: appSettings.replacementReminderOffsetsHours,
     urgentReplacementResponseTimeoutHours,
     urgentReplacementReminderOffsetsHours,
-    censusResponseTimeoutHours,
+    censusResponseTimeoutHours: appSettings.censusResponseTimeoutHours,
+    censusReminderOffsetsHours: appSettings.censusReminderOffsetsHours,
+    adminAlertEmail: appSettings.adminAlertEmail,
     notificationChannels: appSettings.notificationChannels
   };
 }
@@ -180,18 +346,74 @@ export async function getAssignmentAutomationLastRunSummary() {
   return setting.value;
 }
 
-export async function updateSettings(input: SettingsDto) {
-  const entries = Object.entries(input);
+export async function getSettingsChangeHistory() {
+  const setting = await db.appSetting.findUnique({
+    where: {
+      key: SETTINGS_CHANGE_HISTORY_SETTING_KEY
+    }
+  });
 
-  await db.$transaction(
-    entries.map(([key, value]) =>
-      db.appSetting.upsert({
-        where: { key },
-        update: { value },
-        create: { key, value }
-      })
-    )
-  );
+  return parseSettingsChangeHistory(setting?.value);
+}
+
+export async function updateSettings(
+  input: SettingsDto,
+  options?: {
+    actorUserId?: string | null;
+  }
+) {
+  const previousSettings = await getAppSettings();
+  const nextSettings = normalizeSettings(input);
+  const entries = Object.entries(nextSettings);
+  const changedKeys = getChangedSettingKeys(previousSettings, nextSettings);
+
+  await db.$transaction(async (tx) => {
+    await Promise.all(
+      entries.map(([key, value]) =>
+        tx.appSetting.upsert({
+          where: { key },
+          update: { value: value as Prisma.InputJsonValue },
+          create: { key, value: value as Prisma.InputJsonValue }
+        })
+      )
+    );
+
+    if (!changedKeys.length) {
+      return;
+    }
+
+    const existingHistory = await tx.appSetting.findUnique({
+      where: {
+        key: SETTINGS_CHANGE_HISTORY_SETTING_KEY
+      }
+    });
+    const history = parseSettingsChangeHistory(existingHistory?.value);
+    const lastVersion = history.at(-1)?.version ?? 0;
+    const historyEntry: SettingsChangeHistoryEntry = {
+      version: lastVersion + 1,
+      changedAt: new Date().toISOString(),
+      actorUserId: options?.actorUserId ?? null,
+      changedKeys,
+      previous: previousSettings,
+      next: nextSettings
+    };
+    const nextHistory = [...history, historyEntry].slice(
+      -SETTINGS_CHANGE_HISTORY_LIMIT
+    );
+
+    await tx.appSetting.upsert({
+      where: {
+        key: SETTINGS_CHANGE_HISTORY_SETTING_KEY
+      },
+      update: {
+        value: nextHistory as unknown as Prisma.InputJsonValue
+      },
+      create: {
+        key: SETTINGS_CHANGE_HISTORY_SETTING_KEY,
+        value: nextHistory as unknown as Prisma.InputJsonValue
+      }
+    });
+  });
 
   return getAppSettings();
 }

@@ -105,7 +105,8 @@ import {
   inviteNextAvailableReplacementForAssignment,
   notifyAdminsForUnresolvedAssignments,
   processAssignmentAutomationRun,
-  sendDueAssignmentReminders
+  sendDueAssignmentReminders,
+  sendReplacementCensusReminders
 } from "@/services/assignment-automation.service";
 
 function automationSettings() {
@@ -122,7 +123,9 @@ function automationSettings() {
     replacementReminderOffsetsHours: [4, 8],
     urgentReplacementResponseTimeoutHours: 4,
     urgentReplacementReminderOffsetsHours: [2],
-    censusResponseTimeoutHours: 72
+    censusResponseTimeoutHours: 72,
+    censusReminderOffsetsHours: [24, 48],
+    adminAlertEmail: "admin@ppam.local"
   };
 }
 
@@ -675,6 +678,81 @@ describe("assignment automation idempotency QA", () => {
             path: ["reminderKey"],
             equals: "pending-confirmation-replacement-invitation-1-4h"
           }
+        })
+      })
+    );
+  });
+
+  it("uses configured replacement census reminder offsets", async () => {
+    mocks.getAssignmentAutomationSettings.mockResolvedValue(automationSettings());
+    mocks.db.replacementCensusResponse.findMany.mockResolvedValue([
+      {
+        id: "census-response-1",
+        censusId: "census-1",
+        token: "census-token",
+        expiresAt: new Date("2026-06-18T12:00:00.000Z"),
+        census: {
+          scheduleWeekId: "week-1",
+          scheduleWeek: {
+            startDate: new Date("2026-06-15T00:00:00.000Z"),
+            endDate: new Date("2026-06-21T00:00:00.000Z")
+          }
+        },
+        volunteer: {
+          userId: "user-1",
+          user: {
+            name: "Julia"
+          }
+        }
+      }
+    ]);
+    mocks.db.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "julia@example.org"
+    });
+    mocks.db.notificationLog.findFirst.mockResolvedValue(null);
+    mocks.db.notificationLog.create.mockResolvedValue({
+      id: "notification-1",
+      status: "SENT",
+      sentAt: new Date("2026-06-16T12:00:00.000Z"),
+      errorMessage: null
+    });
+
+    const now = new Date("2026-06-16T12:00:00.000Z");
+    const result = await sendReplacementCensusReminders({ now });
+
+    expect(result).toMatchObject({
+      processedCount: 1,
+      sentCount: 1,
+      duplicateCount: 0
+    });
+    expect(mocks.db.replacementCensusResponse.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          expiresAt: {
+            gt: now,
+            lte: new Date("2026-06-18T12:00:00.000Z")
+          }
+        })
+      })
+    );
+    expect(mocks.db.notificationLog.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          metadata: {
+            path: ["reminderKey"],
+            equals: "census-reminder:census-response-1:48h"
+          }
+        })
+      })
+    );
+    expect(mocks.db.notificationLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          metadata: expect.objectContaining({
+            reminderKey: "census-reminder:census-response-1:48h",
+            reminderOffsetHours: 48
+          })
         })
       })
     );

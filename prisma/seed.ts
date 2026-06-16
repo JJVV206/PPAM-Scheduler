@@ -359,6 +359,18 @@ async function main() {
         value: [2]
       },
       {
+        key: "censusResponseTimeoutHours",
+        value: 72
+      },
+      {
+        key: "censusReminderOffsetsHours",
+        value: [24, 48]
+      },
+      {
+        key: "adminAlertEmail",
+        value: "admin@ppam.local"
+      },
+      {
         key: "notificationChannels",
         value: ["EMAIL"]
       }

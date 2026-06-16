@@ -10,10 +10,8 @@ vi.mock("@/services/assignment-automation.service", () => ({
   processAssignmentAutomationRun: mocks.processAssignmentAutomationRun
 }));
 
-import {
-  GET,
-  buildCronAutomationResponse
-} from "@/app/api/cron/assignment-automation/route";
+import { GET } from "@/app/api/cron/assignment-automation/route";
+import { buildCronAutomationResponse } from "@/lib/cron/assignment-automation-response";
 import { isAuthorizedCronRequest } from "@/lib/cron/auth";
 import type { AssignmentAutomationRunResult } from "@/services/assignment-automation.service";
 

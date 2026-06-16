@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { buildCronAutomationResponse } from "@/lib/cron/assignment-automation-response";
 import { processAssignmentAutomationRun } from "@/services/assignment-automation.service";
-import type { AssignmentAutomationRunResult } from "@/services/assignment-automation.service";
 import { isAuthorizedCronRequest } from "@/lib/cron/auth";
 
 export const dynamic = "force-dynamic";
@@ -11,20 +11,6 @@ export const maxDuration = 60;
 const NO_STORE_HEADERS = {
   "Cache-Control": "no-store"
 } as const;
-
-export function buildCronAutomationResponse(
-  result: AssignmentAutomationRunResult
-) {
-  return {
-    status: result.status,
-    automationRunId: result.automationRunId,
-    startedAt: result.startedAt,
-    finishedAt: result.finishedAt,
-    durationMs: result.durationMs,
-    failedStepCount: result.failedStepCount,
-    summarySaved: result.summarySaved
-  };
-}
 
 function unauthorizedCronResponse() {
   return NextResponse.json(

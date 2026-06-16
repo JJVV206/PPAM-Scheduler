@@ -279,5 +279,14 @@ export type AssignmentFilters = {
 export type SettingsDto = {
   confirmationLeadDays: number;
   reminderTimingDays: number[];
+  finalReminderHours: number;
+  primaryResponseTimeoutHours: number;
+  primaryReminderOffsetsHours: number[];
+  replacementResponseTimeoutHours: number;
+  replacementReminderOffsetsHours: number[];
+  censusResponseTimeoutHours: number;
+  censusReminderOffsetsHours: number[];
+  urgentThresholdHours: number;
+  adminAlertEmail: string;
   notificationChannels: NotificationChannel[];
 };

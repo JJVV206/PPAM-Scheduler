@@ -22,6 +22,8 @@ import {
   TIME_SLOT_DEFINITIONS
 } from "@/lib/constants/domain";
 import {
+  DEFAULT_CENSUS_REMINDER_OFFSETS_HOURS,
+  DEFAULT_CENSUS_RESPONSE_TIMEOUT_HOURS,
   DEFAULT_FINAL_REMINDER_HOURS,
   DEFAULT_PRIMARY_REMINDER_OFFSETS_HOURS,
   DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS,
@@ -87,7 +89,6 @@ export type {
 
 const TERMINAL_ASSIGNMENT_STATUSES = ["CANCELLED", "COMPLETED"] as const;
 const AUTOMATION_BATCH_SIZE = 50;
-const CENSUS_REMINDER_HOURS_BEFORE_CLOSE = 24;
 const AUTOMATION_LAST_RUN_SETTING_KEY = "assignmentAutomationLastRun";
 
 type AutomationStepStatus = "completed" | "skipped" | "failed";
@@ -1520,6 +1521,14 @@ function getNormalizedReminderSettings(
     urgentReplacementReminderOffsetsHours: normalizeReminderOffsetsHours(
       settings.urgentReplacementReminderOffsetsHours,
       DEFAULT_URGENT_REPLACEMENT_REMINDER_OFFSETS_HOURS
+    ),
+    censusResponseTimeoutHours: normalizePositiveHourSetting(
+      settings.censusResponseTimeoutHours,
+      DEFAULT_CENSUS_RESPONSE_TIMEOUT_HOURS
+    ),
+    censusReminderOffsetsHours: normalizeReminderOffsetsHours(
+      settings.censusReminderOffsetsHours,
+      DEFAULT_CENSUS_REMINDER_OFFSETS_HOURS
     )
   };
 }
@@ -2248,7 +2257,9 @@ export async function sendReplacementCensusReminders(input?: {
   automationRunId?: string;
 }): Promise<SendReplacementCensusRemindersResult> {
   const now = input?.now ?? new Date();
-  const settings = await getAssignmentAutomationSettings();
+  const settings = getNormalizedReminderSettings(
+    await getAssignmentAutomationSettings()
+  );
 
   if (!settings.notificationChannels.includes("EMAIL")) {
     return {
@@ -2262,7 +2273,12 @@ export async function sendReplacementCensusReminders(input?: {
     };
   }
 
-  const targetAt = addHours(now, CENSUS_REMINDER_HOURS_BEFORE_CLOSE);
+  const maxReminderOffsetHours =
+    settings.censusReminderOffsetsHours.at(-1) ??
+    DEFAULT_CENSUS_REMINDER_OFFSETS_HOURS[
+      DEFAULT_CENSUS_REMINDER_OFFSETS_HOURS.length - 1
+    ];
+  const targetAt = addHours(now, maxReminderOffsetHours);
   const responses = await db.replacementCensusResponse.findMany({
     where: {
       status: "SENT",
@@ -2297,14 +2313,28 @@ export async function sendReplacementCensusReminders(input?: {
   let duplicateCount = 0;
 
   for (const response of responses) {
-    const reminderKey = `census-reminder:${response.id}:${CENSUS_REMINDER_HOURS_BEFORE_CLOSE}h`;
-    const duplicate = await hasSentCensusReminder({
-      userId: response.volunteer.userId,
-      censusId: response.censusId,
-      reminderKey
-    });
+    const dueOffsets = settings.censusReminderOffsetsHours.filter(
+      (offsetHours) => response.expiresAt <= addHours(now, offsetHours)
+    );
+    let reminderKey: string | null = null;
+    let reminderOffsetHours: number | null = null;
 
-    if (duplicate) {
+    for (const offsetHours of dueOffsets) {
+      const candidateReminderKey = `census-reminder:${response.id}:${offsetHours}h`;
+      const duplicate = await hasSentCensusReminder({
+        userId: response.volunteer.userId,
+        censusId: response.censusId,
+        reminderKey: candidateReminderKey
+      });
+
+      if (!duplicate) {
+        reminderKey = candidateReminderKey;
+        reminderOffsetHours = offsetHours;
+        break;
+      }
+    }
+
+    if (!reminderKey || reminderOffsetHours === null) {
       duplicateCount += 1;
       continue;
     }
@@ -2330,6 +2360,7 @@ export async function sendReplacementCensusReminders(input?: {
       text: email.text,
       metadata: {
         reminderKey,
+        reminderOffsetHours,
         censusId: response.censusId,
         censusResponseId: response.id,
         scheduleWeekId: response.census.scheduleWeekId,

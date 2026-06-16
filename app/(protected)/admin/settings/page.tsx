@@ -190,12 +190,19 @@ export default async function AdminSettingsPage() {
                 value={`${automationSettings.censusResponseTimeoutHours} horas`}
               />
               <ConfigRow
+                label="Recordatorios censo"
+                value={`${automationSettings.censusReminderOffsetsHours.join(", ")} horas`}
+              />
+              <ConfigRow
                 label="Canales activos"
                 value={automationSettings.notificationChannels
                   .map((channel) => NOTIFICATION_CHANNEL_LABELS[channel])
                   .join(", ")}
               />
-              <ConfigRow label="Email admin" value="Alertas internas activas" />
+              <ConfigRow
+                label="Email admin"
+                value={automationSettings.adminAlertEmail}
+              />
             </div>
           </div>
         </CardContent>
