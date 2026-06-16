@@ -1,44 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+
+import { clearAuthCookies } from "@/lib/auth/cookies";
 import { getSessionSecret } from "@/lib/env/config";
-
-const AUTH_COOKIE_NAMES = [
-  "__Host-next-auth.csrf-token",
-  "__Secure-next-auth.callback-url",
-  "__Secure-next-auth.session-token",
-  "next-auth.callback-url",
-  "next-auth.csrf-token",
-  "next-auth.session-token"
-] as const;
-
-const AUTH_COOKIE_PREFIXES = [
-  "__Secure-next-auth.session-token.",
-  "next-auth.session-token."
-] as const;
-
-export function getAuthCookieNamesToClear(
-  request: {
-    cookies: {
-      getAll(): Array<{ name: string }>;
-    };
-  }
-) {
-  const names = new Set<string>(AUTH_COOKIE_NAMES);
-
-  for (const cookie of request.cookies.getAll()) {
-    if (AUTH_COOKIE_PREFIXES.some((prefix) => cookie.name.startsWith(prefix))) {
-      names.add(cookie.name);
-    }
-  }
-
-  return [...names];
-}
-
-function clearAuthCookies(response: NextResponse, request: NextRequest) {
-  for (const name of getAuthCookieNamesToClear(request)) {
-    response.cookies.delete(name);
-  }
-}
 
 async function readToken(request: NextRequest) {
   try {
@@ -88,9 +52,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isHomeRoute || isAuthRoute) {
-    return NextResponse.redirect(
-      new URL(token.role === "ADMIN" ? "/admin" : "/volunteer", request.url)
-    );
+    return NextResponse.next();
   }
 
   if (pathname.startsWith("/admin") && token.role !== "ADMIN") {

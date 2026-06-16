@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getAuthCookieNamesToClear } from "@/middleware";
+import { getAuthCookieNamesToClear } from "@/lib/auth/cookies";
 
 describe("middleware auth cookies", () => {
   it("includes fixed and chunked NextAuth cookies for stale-session cleanup", () => {
