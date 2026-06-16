@@ -59,13 +59,5 @@ if (isProductionDeployment && !skipMigrations) {
 console.log("Generating Prisma client...");
 run("prisma", ["generate"]);
 
-if (
-  isProductionDeployment &&
-  process.env.MAINTENANCE_WIPE_USERS_CONFIRM?.trim()
-) {
-  console.log("Running production user wipe maintenance...");
-  run("node", ["scripts/wipe-production-users.mjs"]);
-}
-
 console.log("Building Next.js application...");
 run("next", ["build"]);
