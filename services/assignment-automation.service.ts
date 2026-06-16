@@ -7,6 +7,7 @@ import {
   ACTIVE_ASSIGNMENT_INVITATION_STATUSES,
   sendPendingPrimaryInvitationsForAssignment
 } from "@/services/assignment-invitation.service";
+import { selectNextReplacementCandidateForAssignment } from "@/services/replacement-candidate.service";
 
 const TERMINAL_ASSIGNMENT_STATUSES = ["CANCELLED", "COMPLETED"] as const;
 
@@ -38,13 +39,19 @@ export type ProcessAssignmentsNeedingReplacementResult =
     alreadyMarkedCount: number;
   };
 
+export type ReplacementCandidateSelectionResult =
+  AssignmentAutomationStepResult & {
+    selectedCount: number;
+    unresolvedCount: number;
+  };
+
 export type AssignmentAutomationRunResult = {
   startedAt: string;
   finishedAt: string;
   sendPendingPrimaryInvitations: SendPendingPrimaryInvitationsResult;
   expireTimedOutInvitations: ExpireTimedOutInvitationsResult;
   processAssignmentsNeedingReplacement: ProcessAssignmentsNeedingReplacementResult;
-  inviteNextAvailableReplacement: AssignmentAutomationStepResult;
+  inviteNextAvailableReplacement: ReplacementCandidateSelectionResult;
   sendDueAssignmentReminders: AssignmentAutomationStepResult;
   notifyAdminsForUnresolvedAssignments: AssignmentAutomationStepResult;
 };
@@ -488,10 +495,59 @@ export async function processAssignmentsNeedingReplacement(): Promise<ProcessAss
   };
 }
 
-export async function inviteNextAvailableReplacement(): Promise<AssignmentAutomationStepResult> {
-  return skippedStep(
-    "Replacement candidate selection is implemented in module 5 and replacement invitations in module 6."
-  );
+export async function inviteNextAvailableReplacement(): Promise<ReplacementCandidateSelectionResult> {
+  const assignments = await db.assignment.findMany({
+    where: {
+      date: {
+        gte: startOfDay(new Date())
+      },
+      status: "NEEDS_REPLACEMENT",
+      invitations: {
+        none: {
+          type: "REPLACEMENT",
+          status: {
+            in: ACTIVE_ASSIGNMENT_INVITATION_STATUSES
+          }
+        }
+      }
+    },
+    select: {
+      id: true
+    },
+    orderBy: [
+      {
+        date: "asc"
+      },
+      {
+        timeSlot: "asc"
+      }
+    ]
+  });
+
+  let selectedCount = 0;
+  let unresolvedCount = 0;
+
+  for (const assignment of assignments) {
+    const candidate = await selectNextReplacementCandidateForAssignment(
+      assignment.id
+    );
+
+    if (candidate) {
+      selectedCount += 1;
+    } else {
+      unresolvedCount += 1;
+    }
+  }
+
+  return {
+    status: "completed",
+    processedCount: assignments.length,
+    skippedCount: 0,
+    selectedCount,
+    unresolvedCount,
+    detail:
+      "Replacement candidates were selected only; replacement invitations are created in module 6."
+  };
 }
 
 export async function sendDueAssignmentReminders(): Promise<AssignmentAutomationStepResult> {

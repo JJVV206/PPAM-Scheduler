@@ -48,6 +48,10 @@ import {
 import { safePercentage } from "@/lib/utils";
 import { determineAssignmentStatus } from "@/services/assignment-engine";
 import { getSingletonPreachingPoint } from "@/services/point.service";
+import {
+  getReplacementCandidatesForAssignment,
+  toVolunteerSummary
+} from "@/services/replacement-candidate.service";
 
 const assignmentInclude = {
   scheduleWeek: true,
@@ -1345,14 +1349,9 @@ export async function getOpenSlots(): Promise<OpenSlotDto[]> {
         const positions = [
           ...new Set([...missingPositions, ...declinedPositions])
         ];
-        const suggestions = await getAvailableVolunteersForSlot({
-          date: assignment.date,
-          dayOfWeek: assignment.dayOfWeek,
-          timeSlot: assignment.timeSlot,
-          area: assignment.preachingPoint.area,
-          excludeVolunteerIds: assignment.volunteers.map(
-            (item) => item.volunteerId
-          )
+        const suggestions = await getReplacementCandidatesForAssignment({
+          assignmentId: assignment.id,
+          take: 6
         });
 
         return {
@@ -1369,7 +1368,7 @@ export async function getOpenSlots(): Promise<OpenSlotDto[]> {
             differenceInCalendarDays(assignment.date, new Date()) <= 2
               ? "Urgente"
               : "Vacante",
-          suggestedVolunteers: suggestions,
+          suggestedVolunteers: suggestions.map(toVolunteerSummary),
           notes: assignment.notes
         } satisfies OpenSlotDto;
       })
