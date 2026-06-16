@@ -51,6 +51,14 @@ curl -i "https://YOUR_PRODUCTION_URL/api/health?scope=readiness"
 curl -i https://YOUR_PRODUCTION_URL/api/cron/assignment-automation
 ```
 
+- Verify the automation cron accepts the configured secret and returns only a
+  short operational summary:
+
+```bash
+curl -i -H "Authorization: Bearer $CRON_SECRET" \
+  https://YOUR_PRODUCTION_URL/api/cron/assignment-automation
+```
+
 ## Smoke QA
 
 Run read-only QA:
