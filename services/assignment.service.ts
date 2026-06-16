@@ -44,6 +44,7 @@ import {
   getAssignmentInvitationAvailability,
   sendPendingPrimaryInvitationsForAssignment
 } from "@/services/assignment-invitation.service";
+import { prepareScheduleWeekAutomation } from "@/services/schedule-week-preparation.service";
 import { safePercentage } from "@/lib/utils";
 import { determineAssignmentStatus } from "@/services/assignment-engine";
 import { getSingletonPreachingPoint } from "@/services/point.service";
@@ -390,6 +391,11 @@ function asJsonObject(value: Prisma.JsonValue | null) {
   return {};
 }
 
+function difference(left: string[], right: string[]) {
+  const rightSet = new Set(right);
+  return left.filter((item) => !rightSet.has(item));
+}
+
 function compactJsonMetadata(metadata: Record<string, unknown>) {
   return Object.fromEntries(
     Object.entries(metadata).filter(([, value]) => value !== undefined)
@@ -603,6 +609,16 @@ export async function updateAssignment(
   const volunteerIds =
     input.volunteers?.map((item) => item.volunteerId) ??
     current.volunteers.map((item) => item.volunteerId);
+  const currentVolunteerIds = current.volunteers.map(
+    (volunteer) => volunteer.volunteerId
+  );
+  const nextVolunteerIds = [...new Set(volunteerIds)];
+  const removedVolunteerIds = input.volunteers
+    ? difference(currentVolunteerIds, nextVolunteerIds)
+    : [];
+  const addedVolunteerIds = input.volunteers
+    ? difference(nextVolunteerIds, currentVolunteerIds)
+    : [];
   const movedToNewSlot =
     !isSameDay(nextDate, current.date) ||
     nextTimeSlot !== current.timeSlot ||
@@ -661,6 +677,58 @@ export async function updateAssignment(
     });
 
     if (input.volunteers) {
+      const activeInvitationsToInvalidate = removedVolunteerIds.length
+        ? await tx.assignmentInvitation.findMany({
+            where: {
+              assignmentId,
+              volunteerId: {
+                in: removedVolunteerIds
+              },
+              type: "PRIMARY",
+              status: {
+                in: ACTIVE_ASSIGNMENT_INVITATION_STATUSES
+              }
+            }
+          })
+        : [];
+
+      for (const invitation of activeInvitationsToInvalidate) {
+        const invalidatedReason =
+          invitation.status === "PENDING"
+            ? "primary_volunteer_changed_before_send"
+            : "primary_volunteer_changed_after_send";
+
+        await tx.assignmentInvitation.update({
+          where: {
+            id: invitation.id
+          },
+          data: {
+            status: "EXPIRED",
+            metadata: mergeJsonMetadata(invitation.metadata, {
+              invalidatedAt: new Date().toISOString(),
+              invalidatedBy: "assignment_update",
+              invalidatedReason,
+              actorUserId: input.actorUserId
+            })
+          }
+        });
+        await recordAssignmentAuditActivity({
+          client: tx,
+          assignmentId,
+          actorUserId: input.actorUserId,
+          event: "INVITATION_EXPIRED",
+          dedupeKey: `invitation-invalidated:${invitation.id}`,
+          metadata: {
+            invitationId: invitation.id,
+            invitationType: "PRIMARY",
+            volunteerProfileId: invitation.volunteerId,
+            previousStatus: invitation.status,
+            source: "assignment_update",
+            reason: invalidatedReason
+          }
+        });
+      }
+
       await tx.assignmentVolunteer.deleteMany({ where: { assignmentId } });
       if (input.volunteers.length) {
         await tx.assignmentVolunteer.createMany({
@@ -670,11 +738,22 @@ export async function updateAssignment(
             position: volunteer.position
           }))
         });
+        await createPendingPrimaryInvitationsForAssignment({
+          tx,
+          assignmentId,
+          volunteerIds: nextVolunteerIds,
+          actorUserId: input.actorUserId,
+          source: "assignment_updated",
+          metadata: {
+            addedVolunteerIds,
+            removedVolunteerIds
+          }
+        });
       }
       await syncResponses({
         tx,
         assignmentId,
-        volunteerIds
+        volunteerIds: nextVolunteerIds
       });
     }
 
@@ -693,7 +772,11 @@ export async function updateAssignment(
         metadata: {
           updatedFields,
           previousStatus: current.status,
-          nextStatus: input.status
+          nextStatus: input.status,
+          previousVolunteerIds: input.volunteers ? currentVolunteerIds : undefined,
+          nextVolunteerIds: input.volunteers ? nextVolunteerIds : undefined,
+          addedVolunteerIds: input.volunteers ? addedVolunteerIds : undefined,
+          removedVolunteerIds: input.volunteers ? removedVolunteerIds : undefined
         }
       }
     });
@@ -707,6 +790,13 @@ export async function updateAssignment(
       include: assignmentInclude
     });
   });
+
+  if (input.volunteers) {
+    await sendPendingPrimaryInvitationsForAssignment({
+      assignmentId,
+      actorUserId: input.actorUserId
+    });
+  }
 
   return mapAssignmentDetail(assignment);
 }
@@ -863,7 +953,7 @@ export async function createScheduleWeek(input: {
   const weekStart = normalizeWeekStart(input.targetWeekStart);
   await assertWeekDoesNotExist(weekStart);
 
-  return db.scheduleWeek.create({
+  const week = await db.scheduleWeek.create({
     data: {
       startDate: weekStart,
       endDate: addDays(weekStart, 6),
@@ -871,6 +961,13 @@ export async function createScheduleWeek(input: {
       createdById: input.actorUserId
     }
   });
+
+  await prepareScheduleWeekAutomation({
+    scheduleWeekId: week.id,
+    actorUserId: input.actorUserId
+  });
+
+  return week;
 }
 
 export async function duplicateScheduleWeek(input: {
@@ -922,6 +1019,11 @@ export async function duplicateScheduleWeek(input: {
       actorUserId: input.actorUserId
     });
   }
+
+  await prepareScheduleWeekAutomation({
+    scheduleWeekId: targetWeek.id,
+    actorUserId: input.actorUserId
+  });
 
   return targetWeek;
 }

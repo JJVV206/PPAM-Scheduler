@@ -85,6 +85,8 @@ enum ReplacementCensusResponseStatus {
 
 enum NotificationType {
   CONFIRMATION_REQUEST
+  CENSUS_REQUEST
+  CENSUS_REMINDER
   REMINDER
   REPLACEMENT_OPPORTUNITY
   FINAL_REMINDER

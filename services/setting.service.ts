@@ -1,5 +1,6 @@
 import { db } from "@/lib/db/prisma";
 import {
+  DEFAULT_CENSUS_RESPONSE_TIMEOUT_HOURS,
   DEFAULT_CONFIRMATION_LEAD_DAYS,
   DEFAULT_FINAL_REMINDER_HOURS,
   DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS,
@@ -13,6 +14,7 @@ export type AssignmentAutomationSettings = {
   finalReminderHours: number;
   primaryResponseTimeoutHours: number;
   replacementResponseTimeoutHours: number;
+  censusResponseTimeoutHours: number;
   notificationChannels: SettingsDto["notificationChannels"];
 };
 
@@ -47,7 +49,8 @@ export async function getAssignmentAutomationSettings(): Promise<AssignmentAutom
   const [
     finalReminderHours,
     primaryResponseTimeoutHours,
-    replacementResponseTimeoutHours
+    replacementResponseTimeoutHours,
+    censusResponseTimeoutHours
   ] = await Promise.all([
     getSettingValue("finalReminderHours", DEFAULT_FINAL_REMINDER_HOURS),
     getSettingValue(
@@ -57,6 +60,10 @@ export async function getAssignmentAutomationSettings(): Promise<AssignmentAutom
     getSettingValue(
       "replacementResponseTimeoutHours",
       DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
+    ),
+    getSettingValue(
+      "censusResponseTimeoutHours",
+      DEFAULT_CENSUS_RESPONSE_TIMEOUT_HOURS
     )
   ]);
 
@@ -65,6 +72,7 @@ export async function getAssignmentAutomationSettings(): Promise<AssignmentAutom
     finalReminderHours,
     primaryResponseTimeoutHours,
     replacementResponseTimeoutHours,
+    censusResponseTimeoutHours,
     notificationChannels: appSettings.notificationChannels
   };
 }

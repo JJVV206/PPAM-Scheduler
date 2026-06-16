@@ -173,7 +173,11 @@ export async function createPendingPrimaryInvitationsForAssignment(input: {
   assignmentId: string;
   volunteerIds: string[];
   actorUserId?: string;
-  source: "assignment_created" | "manual_confirmation_request";
+  source:
+    | "assignment_created"
+    | "assignment_updated"
+    | "manual_confirmation_request"
+    | "week_preparation";
   expiresAt?: Date;
   metadata?: Record<string, unknown>;
 }) {
@@ -220,7 +224,9 @@ export async function createPendingPrimaryInvitationsForAssignment(input: {
   const metadata = compactMetadata({
     source: input.source,
     actorUserId: input.actorUserId,
-    createdAutomatically: input.source === "assignment_created",
+    createdAutomatically:
+      input.source === "assignment_created" ||
+      input.source === "week_preparation",
     ...input.metadata
   }) as Prisma.InputJsonObject;
 
@@ -251,7 +257,9 @@ export async function createPendingPrimaryInvitationsForAssignment(input: {
         volunteerProfileId: volunteerId,
         expiresAt,
         source: input.source,
-        createdAutomatically: input.source === "assignment_created"
+        createdAutomatically:
+          input.source === "assignment_created" ||
+          input.source === "week_preparation"
       }
     });
     createdCount += 1;

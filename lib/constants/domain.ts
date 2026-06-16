@@ -40,6 +40,8 @@ export const ASSIGNMENT_INVITATION_STATUSES = [
 ] as const;
 export const NOTIFICATION_TYPES = [
   "CONFIRMATION_REQUEST",
+  "CENSUS_REQUEST",
+  "CENSUS_REMINDER",
   "REMINDER",
   "REPLACEMENT_OPPORTUNITY",
   "FINAL_REMINDER",
@@ -151,6 +153,8 @@ export const ASSIGNMENT_INVITATION_STATUS_LABELS = {
 
 export const NOTIFICATION_TYPE_LABELS = {
   CONFIRMATION_REQUEST: "Solicitud de confirmación",
+  CENSUS_REQUEST: "Censo de suplentes",
+  CENSUS_REMINDER: "Recordatorio de censo",
   REMINDER: "Recordatorio",
   REPLACEMENT_OPPORTUNITY: "Oportunidad de reemplazo",
   FINAL_REMINDER: "Recordatorio final",

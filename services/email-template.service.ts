@@ -15,6 +15,13 @@ type VolunteerAssignmentEmailInput = AssignmentEmailSummaryInput & {
   volunteerName: string;
 };
 
+type ReplacementCensusEmailInput = {
+  volunteerName: string;
+  weekLabel: string;
+  closesAtLabel: string;
+  responseUrl: string;
+};
+
 export type AssignmentReminderEmailKind =
   | "DAYS_BEFORE"
   | "FINAL_HOURS"
@@ -124,6 +131,30 @@ export function buildReplacementAssignmentInvitationEmail(
       actionWithFallback({
         href: input.responseUrl,
         label: "Responder si puedes cubrirla"
+      })
+    ].join("")
+  };
+}
+
+export function buildReplacementCensusInvitationEmail(
+  input: ReplacementCensusEmailInput
+): EmailTemplate {
+  return {
+    subject: "Censo semanal de suplentes PPAM",
+    html: [
+      `<p>Hola ${escapeHtml(input.volunteerName)},</p>`,
+      `<p>Estamos preparando la ${escapeHtml(
+        input.weekLabel
+      )}. Indica por favor en qué días puedes apoyar como suplente.</p>`,
+      "<ul>",
+      `<li><strong>Semana:</strong> ${escapeHtml(input.weekLabel)}</li>`,
+      `<li><strong>Fecha límite:</strong> ${escapeHtml(
+        input.closesAtLabel
+      )}</li>`,
+      "</ul>",
+      actionWithFallback({
+        href: input.responseUrl,
+        label: "Responder censo semanal"
       })
     ].join("")
   };

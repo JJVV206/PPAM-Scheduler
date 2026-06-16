@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => {
       create: vi.fn()
     },
     assignmentInvitation: {
+      findMany: vi.fn(),
       update: vi.fn(),
       findUniqueOrThrow: vi.fn()
     },
@@ -25,6 +26,7 @@ const mocks = vi.hoisted(() => {
       create: vi.fn(),
       createMany: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn(),
       update: vi.fn()
     },
     volunteerProfile: {
@@ -62,6 +64,7 @@ const mocks = vi.hoisted(() => {
     getAppSettings: vi.fn(),
     getSingletonPreachingPoint: vi.fn(),
     inviteNextAvailableReplacementForAssignment: vi.fn(),
+    prepareScheduleWeekAutomation: vi.fn(),
     recordAssignmentAuditActivity: vi.fn(),
     sendPendingPrimaryInvitationsForAssignment: vi.fn()
   };
@@ -81,6 +84,9 @@ vi.mock("@/services/assignment-automation.service", () => ({
   inviteNextAvailableReplacementForAssignment:
     mocks.inviteNextAvailableReplacementForAssignment
 }));
+vi.mock("@/services/schedule-week-preparation.service", () => ({
+  prepareScheduleWeekAutomation: mocks.prepareScheduleWeekAutomation
+}));
 vi.mock("@/services/assignment-invitation.service", () => ({
   ACTIVE_ASSIGNMENT_INVITATION_STATUSES: ["PENDING", "SENT"],
   buildAssignmentInvitationResponseUrl: vi.fn(
@@ -96,7 +102,8 @@ vi.mock("@/services/assignment-invitation.service", () => ({
 import {
   createWeeklyAssignment,
   duplicateScheduleWeek,
-  respondToAssignmentInvitation
+  respondToAssignmentInvitation,
+  updateAssignment
 } from "@/services/assignment.service";
 
 const fixedPoint = {
@@ -264,6 +271,24 @@ beforeEach(() => {
     sentCount: 1,
     failedCount: 0
   });
+  mocks.prepareScheduleWeekAutomation.mockResolvedValue({
+    scheduleWeekId: "target-week",
+    assignmentCount: 2,
+    primaryInvitations: {
+      createdCount: 0,
+      skippedCount: 4,
+      sentCount: 0,
+      failedCount: 0
+    },
+    replacementCensus: {
+      censusId: "census-1",
+      replacementCount: 4,
+      createdResponseCount: 4,
+      skippedResponseCount: 0,
+      sentCount: 4,
+      failedCount: 0
+    }
+  });
 });
 
 describe("assignment automation orchestration", () => {
@@ -345,6 +370,10 @@ describe("assignment automation orchestration", () => {
 
     expect(mocks.createPendingPrimaryInvitationsForAssignment).toHaveBeenCalledTimes(2);
     expect(mocks.sendPendingPrimaryInvitationsForAssignment).toHaveBeenCalledTimes(2);
+    expect(mocks.prepareScheduleWeekAutomation).toHaveBeenCalledWith({
+      scheduleWeekId: "target-week",
+      actorUserId: "admin-1"
+    });
     expect(mocks.createPendingPrimaryInvitationsForAssignment).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
@@ -353,6 +382,86 @@ describe("assignment automation orchestration", () => {
         source: "assignment_created"
       })
     );
+  });
+
+  it("invalidates prior titular invitations and sends new ones when admins change titular volunteers", async () => {
+    mocks.db.assignment.findUniqueOrThrow.mockResolvedValueOnce(
+      assignmentDetail({
+        volunteers: [
+          assignmentSlot("volunteer-1", "FIRST"),
+          assignmentSlot("volunteer-2", "SECOND")
+        ],
+        responses: [
+          response("volunteer-1", "PENDING"),
+          response("volunteer-2", "PENDING")
+        ]
+      })
+    );
+    mocks.tx.assignment.update.mockResolvedValue({
+      id: "assignment-1"
+    });
+    mocks.tx.assignmentInvitation.findMany.mockResolvedValue([
+      invitation({
+        id: "invitation-old",
+        volunteerId: "volunteer-1",
+        status: "SENT"
+      })
+    ]);
+    mocks.tx.assignmentVolunteer.deleteMany.mockResolvedValue({ count: 2 });
+    mocks.tx.assignmentVolunteer.createMany.mockResolvedValue({ count: 2 });
+    mocks.tx.assignment.findUniqueOrThrow.mockResolvedValue(
+      assignmentDetail({
+        volunteers: [
+          assignmentSlot("volunteer-3", "FIRST"),
+          assignmentSlot("volunteer-2", "SECOND")
+        ],
+        responses: [
+          response("volunteer-3", "PENDING"),
+          response("volunteer-2", "PENDING")
+        ]
+      })
+    );
+
+    await updateAssignment("assignment-1", {
+      volunteers: [
+        { volunteerId: "volunteer-3", position: "FIRST" },
+        { volunteerId: "volunteer-2", position: "SECOND" }
+      ],
+      actorUserId: "admin-1"
+    });
+
+    expect(mocks.tx.assignmentInvitation.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "invitation-old" },
+        data: expect.objectContaining({
+          status: "EXPIRED"
+        })
+      })
+    );
+    expect(mocks.recordAssignmentAuditActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "INVITATION_EXPIRED",
+        dedupeKey: "invitation-invalidated:invitation-old",
+        metadata: expect.objectContaining({
+          reason: "primary_volunteer_changed_after_send"
+        })
+      })
+    );
+    expect(mocks.createPendingPrimaryInvitationsForAssignment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assignmentId: "assignment-1",
+        volunteerIds: ["volunteer-3", "volunteer-2"],
+        source: "assignment_updated",
+        metadata: {
+          addedVolunteerIds: ["volunteer-3"],
+          removedVolunteerIds: ["volunteer-1"]
+        }
+      })
+    );
+    expect(mocks.sendPendingPrimaryInvitationsForAssignment).toHaveBeenCalledWith({
+      assignmentId: "assignment-1",
+      actorUserId: "admin-1"
+    });
   });
 
   it("confirms a titular invitation and records a confirmed assignment response", async () => {
