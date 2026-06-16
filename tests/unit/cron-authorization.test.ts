@@ -164,7 +164,7 @@ describe("assignment automation cron route", () => {
 });
 
 describe("vercel cron configuration", () => {
-  it("runs assignment automation every 30 minutes", () => {
+  it("runs assignment automation daily for Vercel Hobby compatibility", () => {
     const vercelConfig = JSON.parse(
       readFileSync(new URL("../../vercel.json", import.meta.url), "utf8")
     );
@@ -173,7 +173,7 @@ describe("vercel cron configuration", () => {
       expect.arrayContaining([
         {
           path: "/api/cron/assignment-automation",
-          schedule: "*/30 * * * *"
+          schedule: "0 9 * * *"
         }
       ])
     );

@@ -37,7 +37,9 @@ openssl rand -base64 32
 ```
 
 Generate `CRON_SECRET` the same way. Vercel will call `/api/cron/assignment-automation`
-every 30 minutes and must send `Authorization: Bearer $CRON_SECRET`.
+once per day on Hobby projects and must send `Authorization: Bearer $CRON_SECRET`.
+Use Vercel Pro or an external scheduler if production needs the automation to
+run more frequently than daily.
 The cron response intentionally exposes only an operational summary, not step
 details, email metadata, tokens, or internal error messages.
 
