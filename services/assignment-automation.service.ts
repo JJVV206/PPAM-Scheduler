@@ -761,6 +761,7 @@ async function alertAdminsForAssignment(input: {
         type: "ASSIGNMENT_UPDATE",
         subject: email.subject,
         html: email.html,
+        text: email.text,
         metadata: {
           alertKey: input.alertKey,
           reason: input.reason,
@@ -1790,6 +1791,7 @@ async function sendAssignmentReminder(
     kind: recipient.reminder.kind,
     offsetDays: recipient.reminder.offsetDays,
     offsetHours: recipient.reminder.offsetHours,
+    invitationType: recipient.invitationType,
     volunteerName: recipient.volunteerName,
     dateLabel,
     timeSlotLabel,
@@ -1818,6 +1820,7 @@ async function sendAssignmentReminder(
       type: recipient.reminder.notificationType,
       subject: email.subject,
       html: email.html,
+      text: email.text,
       metadata
     });
 
@@ -2324,6 +2327,7 @@ export async function sendReplacementCensusReminders(input?: {
       type: "CENSUS_REMINDER",
       subject: email.subject,
       html: email.html,
+      text: email.text,
       metadata: {
         reminderKey,
         censusId: response.censusId,

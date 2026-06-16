@@ -133,7 +133,7 @@ describe("admin assignment alert emails", () => {
       assignmentUrl: "https://ppam.example.org/admin/assignments/assignment-1"
     });
 
-    expect(email.subject).toContain("Urgente");
+    expect(email.subject).toContain("Alerta admin");
     expect(email.html).toContain("viernes 12 de junio");
     expect(email.html).toContain("11:00 - 13:00");
     expect(email.html).toContain("Hospital Dr Jose G. Parres");

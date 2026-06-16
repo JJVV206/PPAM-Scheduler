@@ -466,6 +466,7 @@ async function sendReplacementCensusResponseEmail(
       type: "CENSUS_REQUEST",
       subject: email.subject,
       html: email.html,
+      text: email.text,
       metadata: {
         censusId: response.censusId,
         censusResponseId: response.id,

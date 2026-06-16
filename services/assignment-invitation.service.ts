@@ -531,6 +531,7 @@ async function sendAssignmentInvitationEmail(
       type: getInvitationNotificationType(invitation.type),
       subject: email.subject,
       html: email.html,
+      text: email.text,
       metadata: {
         invitationId: invitation.id,
         invitationType: invitation.type,

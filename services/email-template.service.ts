@@ -3,6 +3,7 @@ import type { AssignmentInvitationType } from "@prisma/client";
 export type EmailTemplate = {
   subject: string;
   html: string;
+  text: string;
 };
 
 type AssignmentEmailSummaryInput = {
@@ -30,6 +31,7 @@ export type AssignmentReminderEmailKind =
 export type AssignmentReminderEmailInput = VolunteerAssignmentEmailInput & {
   kind: AssignmentReminderEmailKind;
   responseUrl: string;
+  invitationType?: AssignmentInvitationType;
   offsetDays?: number;
   offsetHours?: number;
 };
@@ -49,6 +51,24 @@ export type AdminAssignmentAlertEmailInput = AssignmentEmailSummaryInput & {
   errorMessage?: string;
 };
 
+type EmailSummaryRow = {
+  label: string;
+  value?: string | null;
+};
+
+type BuildActionEmailInput = {
+  subject: string;
+  greeting?: string;
+  intro: string;
+  summary: EmailSummaryRow[];
+  cta?: {
+    label: string;
+    url: string;
+    fallbackLabel?: string;
+  };
+  closing?: string;
+};
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -58,32 +78,8 @@ function escapeHtml(value: string) {
     .replace(/'/g, "&#39;");
 }
 
-function assignmentSummaryList(input: AssignmentEmailSummaryInput) {
-  return [
-    "<ul>",
-    `<li><strong>Fecha:</strong> ${escapeHtml(input.dateLabel)}</li>`,
-    `<li><strong>Horario:</strong> ${escapeHtml(input.timeSlotLabel)}</li>`,
-    `<li><strong>Punto de predicación:</strong> ${escapeHtml(
-      input.pointName
-    )}</li>`,
-    "</ul>"
-  ].join("");
-}
-
-function actionWithFallback(input: {
-  href: string;
-  label: string;
-  fallbackLabel?: string;
-}) {
-  const href = escapeHtml(input.href);
-
-  return [
-    `<p><a href="${href}">${escapeHtml(input.label)}</a></p>`,
-    `<p>${escapeHtml(
-      input.fallbackLabel ??
-        "Si el botón no funciona, copia y pega esta URL en tu navegador:"
-    )}<br>${href}</p>`
-  ].join("");
+function normalizeText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
 }
 
 function formatNameList(names: string[], fallback = "No registrado") {
@@ -98,23 +94,97 @@ function getInvitationTypeLabel(invitationType?: AssignmentInvitationType) {
   return invitationType === "REPLACEMENT" ? "Suplente" : "Titular";
 }
 
+function getActionFallbackLabel(fallbackLabel?: string) {
+  return (
+    fallbackLabel ??
+    "Si el enlace no funciona, copia y pega esta URL en tu navegador:"
+  );
+}
+
+function buildActionEmail(input: BuildActionEmailInput): EmailTemplate {
+  const visibleRows = input.summary.filter((row) => row.value?.trim());
+  const greeting = input.greeting ? normalizeText(input.greeting) : undefined;
+  const intro = normalizeText(input.intro);
+  const closing =
+    input.closing ?? "Gracias por apoyar la organización de PPAM.";
+  const html = [
+    greeting ? `<p>${escapeHtml(greeting)}</p>` : "",
+    `<p>${escapeHtml(intro)}</p>`,
+    visibleRows.length
+      ? [
+          "<ul>",
+          ...visibleRows.map(
+            (row) =>
+              `<li><strong>${escapeHtml(row.label)}:</strong> ${escapeHtml(
+                row.value ?? ""
+              )}</li>`
+          ),
+          "</ul>"
+        ].join("")
+      : "",
+    input.cta
+      ? [
+          `<p><a href="${escapeHtml(input.cta.url)}">${escapeHtml(
+            input.cta.label
+          )}</a></p>`,
+          `<p>${escapeHtml(getActionFallbackLabel(input.cta.fallbackLabel))}<br>${escapeHtml(
+            input.cta.url
+          )}</p>`
+        ].join("")
+      : "",
+    `<p>${escapeHtml(closing)}</p>`
+  ].join("");
+  const text = [
+    greeting,
+    intro,
+    ...visibleRows.map((row) => `${row.label}: ${row.value}`),
+    input.cta ? `${input.cta.label}: ${input.cta.url}` : undefined,
+    input.cta
+      ? `${getActionFallbackLabel(input.cta.fallbackLabel)} ${input.cta.url}`
+      : undefined,
+    closing
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
+
+  return {
+    subject: input.subject,
+    html,
+    text
+  };
+}
+
+function assignmentSummaryRows(input: AssignmentEmailSummaryInput) {
+  return [
+    { label: "Fecha", value: input.dateLabel },
+    { label: "Horario", value: input.timeSlotLabel },
+    { label: "Punto", value: input.pointName }
+  ];
+}
+
+function censusSummaryRows(input: ReplacementCensusEmailInput) {
+  return [
+    { label: "Semana", value: input.weekLabel },
+    { label: "Fecha límite", value: input.closesAtLabel }
+  ];
+}
+
 export function buildPrimaryAssignmentInvitationEmail(
   input: VolunteerAssignmentEmailInput & {
     responseUrl: string;
   }
 ): EmailTemplate {
-  return {
-    subject: "Confirma tu asignación de PPAM",
-    html: [
-      `<p>Hola ${escapeHtml(input.volunteerName)},</p>`,
-      "<p>Tienes una asignación de PPAM pendiente de confirmación.</p>",
-      assignmentSummaryList(input),
-      actionWithFallback({
-        href: input.responseUrl,
-        label: "Confirmar o rechazar asignación"
-      })
-    ].join("")
-  };
+  return buildActionEmail({
+    subject: "Confirma tu asignación titular de PPAM",
+    greeting: `Hola ${input.volunteerName},`,
+    intro:
+      "Tienes una asignación titular de PPAM pendiente de confirmación. Responde si podrás asistir o si necesitas que busquemos suplente.",
+    summary: assignmentSummaryRows(input),
+    cta: {
+      label: "Confirmar o rechazar asignación",
+      url: input.responseUrl
+    }
+  });
 }
 
 export function buildReplacementAssignmentInvitationEmail(
@@ -122,120 +192,125 @@ export function buildReplacementAssignmentInvitationEmail(
     responseUrl: string;
   }
 ): EmailTemplate {
-  return {
-    subject: "Oportunidad de reemplazo PPAM",
-    html: [
-      `<p>Hola ${escapeHtml(input.volunteerName)},</p>`,
-      "<p>Hay una asignación de PPAM que necesita suplente.</p>",
-      assignmentSummaryList(input),
-      actionWithFallback({
-        href: input.responseUrl,
-        label: "Responder si puedes cubrirla"
-      })
-    ].join("")
-  };
+  return buildActionEmail({
+    subject: "Invitación para cubrir como suplente en PPAM",
+    greeting: `Hola ${input.volunteerName},`,
+    intro:
+      "Hay una asignación de PPAM que necesita suplente. Indica si puedes cubrirla para confirmar el turno.",
+    summary: assignmentSummaryRows(input),
+    cta: {
+      label: "Responder si puedes cubrirla",
+      url: input.responseUrl
+    }
+  });
 }
 
 export function buildReplacementCensusInvitationEmail(
   input: ReplacementCensusEmailInput
 ): EmailTemplate {
-  return {
+  return buildActionEmail({
     subject: "Censo semanal de suplentes PPAM",
-    html: [
-      `<p>Hola ${escapeHtml(input.volunteerName)},</p>`,
-      `<p>Estamos preparando la ${escapeHtml(
-        input.weekLabel
-      )}. Indica por favor en qué días puedes apoyar como suplente.</p>`,
-      "<ul>",
-      `<li><strong>Semana:</strong> ${escapeHtml(input.weekLabel)}</li>`,
-      `<li><strong>Fecha límite:</strong> ${escapeHtml(
-        input.closesAtLabel
-      )}</li>`,
-      "</ul>",
-      actionWithFallback({
-        href: input.responseUrl,
-        label: "Responder censo semanal"
-      })
-    ].join("")
-  };
+    greeting: `Hola ${input.volunteerName},`,
+    intro:
+      "Estamos preparando la semana. Indica en qué días puedes apoyar como suplente; puedes marcar disponibilidad general o un horario específico.",
+    summary: censusSummaryRows(input),
+    cta: {
+      label: "Responder censo semanal",
+      url: input.responseUrl
+    }
+  });
 }
 
 export function buildReplacementCensusReminderEmail(
   input: ReplacementCensusEmailInput
 ): EmailTemplate {
-  return {
+  return buildActionEmail({
     subject: "Recordatorio: responde el censo semanal de suplentes",
-    html: [
-      `<p>Hola ${escapeHtml(input.volunteerName)},</p>`,
-      `<p>El censo de suplentes para la ${escapeHtml(
-        input.weekLabel
-      )} sigue pendiente. Por favor indica si puedes apoyar antes del cierre.</p>`,
-      "<ul>",
-      `<li><strong>Semana:</strong> ${escapeHtml(input.weekLabel)}</li>`,
-      `<li><strong>Fecha límite:</strong> ${escapeHtml(
-        input.closesAtLabel
-      )}</li>`,
-      "</ul>",
-      actionWithFallback({
-        href: input.responseUrl,
-        label: "Responder censo semanal"
-      })
-    ].join("")
-  };
+    greeting: `Hola ${input.volunteerName},`,
+    intro:
+      "Tu respuesta al censo semanal de suplentes sigue pendiente. Por favor indica si puedes apoyar antes del cierre.",
+    summary: censusSummaryRows(input),
+    cta: {
+      label: "Responder censo semanal",
+      url: input.responseUrl
+    }
+  });
+}
+
+function buildPendingConfirmationReminderEmail(
+  input: AssignmentReminderEmailInput
+) {
+  const hours = input.offsetHours;
+  const invitationType = input.invitationType ?? "PRIMARY";
+  const isReplacement = invitationType === "REPLACEMENT";
+  const subject = isReplacement
+    ? hours
+      ? `Recordatorio suplente ${hours}h: responde si puedes cubrir`
+      : "Recordatorio suplente: responde si puedes cubrir"
+    : hours
+      ? `Recordatorio titular ${hours}h: confirma tu asignación`
+      : "Recordatorio titular: confirma tu asignación";
+
+  return buildActionEmail({
+    subject,
+    greeting: `Hola ${input.volunteerName},`,
+    intro: isReplacement
+      ? "Tu invitación para cubrir como suplente sigue pendiente. Responde antes de que expire para poder confirmar la cobertura."
+      : "Tu asignación titular sigue pendiente. Responde antes de que expire para que el sistema pueda organizar el turno.",
+    summary: assignmentSummaryRows(input),
+    cta: {
+      label: isReplacement
+        ? "Responder invitación de suplente"
+        : "Confirmar o rechazar asignación",
+      url: input.responseUrl
+    }
+  });
+}
+
+function buildConfirmedAssignmentReminderEmail(
+  input: AssignmentReminderEmailInput
+) {
+  if (input.kind === "FINAL_HOURS") {
+    const hours = input.offsetHours ?? 0;
+
+    return buildActionEmail({
+      subject: `Recordatorio final: asignación PPAM en ${hours} horas`,
+      greeting: `Hola ${input.volunteerName},`,
+      intro:
+        "Este es el recordatorio final de tu asignación confirmada de PPAM.",
+      summary: assignmentSummaryRows(input),
+      cta: {
+        label: "Ver detalle de la asignación",
+        url: input.responseUrl
+      }
+    });
+  }
+
+  const days = input.offsetDays ?? 0;
+
+  return buildActionEmail({
+    subject:
+      days === 1
+        ? "Recordatorio: asignación PPAM mañana"
+        : `Recordatorio: asignación PPAM en ${days} días`,
+    greeting: `Hola ${input.volunteerName},`,
+    intro: "Te recordamos tu próxima asignación confirmada de PPAM.",
+    summary: assignmentSummaryRows(input),
+    cta: {
+      label: "Ver detalle de la asignación",
+      url: input.responseUrl
+    }
+  });
 }
 
 export function buildAssignmentReminderEmail(
   input: AssignmentReminderEmailInput
 ): EmailTemplate {
   if (input.kind === "PENDING_CONFIRMATION") {
-    return {
-      subject: "Pendiente: confirma tu asignación de PPAM",
-      html: [
-        `<p>Hola ${escapeHtml(input.volunteerName)},</p>`,
-        "<p>Tu invitación de PPAM sigue pendiente. Por favor confirma o rechaza antes de que expire.</p>",
-        assignmentSummaryList(input),
-        actionWithFallback({
-          href: input.responseUrl,
-          label: "Confirmar o rechazar asignación"
-        })
-      ].join("")
-    };
+    return buildPendingConfirmationReminderEmail(input);
   }
 
-  if (input.kind === "FINAL_HOURS") {
-    const hours = input.offsetHours ?? 0;
-
-    return {
-      subject: `Recordatorio final: asignación PPAM en ${hours} horas`,
-      html: [
-        `<p>Hola ${escapeHtml(input.volunteerName)},</p>`,
-        "<p>Este es un recordatorio final de tu asignación confirmada de PPAM.</p>",
-        assignmentSummaryList(input),
-        actionWithFallback({
-          href: input.responseUrl,
-          label: "Ver detalle de la asignación"
-        })
-      ].join("")
-    };
-  }
-
-  const days = input.offsetDays ?? 0;
-
-  return {
-    subject:
-      days === 1
-        ? "Recordatorio: asignación PPAM mañana"
-        : `Recordatorio: asignación PPAM en ${days} días`,
-    html: [
-      `<p>Hola ${escapeHtml(input.volunteerName)},</p>`,
-      "<p>Te recordamos tu próxima asignación confirmada de PPAM.</p>",
-      assignmentSummaryList(input),
-      actionWithFallback({
-        href: input.responseUrl,
-        label: "Ver detalle de la asignación"
-      })
-    ].join("")
-  };
+  return buildConfirmedAssignmentReminderEmail(input);
 }
 
 export function buildAssignmentConfirmationReceivedEmail(
@@ -243,18 +318,17 @@ export function buildAssignmentConfirmationReceivedEmail(
     assignmentUrl: string;
   }
 ): EmailTemplate {
-  return {
+  return buildActionEmail({
     subject: "Confirmación recibida: asignación PPAM",
-    html: [
-      `<p>Hola ${escapeHtml(input.volunteerName)},</p>`,
-      "<p>Recibimos tu confirmación. Gracias por apoyar esta asignación de PPAM.</p>",
-      assignmentSummaryList(input),
-      actionWithFallback({
-        href: input.assignmentUrl,
-        label: "Ver detalle de la asignación"
-      })
-    ].join("")
-  };
+    greeting: `Hola ${input.volunteerName},`,
+    intro:
+      "Recibimos tu confirmación. Gracias por apoyar esta asignación de PPAM.",
+    summary: assignmentSummaryRows(input),
+    cta: {
+      label: "Ver detalle de la asignación",
+      url: input.assignmentUrl
+    }
+  });
 }
 
 export function buildAdminAssignmentAlertEmail(
@@ -262,49 +336,35 @@ export function buildAdminAssignmentAlertEmail(
 ): EmailTemplate {
   const subject =
     input.reason === "INVITATION_EMAIL_FAILED"
-      ? `Urgente: fallo de email para ${input.dateLabel}, ${input.timeSlotLabel}`
-      : `Urgente: asignación sin cobertura para ${input.dateLabel}, ${input.timeSlotLabel}`;
+      ? `Alerta admin: fallo de email para ${input.dateLabel}, ${input.timeSlotLabel}`
+      : `Alerta admin: asignación sin cobertura para ${input.dateLabel}, ${input.timeSlotLabel}`;
   const invitationTypeLabel = getInvitationTypeLabel(input.invitationType);
-  const optionalRows = [
-    input.affectedVolunteerName
-      ? `<li><strong>Voluntario afectado:</strong> ${escapeHtml(
-          input.affectedVolunteerName
-        )}</li>`
-      : "",
-    invitationTypeLabel
-      ? `<li><strong>Tipo de invitación:</strong> ${escapeHtml(
-          invitationTypeLabel
-        )}</li>`
-      : "",
-    input.errorMessage
-      ? `<li><strong>Error de email:</strong> ${escapeHtml(
-          input.errorMessage
-        )}</li>`
-      : ""
-  ].filter(Boolean);
 
-  return {
+  return buildActionEmail({
     subject,
-    html: [
-      "<p>Se requiere intervención humana para una asignación de PPAM.</p>",
-      "<ul>",
-      `<li><strong>Fecha:</strong> ${escapeHtml(input.dateLabel)}</li>`,
-      `<li><strong>Horario:</strong> ${escapeHtml(input.timeSlotLabel)}</li>`,
-      `<li><strong>Punto:</strong> ${escapeHtml(input.pointName)}</li>`,
-      `<li><strong>Titular original:</strong> ${escapeHtml(
-        formatNameList(input.originalVolunteerNames)
-      )}</li>`,
-      `<li><strong>Suplentes intentados:</strong> ${escapeHtml(
-        formatNameList(input.attemptedReplacementNames, "Ninguno")
-      )}</li>`,
-      `<li><strong>Razón:</strong> ${escapeHtml(input.reasonLabel)}</li>`,
-      ...optionalRows,
-      "</ul>",
-      actionWithFallback({
-        href: input.assignmentUrl,
-        label: "Abrir detalle de la asignación",
-        fallbackLabel: "URL directa:"
-      })
-    ].join("")
-  };
+    intro:
+      "Se requiere intervención humana para una asignación de PPAM que el sistema no puede resolver por sí solo.",
+    summary: [
+      ...assignmentSummaryRows(input),
+      {
+        label: "Titular original",
+        value: formatNameList(input.originalVolunteerNames)
+      },
+      {
+        label: "Suplentes intentados",
+        value: formatNameList(input.attemptedReplacementNames, "Ninguno")
+      },
+      { label: "Problema", value: input.reasonLabel },
+      { label: "Voluntario afectado", value: input.affectedVolunteerName },
+      { label: "Tipo de invitación", value: invitationTypeLabel },
+      { label: "Error de email", value: input.errorMessage }
+    ],
+    cta: {
+      label: "Abrir detalle de la asignación",
+      url: input.assignmentUrl,
+      fallbackLabel: "URL directa:"
+    },
+    closing:
+      "Revisa el caso y decide si contactar a alguien fuera del sistema o marcarlo como resuelto."
+  });
 }

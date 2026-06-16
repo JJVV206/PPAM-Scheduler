@@ -41,7 +41,7 @@ describe("assignment invitation helpers", () => {
       responseUrl: "https://ppam.example.org/confirm-assignment/token"
     });
 
-    expect(email.subject).toBe("Confirma tu asignación de PPAM");
+    expect(email.subject).toBe("Confirma tu asignación titular de PPAM");
     expect(email.html).toContain("Julia &lt;Westbrook&gt;");
     expect(email.html).toContain("Viernes, 12 de junio de 2026");
     expect(email.html).toContain("11:00 - 13:00");
@@ -61,7 +61,7 @@ describe("assignment invitation helpers", () => {
       responseUrl: "https://ppam.example.org/confirm-assignment/replacement-token"
     });
 
-    expect(email.subject).toBe("Oportunidad de reemplazo PPAM");
+    expect(email.subject).toBe("Invitación para cubrir como suplente en PPAM");
     expect(email.html).toContain("necesita suplente");
     expect(email.html).toContain("Responder si puedes cubrirla");
     expect(email.html).toContain(

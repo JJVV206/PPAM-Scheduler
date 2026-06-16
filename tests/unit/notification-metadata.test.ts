@@ -12,6 +12,8 @@ describe("sanitizeNotificationMetadata", () => {
         resetToken: "reset-secret",
         password: "plain-text",
         passwordHash: "hash",
+        resetUrl: "https://example.com/reset/reset-secret",
+        responseUrl: "https://example.com/confirm/response-secret",
         pointName: "Hospital Dr Jose G. Parres",
         nested: {
           token: "nested-secret",
@@ -19,10 +21,7 @@ describe("sanitizeNotificationMetadata", () => {
         }
       })
     ).toEqual({
-      pointName: "Hospital Dr Jose G. Parres",
-      nested: {
-        confirmationLink: "https://example.com/confirm/response-id"
-      }
+      pointName: "Hospital Dr Jose G. Parres"
     });
   });
 });

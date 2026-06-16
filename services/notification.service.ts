@@ -19,15 +19,19 @@ type NotificationPayload = {
   channel?: NotificationChannel;
   subject: string;
   html: string;
+  text?: string;
   metadata?: Record<string, unknown>;
 };
 
 const SENSITIVE_METADATA_KEYS = new Set([
+  "confirmationLink",
   "confirmationToken",
   "invitationToken",
   "password",
   "passwordHash",
+  "resetUrl",
   "resetToken",
+  "responseUrl",
   "token"
 ]);
 
@@ -149,7 +153,8 @@ export async function sendEmailNotification(payload: NotificationPayload) {
         from: smtpConfig?.from,
         to: user.email,
         subject: payload.subject,
-        html: payload.html
+        html: payload.html,
+        text: payload.text
       });
     }
 
@@ -214,6 +219,7 @@ export async function resendConfirmationReminder(input: {
     type: "REMINDER",
     subject: email.subject,
     html: email.html,
+    text: email.text,
     metadata: {
       pointName: input.pointName,
       confirmationLink: input.confirmationLink
