@@ -33,6 +33,7 @@
     "qa:data:seed": "tsx scripts/qa-data.ts seed",
     "qa:data:cleanup": "tsx scripts/qa-data.ts cleanup",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:fake-users": "tsx scripts/seed-fake-volunteers.ts",
     "postinstall": "prisma generate",
     "ready:prod": "npm run lint && npm run test && npm run typecheck && npm run vercel:build"
   },

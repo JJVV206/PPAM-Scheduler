@@ -9,7 +9,7 @@ export default async function AdminVolunteersPage() {
   return (
     <DataTable
       title="Voluntarios"
-      description="Gestiona voluntarios activos, monitorea la confiabilidad y revisa el historial del perfil."
+      description="Gestiona voluntarios activos, consulta su contacto y revisa el historial del perfil."
       actions={<CreateVolunteerForm />}
     >
       <VolunteerTable volunteers={volunteers} />

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -14,7 +15,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
-  Sparkles,
   UserCircle2,
   Users
 } from "lucide-react";
@@ -46,7 +46,6 @@ const adminItems: NavItem[] = [
   { href: "/admin/schedule", label: "Horario semanal", icon: CalendarDays },
   { href: "/admin/assignments", label: "Asignaciones", icon: ClipboardList },
   { href: "/admin/volunteers", label: "Voluntarios", icon: Users },
-  { href: "/admin/open-slots", label: "Vacantes", icon: Sparkles },
   { href: "/admin/notifications", label: "Notificaciones", icon: Bell },
   { href: "/admin/settings", label: "Configuración", icon: Settings }
 ];
@@ -58,7 +57,6 @@ const volunteerItems: NavItem[] = [
     label: "Mis asignaciones",
     icon: CalendarDays
   },
-  { href: "/volunteer/open-slots", label: "Vacantes", icon: Sparkles },
   {
     href: "/volunteer/availability",
     label: "Disponibilidad",
@@ -223,14 +221,17 @@ export function AppSidebar({ role }: AppSidebarProps) {
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="bg-primary/12 flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/20 text-primary shadow-[0_10px_24px_rgba(102,145,255,0.18)]">
-                      <Sparkles className="h-5 w-5" />
+                    <div className="flex h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-primary/20 shadow-[0_10px_24px_rgba(102,145,255,0.18)]">
+                      <Image
+                        src="/favicon.png"
+                        alt=""
+                        width={48}
+                        height={48}
+                        className="h-full w-full object-cover"
+                      />
                     </div>
                     <div className="min-w-0">
                       <p className="font-heading text-xl font-semibold">PPAM</p>
-                      <p className="truncate text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                        Planificador
-                      </p>
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -334,19 +335,22 @@ export function AppSidebar({ role }: AppSidebarProps) {
             >
               <div
                 className={cn(
-                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-glow",
+                  "flex h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-primary/20 shadow-glow",
                   desktopCollapsed && "h-11 w-11"
                 )}
               >
-                <Sparkles className="h-6 w-6" />
+                <Image
+                  src="/favicon.png"
+                  alt=""
+                  width={48}
+                  height={48}
+                  className="h-full w-full object-cover"
+                />
               </div>
               {!desktopCollapsed ? (
                 <div className="min-w-0">
                   <p className="truncate font-heading text-xl font-semibold">
                     PPAM
-                  </p>
-                  <p className="truncate text-xs uppercase tracking-[0.28em] text-muted-foreground">
-                    Planificador
                   </p>
                 </div>
               ) : null}
