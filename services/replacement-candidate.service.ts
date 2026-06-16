@@ -186,6 +186,7 @@ function mapCandidate(
     declineCount: volunteer.declineCount,
     noResponseCount: volunteer.noResponseCount,
     temporaryUnavailable: volunteer.temporaryUnavailable,
+    canServeAsReplacement: volunteer.canServeAsReplacement,
     replacementPriority: {
       availabilitySource: availabilityMatch.source,
       availabilityRank: availabilityMatch.rank,
@@ -392,6 +393,7 @@ export function toVolunteerSummary(
     confirmationCount: candidate.confirmationCount,
     declineCount: candidate.declineCount,
     noResponseCount: candidate.noResponseCount,
-    temporaryUnavailable: candidate.temporaryUnavailable
+    temporaryUnavailable: candidate.temporaryUnavailable,
+    canServeAsReplacement: candidate.canServeAsReplacement
   };
 }

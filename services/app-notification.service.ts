@@ -360,6 +360,31 @@ export async function getUnreadCriticalAppNotificationsForUser(input: {
   });
 }
 
+export async function getUnreadAdminAttentionNotificationsForUser(input: {
+  userId: string;
+  take?: number;
+}) {
+  return db.appNotification.findMany({
+    where: {
+      userId: input.userId,
+      readAt: null,
+      type: {
+        in: ADMIN_ATTENTION_NOTIFICATION_TYPES
+      }
+    },
+    include: appNotificationInclude,
+    orderBy: [
+      {
+        priority: "desc"
+      },
+      {
+        createdAt: "desc"
+      }
+    ],
+    take: input.take ?? 50
+  });
+}
+
 export async function markAppNotificationRead(input: {
   userId: string;
   notificationId: string;

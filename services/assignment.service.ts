@@ -113,6 +113,7 @@ function mapVolunteerSummary(record: {
   noResponseCount: number;
   active: boolean;
   temporaryUnavailable: boolean;
+  canServeAsReplacement: boolean;
   user: {
     id: string;
     name: string;
@@ -134,7 +135,8 @@ function mapVolunteerSummary(record: {
     confirmationCount: record.confirmationCount,
     declineCount: record.declineCount,
     noResponseCount: record.noResponseCount,
-    temporaryUnavailable: record.temporaryUnavailable
+    temporaryUnavailable: record.temporaryUnavailable,
+    canServeAsReplacement: record.canServeAsReplacement
   };
 }
 
@@ -2038,7 +2040,16 @@ export async function assignReplacementVolunteer(input: {
 export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
-  const [assignments, openSlots] = await Promise.all([
+  const today = startOfDay(new Date());
+  const upcomingEnd = endOfDay(addDays(today, 3));
+  const [
+    assignments,
+    openSlots,
+    replacementCensus,
+    failedEmails,
+    expiredPrimaryInvitations,
+    expiredReplacementInvitations
+  ] = await Promise.all([
     db.assignment.findMany({
       where: {
         date: {
@@ -2049,14 +2060,71 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
       include: assignmentInclude,
       orderBy: [{ date: "asc" }, { timeSlot: "asc" }, { pairNumber: "asc" }]
     }),
-    getOpenSlots()
+    getOpenSlots(),
+    db.replacementCensus.findFirst({
+      where: {
+        scheduleWeek: {
+          startDate: weekStart
+        }
+      },
+      include: {
+        responses: {
+          select: {
+            status: true
+          }
+        }
+      }
+    }),
+    db.notificationLog.count({
+      where: {
+        status: "FAILED",
+        createdAt: {
+          gte: weekStart,
+          lte: weekEnd
+        }
+      }
+    }),
+    db.assignmentInvitation.count({
+      where: {
+        type: "PRIMARY",
+        status: "EXPIRED",
+        assignment: {
+          date: {
+            gte: today
+          }
+        }
+      }
+    }),
+    db.assignmentInvitation.count({
+      where: {
+        type: "REPLACEMENT",
+        status: "EXPIRED",
+        assignment: {
+          date: {
+            gte: today
+          }
+        }
+      }
+    })
   ]);
 
   const details = assignments.map(mapAssignmentDetail);
-  const today = new Date();
   const requiresAttention = details.filter(
     (assignment) => assignment.requiresAttention
   );
+  const totalCensusResponses = replacementCensus?.responses.length ?? 0;
+  const submittedCensusResponses =
+    replacementCensus?.responses.filter(
+      (response) => response.status === "SUBMITTED"
+    ).length ?? 0;
+  const pendingCensusResponses =
+    replacementCensus?.responses.filter((response) =>
+      ["PENDING", "SENT"].includes(response.status)
+    ).length ?? 0;
+  const declinedCensusResponses =
+    replacementCensus?.responses.filter(
+      (response) => response.status === "DECLINED"
+    ).length ?? 0;
 
   return {
     weekLabel: `Semana del ${weekStart.toLocaleDateString("es-MX")}`,
@@ -2068,13 +2136,35 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
       pendingConfirmations: assignments.filter(
         (item) => item.status === "PENDING_CONFIRMATION"
       ).length,
+      needsReplacement: assignments.filter(
+        (item) => item.status === "NEEDS_REPLACEMENT"
+      ).length,
       declinedAssignments: assignments.filter(
         (item) => item.status === "DECLINED"
       ).length,
-      openSlots: openSlots.length
+      openSlots: openSlots.length,
+      requiresAttention: requiresAttention.length
+    },
+    census: {
+      status: replacementCensus?.status ?? "Sin censo",
+      closesAt: replacementCensus?.closesAt ?? null,
+      totalResponses: totalCensusResponses,
+      submittedResponses: submittedCensusResponses,
+      pendingResponses: pendingCensusResponses,
+      declinedResponses: declinedCensusResponses,
+      responseRate: safePercentage(submittedCensusResponses, totalCensusResponses)
+    },
+    alerts: {
+      failedEmails,
+      expiredPrimaryInvitations,
+      expiredReplacementInvitations,
+      uncoveredAssignments: requiresAttention.length
     },
     todaysAssignments: details.filter(
-      (assignment) => assignment.date.toDateString() === today.toDateString()
+      (assignment) => isSameDay(assignment.date, today)
+    ),
+    upcomingAssignments: details.filter(
+      (assignment) => assignment.date >= today && assignment.date <= upcomingEnd
     ),
     pendingConfirmations: details.filter(
       (assignment) => assignment.status === "PENDING_CONFIRMATION"

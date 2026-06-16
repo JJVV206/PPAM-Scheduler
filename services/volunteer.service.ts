@@ -58,6 +58,7 @@ function mapVolunteer(record: {
   noResponseCount: number;
   active: boolean;
   temporaryUnavailable: boolean;
+  canServeAsReplacement: boolean;
   user: {
     id: string;
     name: string;
@@ -79,7 +80,8 @@ function mapVolunteer(record: {
     confirmationCount: record.confirmationCount,
     declineCount: record.declineCount,
     noResponseCount: record.noResponseCount,
-    temporaryUnavailable: record.temporaryUnavailable
+    temporaryUnavailable: record.temporaryUnavailable,
+    canServeAsReplacement: record.canServeAsReplacement
   };
 }
 

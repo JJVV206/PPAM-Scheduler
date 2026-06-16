@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/forms/empty-state";
 import { AssignmentForm } from "@/components/assignments/assignment-form";
 import { WeeklyScheduleGrid } from "@/components/schedule/weekly-schedule-grid";
 import { ScheduleWeekToolbar } from "@/components/schedule/schedule-week-toolbar";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getWeeklySchedule } from "@/services/assignment.service";
 import { getPreachingPoints } from "@/services/point.service";
@@ -16,6 +17,16 @@ type AdminSchedulePageProps = {
     weekStart?: string;
   }>;
 };
+
+const scheduleStateLegend = [
+  { label: "Titular pendiente", variant: "warning" as const },
+  { label: "Confirmada", variant: "success" as const },
+  { label: "Rechazada", variant: "danger" as const },
+  { label: "Buscando suplente", variant: "danger" as const },
+  { label: "Suplente invitado", variant: "default" as const },
+  { label: "Cubierta por suplente", variant: "success" as const },
+  { label: "Requiere atención", variant: "warning" as const }
+];
 
 function formatSchedulePeriod(startDate: Date, endDate: Date) {
   if (isSameMonth(startDate, endDate) && isSameYear(startDate, endDate)) {
@@ -94,6 +105,13 @@ export default async function AdminSchedulePage({
             <p className="mt-1 text-sm text-muted-foreground">
               {schedulePeriodLabel}
             </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {scheduleStateLegend.map((item) => (
+                <Badge key={item.label} variant={item.variant}>
+                  {item.label}
+                </Badge>
+              ))}
+            </div>
           </div>
 
           <div className="flex w-full flex-col gap-2.5 xl:w-auto xl:flex-row xl:items-center xl:justify-end">

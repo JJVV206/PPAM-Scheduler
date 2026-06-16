@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
+  AlertTriangle,
   Bell,
   CalendarDays,
   ClipboardList,
@@ -45,10 +46,14 @@ const SIDEBAR_COLLAPSED_STORAGE_KEY = "ppam-sidebar-collapsed";
 const adminItems: NavItem[] = [
   { href: "/admin", label: "Inicio", icon: Home },
   { href: "/admin/schedule", label: "Horario semanal", icon: CalendarDays },
+  {
+    href: "/admin/attention",
+    label: "Atención requerida",
+    icon: AlertTriangle
+  },
   { href: "/admin/replacements", label: "Suplentes", icon: UserCheck },
   { href: "/admin/assignments", label: "Asignaciones", icon: ClipboardList },
   { href: "/admin/volunteers", label: "Voluntarios", icon: Users },
-  { href: "/admin/notifications", label: "Notificaciones", icon: Bell },
   { href: "/admin/settings", label: "Configuración", icon: Settings }
 ];
 
@@ -175,7 +180,7 @@ export function AppSidebar({
   const items = getNavItems(role);
   const currentSectionLabel = getCurrentSectionLabel(pathname, items);
   const notificationsHref =
-    role === "ADMIN" ? "/admin/notifications" : "/volunteer/notifications";
+    role === "ADMIN" ? "/admin/attention" : "/volunteer/notifications";
   const preloadRoute = useCallback(
     (href: string) => {
       router.prefetch(href);

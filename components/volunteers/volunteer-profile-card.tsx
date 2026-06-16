@@ -23,6 +23,7 @@ type VolunteerProfileCardProps = {
     phone?: string | null;
     active: boolean;
     temporaryUnavailable: boolean;
+    canServeAsReplacement: boolean;
     confirmationCount: number;
     declineCount: number;
     noResponseCount: number;
@@ -65,6 +66,11 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
             {volunteer.temporaryUnavailable ? (
               <Badge variant="warning">No disponible</Badge>
             ) : null}
+            <Badge
+              variant={volunteer.canServeAsReplacement ? "success" : "outline"}
+            >
+              {volunteer.canServeAsReplacement ? "Suplente" : "No suplente"}
+            </Badge>
           </div>
         </div>
       </CardHeader>

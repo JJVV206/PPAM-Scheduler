@@ -51,6 +51,7 @@ export type VolunteerSummary = {
   declineCount: number;
   noResponseCount: number;
   temporaryUnavailable: boolean;
+  canServeAsReplacement: boolean;
 };
 
 export type PreachingPointSummary = {
@@ -177,10 +178,28 @@ export type AdminDashboardStats = {
     totalAssignments: number;
     confirmedAssignments: number;
     pendingConfirmations: number;
+    needsReplacement: number;
     declinedAssignments: number;
     openSlots: number;
+    requiresAttention: number;
+  };
+  census: {
+    status: string;
+    closesAt?: Date | null;
+    totalResponses: number;
+    submittedResponses: number;
+    pendingResponses: number;
+    declinedResponses: number;
+    responseRate: number;
+  };
+  alerts: {
+    failedEmails: number;
+    expiredPrimaryInvitations: number;
+    expiredReplacementInvitations: number;
+    uncoveredAssignments: number;
   };
   todaysAssignments: AssignmentDetailDto[];
+  upcomingAssignments: AssignmentDetailDto[];
   pendingConfirmations: AssignmentDetailDto[];
   requiresAttention: AssignmentDetailDto[];
   urgentReplacements: OpenSlotDto[];

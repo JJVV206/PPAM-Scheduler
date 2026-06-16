@@ -43,8 +43,8 @@ export default async function AdminAssignmentsPage() {
 
   return (
     <DataTable
-      title="Asignaciones"
-      description="Todas las asignaciones programadas, pendientes, con reemplazo y completadas."
+      title="Asignaciones / historial"
+      description="Consulta por semana, día, estado, voluntario y punto; la operación diaria ocurre en Horario semanal y Atención requerida."
       actions={
         currentWeek ? (
           <AssignmentForm

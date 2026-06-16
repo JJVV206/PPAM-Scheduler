@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import { StatusBadge } from "@/components/assignments/status-badge";
 import { FilterBar } from "@/components/forms/filter-bar";
 import { SearchInput } from "@/components/forms/search-input";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -22,6 +22,12 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
+import {
+  DAYS_OF_WEEK,
+  DAY_LABELS,
+  TIME_SLOT_DEFINITIONS
+} from "@/lib/constants/domain";
+import type { DayOfWeek, TimeSlot } from "@/types/domain";
 
 type VolunteerTableProps = {
   volunteers: Array<{
@@ -31,6 +37,15 @@ type VolunteerTableProps = {
     phone?: string | null;
     active: boolean;
     preferredAreas: string[];
+    canServeAsReplacement: boolean;
+    temporaryUnavailable: boolean;
+    confirmationCount: number;
+    declineCount: number;
+    noResponseCount: number;
+    availabilitySummary?: Array<{
+      dayOfWeek: DayOfWeek;
+      timeSlot: TimeSlot;
+    }>;
   }>;
 };
 
@@ -39,6 +54,34 @@ function normalize(value: string) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+}
+
+function getAvailabilityLines(
+  availabilitySummary: VolunteerTableProps["volunteers"][number]["availabilitySummary"]
+) {
+  const byDay =
+    availabilitySummary?.reduce<Partial<Record<DayOfWeek, TimeSlot[]>>>(
+      (accumulator, item) => {
+        accumulator[item.dayOfWeek] ??= [];
+        accumulator[item.dayOfWeek]?.push(item.timeSlot);
+        return accumulator;
+      },
+      {}
+    ) ?? {};
+
+  return DAYS_OF_WEEK.flatMap((day) => {
+    const slots = byDay[day] ?? [];
+
+    if (!slots.length) {
+      return [];
+    }
+
+    const slotLabels = slots
+      .map((slot) => TIME_SLOT_DEFINITIONS[slot].shortLabel)
+      .join(", ");
+
+    return [`${DAY_LABELS[day]}: ${slotLabels}`];
+  });
 }
 
 export function VolunteerTable({ volunteers }: VolunteerTableProps) {
@@ -69,7 +112,9 @@ export function VolunteerTable({ volunteers }: VolunteerTableProps) {
           volunteer.name,
           volunteer.email,
           volunteer.phone ?? "",
-          volunteer.preferredAreas.join(" ")
+          volunteer.preferredAreas.join(" "),
+          volunteer.canServeAsReplacement ? "suplente reemplazo" : "",
+          getAvailabilityLines(volunteer.availabilitySummary).join(" ")
         ].join(" ")
       );
       const matchesSearch =
@@ -148,39 +193,98 @@ export function VolunteerTable({ volunteers }: VolunteerTableProps) {
           <TableRow>
             <TableHead>Nombre</TableHead>
             <TableHead>Contacto</TableHead>
-            <TableHead>Áreas preferidas</TableHead>
             <TableHead>Estado</TableHead>
+            <TableHead>Suplente</TableHead>
+            <TableHead>Disponibilidad</TableHead>
+            <TableHead>Historial</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
           {filteredVolunteers.length ? (
-            filteredVolunteers.map((volunteer) => (
-              <TableRow key={volunteer.id}>
-                <TableCell className="font-medium">{volunteer.name}</TableCell>
-                <TableCell>
-                  <p>{volunteer.email}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {volunteer.phone ?? "Sin teléfono"}
-                  </p>
-                </TableCell>
-                <TableCell>
-                  {volunteer.preferredAreas.join(", ") || "Ninguna"}
-                </TableCell>
-                <TableCell>
-                  <StatusBadge status={volunteer.active ? "CONFIRMED" : "CANCELLED"} />
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button variant="secondary" asChild>
-                    <Link href={`/admin/volunteers/${volunteer.id}`}>Ver</Link>
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))
+            filteredVolunteers.map((volunteer) => {
+              const availabilityLines = getAvailabilityLines(
+                volunteer.availabilitySummary
+              );
+              const visibleAvailability = availabilityLines.slice(0, 2);
+              const hiddenAvailabilityCount =
+                availabilityLines.length - visibleAvailability.length;
+
+              return (
+                <TableRow key={volunteer.id}>
+                  <TableCell className="min-w-[180px]">
+                    <p className="font-medium">{volunteer.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {volunteer.preferredAreas.join(", ") ||
+                        "Sin áreas preferidas"}
+                    </p>
+                  </TableCell>
+                  <TableCell className="min-w-[220px]">
+                    <p className="break-words text-sm [overflow-wrap:anywhere]">
+                      {volunteer.email}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {volunteer.phone ?? "Sin teléfono"}
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant={volunteer.active ? "success" : "outline"}>
+                        {volunteer.active ? "Activo" : "Inactivo"}
+                      </Badge>
+                      {volunteer.temporaryUnavailable ? (
+                        <Badge variant="warning">No disponible</Badge>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        volunteer.canServeAsReplacement ? "success" : "outline"
+                      }
+                    >
+                      {volunteer.canServeAsReplacement ? "Sí" : "No"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="min-w-[220px]">
+                    {visibleAvailability.length ? (
+                      <div className="space-y-1">
+                        {visibleAvailability.map((line) => (
+                          <p key={line} className="text-sm">
+                            {line}
+                          </p>
+                        ))}
+                        {hiddenAvailabilityCount > 0 ? (
+                          <p className="text-xs text-muted-foreground">
+                            +{hiddenAvailabilityCount} más
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">
+                        Sin disponibilidad
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="grid min-w-[140px] gap-1 text-xs text-muted-foreground">
+                      <span>{volunteer.confirmationCount} confirmadas</span>
+                      <span>{volunteer.declineCount} rechazos</span>
+                      <span>{volunteer.noResponseCount} sin respuesta</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="secondary" asChild>
+                      <Link href={`/admin/volunteers/${volunteer.id}`}>Ver</Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })
           ) : (
             <TableRow>
               <TableCell
-                colSpan={5}
+                colSpan={7}
                 className="h-32 text-center text-muted-foreground"
               >
                 No hay voluntarios que coincidan con esos filtros.

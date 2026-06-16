@@ -16,6 +16,8 @@ import {
 } from "@/lib/constants/app";
 import type { SettingsDto } from "@/types/domain";
 
+const ASSIGNMENT_AUTOMATION_LAST_RUN_SETTING_KEY = "assignmentAutomationLastRun";
+
 export type AssignmentAutomationSettings = {
   reminderTimingDays: number[];
   finalReminderHours: number;
@@ -31,6 +33,40 @@ export type AssignmentAutomationSettings = {
   censusResponseTimeoutHours: number;
   notificationChannels: SettingsDto["notificationChannels"];
 };
+
+export type AssignmentAutomationLastRunSummary = {
+  automationRunId: string;
+  status: "completed" | "completed_with_errors";
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  failedStepCount: number;
+  summarySaved: boolean;
+};
+
+function asRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function isAssignmentAutomationLastRunSummary(
+  value: unknown
+): value is AssignmentAutomationLastRunSummary {
+  const record = asRecord(value);
+
+  return Boolean(
+    record &&
+      typeof record.automationRunId === "string" &&
+      (record.status === "completed" ||
+        record.status === "completed_with_errors") &&
+      typeof record.startedAt === "string" &&
+      typeof record.finishedAt === "string" &&
+      typeof record.durationMs === "number" &&
+      typeof record.failedStepCount === "number" &&
+      typeof record.summarySaved === "boolean"
+  );
+}
 
 export async function getSettingValue<T>(key: string, fallback: T): Promise<T> {
   const setting = await db.appSetting.findUnique({ where: { key } });
@@ -128,6 +164,20 @@ export async function getAssignmentAutomationSettings(): Promise<AssignmentAutom
     censusResponseTimeoutHours,
     notificationChannels: appSettings.notificationChannels
   };
+}
+
+export async function getAssignmentAutomationLastRunSummary() {
+  const setting = await db.appSetting.findUnique({
+    where: {
+      key: ASSIGNMENT_AUTOMATION_LAST_RUN_SETTING_KEY
+    }
+  });
+
+  if (!isAssignmentAutomationLastRunSummary(setting?.value)) {
+    return null;
+  }
+
+  return setting.value;
 }
 
 export async function updateSettings(input: SettingsDto) {
