@@ -23,6 +23,8 @@ Add these variables in Vercel Project Settings -> Environment Variables for Prod
 - `NEXTAUTH_SECRET`
 - `NEXTAUTH_URL`
 - `CRON_SECRET`
+- `RESEND_API_KEY`
+- `RESEND_FROM`
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_SECURE`
@@ -48,6 +50,19 @@ Set `NEXTAUTH_URL` to the final production URL, for example:
 ```text
 https://ppam-scheduler.vercel.app
 ```
+
+Use Resend API for production email when possible:
+
+```text
+RESEND_API_KEY=re_xxxxxxxxx
+RESEND_FROM=PPAM <no-reply@ppam.services>
+```
+
+Replace `re_xxxxxxxxx` with the real API key from Resend. For a first free-plan
+test, Resend allows `onboarding@resend.dev` only for approved test recipients.
+Before sending invitations to real volunteers, verify `ppam.services` in Resend
+and use a sender from that domain. SMTP variables are optional fallback values
+when `RESEND_API_KEY` and `RESEND_FROM` are not configured.
 
 ## 3. Apply migrations
 
@@ -95,7 +110,7 @@ because email is temporarily degraded. To require email readiness too, verify:
 https://YOUR_PRODUCTION_URL/api/health?scope=readiness
 ```
 
-That endpoint should return `200` only when SMTP is configured correctly.
+That endpoint should return `200` only when Resend API or SMTP is configured correctly.
 
 ## 5. First admin user
 

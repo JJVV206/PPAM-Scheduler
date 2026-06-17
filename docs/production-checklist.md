@@ -10,7 +10,9 @@ Use this checklist before promoting a build to real PPAM production traffic.
 - Confirm `NEXTAUTH_SECRET` is a strong random value.
 - Confirm `NEXTAUTH_URL` matches the final Vercel/custom domain.
 - Confirm `CRON_SECRET` is a strong random value.
-- Confirm SMTP variables are configured when email readiness is required.
+- Confirm `RESEND_API_KEY` and `RESEND_FROM` are configured when email readiness is required.
+- Confirm the Resend sender domain is verified before sending to real volunteers.
+- Confirm SMTP variables only if using SMTP instead of Resend API.
 - Run:
 
 ```bash
@@ -39,7 +41,7 @@ npm run prod:migrate
 curl -i https://YOUR_PRODUCTION_URL/api/health
 ```
 
-- Verify full readiness when SMTP is expected:
+- Verify full readiness when email delivery is expected:
 
 ```bash
 curl -i "https://YOUR_PRODUCTION_URL/api/health?scope=readiness"

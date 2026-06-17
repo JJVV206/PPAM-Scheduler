@@ -4,11 +4,11 @@ const ERROR_PATTERNS: Array<[RegExp, string]> = [
     "No fue posible enviar el correo. El servicio de correo no está disponible."
   ],
   [
-    /SMTP_HOST y SMTP_FROM son obligatorios|SMTP_HOST|SMTP_FROM/i,
+    /RESEND_API_KEY|RESEND_FROM|SMTP_HOST y SMTP_FROM son obligatorios|SMTP_HOST|SMTP_FROM/i,
     "Falta configurar el servicio de correo."
   ],
   [
-    /SMTP_PORT debe ser un entero positivo|SMTP_USER y SMTP_PASS|SMTP_SECURE|configuración SMTP|SMTP/i,
+    /invalid_api_key|restricted_api_key|missing_api_key|SMTP_PORT debe ser un entero positivo|SMTP_USER y SMTP_PASS|SMTP_SECURE|configuración SMTP|SMTP/i,
     "La configuración del correo no es válida."
   ],
   [

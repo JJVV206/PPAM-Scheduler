@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import {
   NotificationChannel,
   NotificationStatus,
@@ -7,7 +8,7 @@ import {
 } from "@prisma/client";
 
 import { db } from "@/lib/db/prisma";
-import { getAppBaseUrl, getSmtpConfig } from "@/lib/env/config";
+import { getAppBaseUrl, getEmailDeliveryConfig } from "@/lib/env/config";
 import { humanizeErrorMessage } from "@/lib/utils/error-message";
 import { safeJsonMetadata } from "@/lib/utils/safe-metadata";
 import { AppError } from "@/services/errors";
@@ -30,19 +31,20 @@ export function sanitizeNotificationMetadata(
   return safeJsonMetadata(metadata) as Record<string, unknown> | undefined;
 }
 
-function createTransport() {
-  const smtpConfig = getSmtpConfig();
-
-  if (!smtpConfig) {
-    return null;
-  }
-
+function createSmtpTransport(smtpConfig: Extract<
+  NonNullable<ReturnType<typeof getEmailDeliveryConfig>>,
+  { provider: "smtp" }
+>) {
   return nodemailer.createTransport({
     host: smtpConfig.host,
     port: smtpConfig.port,
     secure: smtpConfig.secure,
     auth: smtpConfig.auth
   });
+}
+
+function createResendClient(apiKey: string) {
+  return new Resend(apiKey);
 }
 
 export async function logNotification(payload: {
@@ -86,10 +88,9 @@ export async function sendEmailNotification(payload: NotificationPayload) {
   }
 
   try {
-    const smtpConfig = getSmtpConfig();
-    const transport = smtpConfig ? createTransport() : null;
+    const emailConfig = getEmailDeliveryConfig();
 
-    if (!transport) {
+    if (!emailConfig) {
       console.info("Email notification", {
         to: user.email,
         subject: payload.subject,
@@ -107,24 +108,54 @@ export async function sendEmailNotification(payload: NotificationPayload) {
           simulated: true
         }
       });
-    } else {
-      await transport.sendMail({
-        from: smtpConfig?.from,
+    } else if (emailConfig.provider === "resend") {
+      const resend = createResendClient(emailConfig.apiKey);
+      const result = await resend.emails.send({
+        from: emailConfig.from,
         to: user.email,
         subject: payload.subject,
         html: payload.html,
         text: payload.text
       });
-    }
 
-    return logNotification({
-      userId: payload.userId,
-      assignmentId: payload.assignmentId,
-      type: payload.type,
-      channel: payload.channel ?? "EMAIL",
-      status: "SENT",
-      metadata: payload.metadata
-    });
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
+      return logNotification({
+        userId: payload.userId,
+        assignmentId: payload.assignmentId,
+        type: payload.type,
+        channel: payload.channel ?? "EMAIL",
+        status: "SENT",
+        metadata: {
+          ...payload.metadata,
+          provider: "resend",
+          providerMessageId: result.data?.id
+        }
+      });
+    } else {
+      const transport = createSmtpTransport(emailConfig);
+      await transport.sendMail({
+        from: emailConfig.from,
+        to: user.email,
+        subject: payload.subject,
+        html: payload.html,
+        text: payload.text
+      });
+
+      return logNotification({
+        userId: payload.userId,
+        assignmentId: payload.assignmentId,
+        type: payload.type,
+        channel: payload.channel ?? "EMAIL",
+        status: "SENT",
+        metadata: {
+          ...payload.metadata,
+          provider: "smtp"
+        }
+      });
+    }
   } catch (error) {
     const technicalMessage =
       error instanceof Error

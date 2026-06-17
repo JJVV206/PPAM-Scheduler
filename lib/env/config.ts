@@ -14,6 +14,19 @@ type SmtpConfig = {
   secure: boolean;
 };
 
+type ResendConfig = {
+  apiKey: string;
+  from: string;
+};
+
+type EmailDeliveryConfig =
+  | ({
+      provider: "resend";
+    } & ResendConfig)
+  | ({
+      provider: "smtp";
+    } & SmtpConfig);
+
 function hasValue(value: string | undefined | null): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -101,12 +114,6 @@ export function getSmtpConfig(): SmtpConfig | null {
   const from = process.env.SMTP_FROM?.trim();
 
   if (!hasValue(host) || !hasValue(from)) {
-    if (isProductionRuntime()) {
-      throw new Error(
-        "SMTP_HOST y SMTP_FROM son obligatorios en producción para enviar correos."
-      );
-    }
-
     return null;
   }
 
@@ -137,4 +144,50 @@ export function getSmtpConfig(): SmtpConfig | null {
     from,
     auth: hasValue(user) && hasValue(pass) ? { user, pass } : undefined
   };
+}
+
+export function getResendConfig(): ResendConfig | null {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM?.trim();
+
+  if (!hasValue(apiKey) && !hasValue(from)) {
+    return null;
+  }
+
+  if (!hasValue(apiKey) || !hasValue(from)) {
+    throw new Error(
+      "RESEND_API_KEY y RESEND_FROM deben configurarse juntos para enviar correos con Resend."
+    );
+  }
+
+  return {
+    apiKey,
+    from
+  };
+}
+
+export function getEmailDeliveryConfig(): EmailDeliveryConfig | null {
+  const resend = getResendConfig();
+  if (resend) {
+    return {
+      provider: "resend",
+      ...resend
+    };
+  }
+
+  const smtp = getSmtpConfig();
+  if (smtp) {
+    return {
+      provider: "smtp",
+      ...smtp
+    };
+  }
+
+  if (isProductionRuntime()) {
+    throw new Error(
+      "RESEND_API_KEY/RESEND_FROM o SMTP_HOST/SMTP_FROM son obligatorios en producción para enviar correos."
+    );
+  }
+
+  return null;
 }
