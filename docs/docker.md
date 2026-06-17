@@ -104,11 +104,11 @@ DATABASE_URL
 DIRECT_URL
 NEXTAUTH_SECRET
 NEXTAUTH_URL
-SMTP_HOST
-SMTP_PORT
-SMTP_SECURE
-SMTP_FROM
-SMTP_USER / SMTP_PASS when your provider requires auth
+CRON_SECRET
+RESEND_API_KEY
+RESEND_FROM
+SMTP_HOST / SMTP_PORT / SMTP_SECURE / SMTP_FROM as optional SMTP fallback
+SMTP_USER / SMTP_PASS when your SMTP provider requires auth
 ```
 
 Run migrations from a tools image before starting production:

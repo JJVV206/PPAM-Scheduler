@@ -67,6 +67,8 @@ Before deploying, configure these environment variables with real production val
 - `NEXTAUTH_SECRET`
 - `NEXTAUTH_URL`
 - `CRON_SECRET`
+- `RESEND_API_KEY`
+- `RESEND_FROM`
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_SECURE`
@@ -87,7 +89,8 @@ Notes:
 
 - Production no longer relies on `prisma db push`; use migrations instead.
 - `/api/health` reports core app/database health. Use `?scope=readiness` when email must be part of the release gate.
-- If SMTP is missing or invalid in production, password reset and assignment emails will fail explicitly instead of being marked as sent.
+- Resend API is the recommended production email provider. SMTP remains available as a fallback for providers that do not expose an API.
+- If Resend/SMTP is missing or invalid in production, password reset and assignment emails will fail explicitly instead of being marked as sent.
 - The app is configured with `output: "standalone"` to support container deployment.
 - Vercel + Neon deployment steps are documented in `docs/deploy-vercel.md`.
 - The production checklist is documented in `docs/production-checklist.md`.

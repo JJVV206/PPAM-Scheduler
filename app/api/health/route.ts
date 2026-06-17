@@ -1,7 +1,7 @@
 import { db } from "@/lib/db/prisma";
 import {
+  getEmailDeliveryConfig,
   getMissingRequiredAppEnv,
-  getSmtpConfig,
   isProductionRuntime
 } from "@/lib/env/config";
 
@@ -13,7 +13,8 @@ export async function GET(request: Request) {
     database: "ok" as "ok" | "error"
   };
   const readiness = {
-    email: "configured" as "configured" | "simulated" | "error"
+    email: "configured" as "configured" | "simulated" | "error",
+    emailProvider: null as "resend" | "smtp" | null
   };
   const coreIssues: string[] = [];
   const readinessIssues: string[] = [];
@@ -36,13 +37,15 @@ export async function GET(request: Request) {
   }
 
   try {
-    const smtpConfig = getSmtpConfig();
-    if (!smtpConfig) {
+    const emailConfig = getEmailDeliveryConfig();
+    if (!emailConfig) {
       readiness.email = "simulated";
       if (isProductionRuntime()) {
         readiness.email = "error";
-        readinessIssues.push("SMTP is not configured for production.");
+        readinessIssues.push("Email delivery is not configured for production.");
       }
+    } else {
+      readiness.emailProvider = emailConfig.provider;
     }
   } catch (error) {
     readiness.email = "error";

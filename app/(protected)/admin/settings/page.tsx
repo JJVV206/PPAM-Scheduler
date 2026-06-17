@@ -2,7 +2,7 @@ import { SettingsForm } from "@/features/settings/settings-form";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { NOTIFICATION_CHANNEL_LABELS } from "@/lib/constants/domain";
-import { getSmtpConfig } from "@/lib/env/config";
+import { getEmailDeliveryConfig } from "@/lib/env/config";
 import { formatDisplayDate } from "@/lib/utils";
 import {
   getAppSettings,
@@ -10,28 +10,41 @@ import {
   getAssignmentAutomationSettings
 } from "@/services/setting.service";
 
-function getSafeSmtpSummary() {
+function getSafeEmailSummary() {
   try {
-    const smtp = getSmtpConfig();
+    const email = getEmailDeliveryConfig();
 
-    if (!smtp) {
+    if (!email) {
       return {
         status: "No configurado",
+        provider: "Simulado",
         from: "Sin remitente",
         host: "Sin servidor",
         auth: "No"
       };
     }
 
+    if (email.provider === "resend") {
+      return {
+        status: "Configurado",
+        provider: "Resend API",
+        from: email.from,
+        host: "api.resend.com",
+        auth: "API key"
+      };
+    }
+
     return {
       status: "Configurado",
-      from: smtp.from,
-      host: `${smtp.host}:${smtp.port}`,
-      auth: smtp.auth ? "Sí" : "No"
+      provider: "SMTP",
+      from: email.from,
+      host: `${email.host}:${email.port}`,
+      auth: email.auth ? "Sí" : "No"
     };
   } catch {
     return {
       status: "Requiere revisión",
+      provider: "No disponible",
       from: "No disponible",
       host: "No disponible",
       auth: "No disponible"
@@ -60,7 +73,7 @@ export default async function AdminSettingsPage() {
     getAssignmentAutomationSettings(),
     getAssignmentAutomationLastRunSummary()
   ]);
-  const smtp = getSafeSmtpSummary();
+  const email = getSafeEmailSummary();
 
   return (
     <div className="space-y-6">
@@ -126,10 +139,11 @@ export default async function AdminSettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-2xl border border-border/70 bg-background/25 px-4">
-                <ConfigRow label="SMTP" value={smtp.status} />
-                <ConfigRow label="Servidor" value={smtp.host} />
-                <ConfigRow label="Remitente" value={smtp.from} />
-                <ConfigRow label="Autenticación" value={smtp.auth} />
+                <ConfigRow label="Email" value={email.status} />
+                <ConfigRow label="Proveedor" value={email.provider} />
+                <ConfigRow label="Servidor" value={email.host} />
+                <ConfigRow label="Remitente" value={email.from} />
+                <ConfigRow label="Autenticación" value={email.auth} />
               </div>
               <div className="flex flex-wrap gap-2">
                 {[

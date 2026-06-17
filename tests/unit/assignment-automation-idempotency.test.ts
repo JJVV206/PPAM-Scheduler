@@ -94,6 +94,7 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/lib/db/prisma", () => ({ db: mocks.db }));
 vi.mock("@/lib/env/config", () => ({
   getAppBaseUrl: () => "https://ppam.example.org",
+  getEmailDeliveryConfig: () => null,
   getSmtpConfig: () => null
 }));
 vi.mock("@/services/setting.service", () => ({
