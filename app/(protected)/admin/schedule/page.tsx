@@ -97,7 +97,7 @@ export default async function AdminSchedulePage({
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <section className="surface-panel shrink-0 overflow-hidden px-4 py-4 sm:px-5 sm:py-5">
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(24rem,1fr)_auto] xl:items-start xl:gap-6">
           <div className="min-w-0">
             <h1 className="font-heading text-3xl font-semibold leading-tight sm:text-4xl lg:whitespace-nowrap">
               Horario semanal
@@ -114,7 +114,7 @@ export default async function AdminSchedulePage({
             </div>
           </div>
 
-          <div className="flex min-w-0 flex-col gap-2.5 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
+          <div className="flex min-w-0 flex-col gap-2.5 xl:items-end">
             <ScheduleWeekToolbar
               selectedWeekStart={schedule.startDate.toISOString().slice(0, 10)}
               currentWeekStart={currentWeekStart}
@@ -126,7 +126,7 @@ export default async function AdminSchedulePage({
             />
 
             {currentWeek ? (
-              <div className="w-full sm:w-auto sm:shrink-0">
+              <div className="w-full sm:w-auto xl:shrink-0">
                 <AssignmentForm
                   scheduleWeekId={currentWeek.id}
                   triggerClassName="w-full sm:w-auto sm:whitespace-nowrap"
@@ -137,12 +137,7 @@ export default async function AdminSchedulePage({
                   volunteers={volunteers}
                 />
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground xl:max-w-[30rem] xl:text-right">
-                Primero crea o duplica la semana para habilitar asignaciones y
-                seguimiento.
-              </p>
-            )}
+            ) : null}
           </div>
         </div>
       </section>
