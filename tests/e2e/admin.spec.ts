@@ -59,4 +59,32 @@ test.describe("admin workspace", () => {
       await expect(page.locator("body")).toBeVisible();
     }
   });
+
+  test("opens a full assignment detail page from the assignments list", async ({
+    page
+  }) => {
+    test.slow();
+
+    await page.goto("/admin/assignments");
+
+    const detailLink = page
+      .locator('a[href^="/admin/assignments/"]')
+      .first();
+
+    await expect(detailLink).toBeVisible();
+    const detailHref = await detailLink.getAttribute("href");
+
+    expect(detailHref).toMatch(/^\/admin\/assignments\/[^/]+$/);
+
+    await Promise.all([
+      page.waitForURL(new RegExp(`${detailHref}$`), { timeout: 30_000 }),
+      detailLink.click()
+    ]);
+
+    await expect(page).toHaveURL(/\/admin\/assignments\/[^/]+$/);
+    await expect(
+      page.getByRole("heading", { name: /hospital dr josé g\. parres/i })
+    ).toBeVisible();
+    await expect(page.getByText(/proceso automático/i)).toBeVisible();
+  });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { addDays, startOfWeek } from "date-fns";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -344,12 +345,26 @@ export function AssignmentGroupedList({
                                     state={assignment.automationState}
                                   />
                                 </TableCell>
-                                <TableCell className="text-right">
-                                  <AssignmentDetailModal
-                                    assignment={assignment}
-                                    preachingPoints={preachingPoints}
-                                    volunteers={volunteers}
-                                  />
+                                <TableCell>
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      asChild
+                                      variant="secondary"
+                                      size="sm"
+                                    >
+                                      <Link
+                                        href={`/admin/assignments/${assignment.id}`}
+                                      >
+                                        Ver detalles
+                                      </Link>
+                                    </Button>
+                                    <AssignmentDetailModal
+                                      assignment={assignment}
+                                      triggerLabel="Vista rápida"
+                                      preachingPoints={preachingPoints}
+                                      volunteers={volunteers}
+                                    />
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -389,9 +404,17 @@ export function AssignmentGroupedList({
                                   </p>
                                 </div>
                               </div>
-                              <div className="shrink-0">
+                              <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+                                <Button asChild variant="secondary" size="sm">
+                                  <Link
+                                    href={`/admin/assignments/${assignment.id}`}
+                                  >
+                                    Ver detalles
+                                  </Link>
+                                </Button>
                                 <AssignmentDetailModal
                                   assignment={assignment}
+                                  triggerLabel="Vista rápida"
                                   preachingPoints={preachingPoints}
                                   volunteers={volunteers}
                                 />
