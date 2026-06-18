@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { expectStatus } from "./support/assertions";
+import { expectNoHorizontalOverflow, expectStatus } from "./support/assertions";
 
 test.describe("admin workspace", () => {
   test("loads the admin dashboard and primary navigation", async ({ page }) => {
@@ -90,5 +90,20 @@ test.describe("admin workspace", () => {
       page.getByRole("heading", { name: /hospital dr josé g\. parres/i })
     ).toBeVisible();
     await expect(page.getByText(/proceso automático/i)).toBeVisible();
+  });
+
+  test("keeps the weekly schedule accessible without page overflow", async ({
+    page
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/admin/schedule");
+
+    await expect(
+      page.getByRole("grid", { name: /horario semanal de lunes a domingo/i })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /abrir horario de/i }).first()
+    ).toBeVisible();
+    await expectNoHorizontalOverflow(page);
   });
 });

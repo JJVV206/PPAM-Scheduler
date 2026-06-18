@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { expectStatus } from "./support/assertions";
+import { expectNoHorizontalOverflow, expectStatus } from "./support/assertions";
 
 test.describe("volunteer workspace", () => {
   test("loads volunteer dashboard and key self-service actions", async ({
@@ -13,6 +13,7 @@ test.describe("volunteer workspace", () => {
     await expect(
       page.getByRole("link", { name: /actualizar disponibilidad/i })
     ).toBeVisible();
+    await expectNoHorizontalOverflow(page);
   });
 
   test("serves volunteer APIs and blocks admin APIs", async ({ request }) => {

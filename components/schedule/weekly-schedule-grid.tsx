@@ -21,12 +21,20 @@ export function WeeklyScheduleGrid({ schedule }: WeeklyScheduleGridProps) {
       </div>
 
       <div className="hidden h-full min-w-[980px] xl:block">
-        <div className="grid h-full min-h-[640px] w-full grid-cols-[84px_repeat(7,minmax(0,1fr))] grid-rows-[58px_repeat(5,minmax(96px,1fr))] gap-px overflow-clip rounded-lg border border-border/70 bg-border/70">
-          <div className="sticky top-0 z-30 bg-surface-elevated p-2 shadow-[0_1px_0_hsl(var(--border))]" />
+        <div
+          aria-label="Horario semanal de lunes a domingo"
+          className="grid h-full min-h-[640px] w-full grid-cols-[84px_repeat(7,minmax(0,1fr))] grid-rows-[58px_repeat(5,minmax(96px,1fr))] gap-px overflow-clip rounded-lg border border-border/70 bg-border/70"
+          role="grid"
+        >
+          <div
+            aria-hidden="true"
+            className="sticky top-0 z-30 bg-surface-elevated p-2 shadow-[0_1px_0_hsl(var(--border))]"
+          />
           {schedule.days.map((day) => (
             <div
               key={day.dayOfWeek}
               className="sticky top-0 z-30 min-w-0 bg-surface-elevated px-2 py-2 text-center shadow-[0_1px_0_hsl(var(--border))]"
+              role="columnheader"
             >
               <p className="font-heading text-sm font-semibold text-foreground lg:text-base">
                 {format(day.date, "EEE", { locale: es })}
@@ -39,7 +47,11 @@ export function WeeklyScheduleGrid({ schedule }: WeeklyScheduleGridProps) {
 
           {TIME_SLOTS.map((timeSlot) => (
             <Fragment key={timeSlot}>
-              <div className="min-w-0 bg-surface-elevated px-2 py-2">
+              <div
+                aria-label={TIME_SLOT_DEFINITIONS[timeSlot].label}
+                className="min-w-0 bg-surface-elevated px-2 py-2"
+                role="rowheader"
+              >
                 <p className="text-sm font-semibold leading-tight text-foreground">
                   {TIME_SLOT_DEFINITIONS[timeSlot].shortLabel}
                 </p>
@@ -51,6 +63,7 @@ export function WeeklyScheduleGrid({ schedule }: WeeklyScheduleGridProps) {
                   <div
                     key={`${day.dayOfWeek}-${timeSlot}`}
                     className="h-full min-w-0 bg-surface p-1"
+                    role="gridcell"
                   >
                     <ScheduleSlotPreview
                       assignments={groups}

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ArrowUpRight, Layers3, MapPin, Users2 } from "lucide-react";
 
-import { cn, formatCount } from "@/lib/utils";
+import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
+import { cn, formatCount, formatDisplayDate } from "@/lib/utils";
 import type {
   AssignmentStatus,
   TimeSlot,
@@ -61,6 +62,30 @@ const compactStatusMap: Record<
 
 function buildScheduleSlotHref(date: Date, timeSlot: TimeSlot) {
   return `/admin/schedule/${format(date, "yyyy-MM-dd")}/${timeSlot}`;
+}
+
+function getSlotActionLabel({
+  date,
+  timeSlot,
+  pairCount,
+  pointCount
+}: {
+  date: Date;
+  timeSlot: TimeSlot;
+  pairCount: number;
+  pointCount: number;
+}) {
+  const dateLabel = formatDisplayDate(date, "EEEE d 'de' MMMM");
+  const timeLabel = TIME_SLOT_DEFINITIONS[timeSlot].label;
+
+  return `Abrir horario de ${dateLabel}, ${timeLabel}. ${formatCount(
+    pairCount,
+    "pareja"
+  )} y ${formatCount(pointCount, "punto")}.`;
+}
+
+function getPairActionLabel(pair: PreviewPair) {
+  return `Ver detalle de pareja ${pair.pairNumber} en ${pair.preachingPointName}`;
 }
 
 function getCompactSlotSummary(input: {
@@ -125,6 +150,12 @@ export function ScheduleSlotPreview({
     confirmedCount,
     needsAttentionCount
   });
+  const slotActionLabel = getSlotActionLabel({
+    date,
+    timeSlot,
+    pairCount,
+    pointCount
+  });
 
   if (compact) {
     return (
@@ -144,7 +175,7 @@ export function ScheduleSlotPreview({
           </div>
           <Link
             href={slotHref}
-            aria-label="Abrir horario"
+            aria-label={slotActionLabel}
             className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary transition hover:bg-primary/15 hover:text-primary"
           >
             <ArrowUpRight className="h-3.5 w-3.5" />
@@ -168,6 +199,7 @@ export function ScheduleSlotPreview({
           <div className="mt-2 flex flex-1 items-end">
             <Link
               href={slotHref}
+              aria-label={slotActionLabel}
               className="inline-flex max-w-full break-words text-[11px] font-medium leading-tight text-primary/90 transition hover:text-primary"
             >
               Abrir horario
@@ -202,6 +234,7 @@ export function ScheduleSlotPreview({
         </div>
         <Link
           href={slotHref}
+          aria-label={slotActionLabel}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/15 hover:text-primary"
         >
           Ver horario
@@ -215,6 +248,7 @@ export function ScheduleSlotPreview({
             <Link
               key={pair.id}
               href={`/admin/assignments/${pair.id}`}
+              aria-label={getPairActionLabel(pair)}
               className="group flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-background/35 px-3 py-2.5 transition hover:border-primary/30 hover:bg-background/50"
             >
               <div className="min-w-0">
@@ -252,6 +286,7 @@ export function ScheduleSlotPreview({
           {hiddenPairsCount > 0 ? (
             <Link
               href={slotHref}
+              aria-label={`${slotActionLabel} Ver todas las parejas ocultas.`}
               className="inline-flex text-xs font-semibold text-primary transition hover:text-primary/80"
             >
               +{formatCount(hiddenPairsCount, "pareja")} más en este horario

@@ -15,7 +15,12 @@ export function DayColumn({ day }: DayColumnProps) {
   ).length;
 
   return (
-    <section className="surface-panel space-y-3 p-3">
+    <section
+      aria-label={`Horario de ${format(day.date, "EEEE d 'de' MMMM", {
+        locale: es
+      })}`}
+      className="surface-panel space-y-3 p-3"
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-heading text-xl font-semibold capitalize">

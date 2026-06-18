@@ -34,14 +34,23 @@ export function RouteTransitionIndicator() {
     [pathname, searchParams]
   );
   const [isNavigating, setIsNavigating] = useState(false);
+  const [showSlowNavigationMessage, setShowSlowNavigationMessage] =
+    useState(false);
   const timeoutRef = useRef<number | null>(null);
+  const slowMessageTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     setIsNavigating(false);
+    setShowSlowNavigationMessage(false);
 
     if (timeoutRef.current) {
       window.clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
+    }
+
+    if (slowMessageTimeoutRef.current) {
+      window.clearTimeout(slowMessageTimeoutRef.current);
+      slowMessageTimeoutRef.current = null;
     }
   }, [routeKey]);
 
@@ -57,13 +66,23 @@ export function RouteTransitionIndicator() {
       if (!shouldTrackNavigation(anchor)) return;
 
       setIsNavigating(true);
+      setShowSlowNavigationMessage(false);
 
       if (timeoutRef.current) {
         window.clearTimeout(timeoutRef.current);
       }
+      if (slowMessageTimeoutRef.current) {
+        window.clearTimeout(slowMessageTimeoutRef.current);
+      }
+
+      slowMessageTimeoutRef.current = window.setTimeout(() => {
+        setShowSlowNavigationMessage(true);
+        slowMessageTimeoutRef.current = null;
+      }, 450);
 
       timeoutRef.current = window.setTimeout(() => {
         setIsNavigating(false);
+        setShowSlowNavigationMessage(false);
         timeoutRef.current = null;
       }, 10000);
     }
@@ -74,6 +93,9 @@ export function RouteTransitionIndicator() {
       document.removeEventListener("click", handleClick, { capture: true });
       if (timeoutRef.current) {
         window.clearTimeout(timeoutRef.current);
+      }
+      if (slowMessageTimeoutRef.current) {
+        window.clearTimeout(slowMessageTimeoutRef.current);
       }
     };
   }, []);
@@ -89,6 +111,11 @@ export function RouteTransitionIndicator() {
       <div className="h-1 w-full overflow-hidden bg-primary/10">
         <div className="h-full w-1/2 animate-[navigation-progress_1.1s_ease-in-out_infinite] rounded-r-full bg-primary shadow-[0_0_18px_hsl(var(--primary)/0.45)]" />
       </div>
+      {showSlowNavigationMessage ? (
+        <div className="fixed right-4 top-4 rounded-full border border-border/70 bg-surface-elevated px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-soft">
+          Cargando...
+        </div>
+      ) : null}
       <span className="sr-only">Cargando página</span>
     </div>
   );

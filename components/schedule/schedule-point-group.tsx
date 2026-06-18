@@ -53,6 +53,7 @@ export function SchedulePointGroup({ group }: SchedulePointGroupProps) {
         <Link
           key={pair.id}
           href={`/admin/assignments/${pair.id}`}
+          aria-label={`Ver detalle de pareja ${pair.pairNumber} en ${group.preachingPointName}`}
           className="group flex min-h-14 items-center justify-between gap-2 rounded-lg border border-border/65 bg-background/35 px-2.5 py-2 transition hover:border-primary/30 hover:bg-background/50"
         >
           <div className="min-w-0 flex-1">
