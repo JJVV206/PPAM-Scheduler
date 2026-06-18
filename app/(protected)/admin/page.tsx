@@ -8,6 +8,7 @@ import {
   UserSearch
 } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,7 +55,7 @@ function CoverageMetric({
 }) {
   return (
     <div
-      className={`${toneClasses[tone].card} flex min-h-[6.75rem] flex-col justify-between rounded-lg border p-3`}
+      className={`${toneClasses[tone].card} flex min-h-[7.5rem] flex-col justify-between rounded-lg border p-4`}
     >
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm leading-5 text-muted-foreground">{label}</p>
@@ -81,19 +82,235 @@ function AlertMetric({
   value: number;
 }) {
   return (
-    <div className="flex min-h-[4.75rem] items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/35 p-3">
-      <div className="flex min-w-0 items-center gap-3">
-        <span className="bg-warning/12 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-warning">
-          <Icon className="h-4 w-4" />
-        </span>
-        <p className="min-w-0 text-sm leading-5 text-muted-foreground">
+    <div className="grid min-h-[8.75rem] grid-cols-[auto_minmax(0,1fr)] items-center gap-4 rounded-lg border border-border/70 bg-background/35 p-4">
+      <span className="bg-warning/12 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-warning">
+        <Icon className="h-5 w-5" />
+      </span>
+      <div className="min-w-0">
+        <p className="font-heading text-3xl font-semibold leading-none">
+          {value}
+        </p>
+        <p className="mt-2 min-w-0 text-sm leading-5 text-muted-foreground">
           {label}
         </p>
       </div>
-      <p className="font-heading text-2xl font-semibold leading-none">
+    </div>
+  );
+}
+
+function CensusMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex min-h-[6.25rem] flex-col justify-between rounded-lg border border-border/70 bg-background/35 p-4">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="font-heading text-3xl font-semibold leading-none">
         {value}
       </p>
     </div>
+  );
+}
+
+function DashboardPanelHeader({
+  title,
+  description,
+  action,
+  badge
+}: {
+  title: string;
+  description: string;
+  action?: ReactNode;
+  badge?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0">
+        <h2 className="font-heading text-2xl font-semibold leading-tight">
+          {title}
+        </h2>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      {(action ?? badge) ? (
+        <div className="flex shrink-0 items-center gap-2">
+          {action ?? badge}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CoveragePanel({
+  dashboard
+}: {
+  dashboard: Awaited<ReturnType<typeof getAdminDashboardStats>>;
+}) {
+  return (
+    <section className="surface-panel flex min-h-[16rem] flex-col gap-4 p-4 lg:p-5">
+      <DashboardPanelHeader
+        title="Cobertura semanal"
+        description={dashboard.weekLabel}
+        action={
+          <Button asChild variant="secondary" size="sm">
+            <Link href="/admin/schedule">
+              Horario semanal
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        }
+      />
+
+      <div className="grid flex-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+        <CoverageMetric
+          icon={CheckCircle2}
+          label="Confirmadas"
+          value={dashboard.stats.confirmedAssignments}
+          tone="success"
+        />
+        <CoverageMetric
+          icon={ClipboardCheck}
+          label="Pendientes"
+          value={dashboard.stats.pendingConfirmations}
+          tone="warning"
+        />
+        <CoverageMetric
+          icon={UserSearch}
+          label="Buscando suplente"
+          value={dashboard.stats.needsReplacement}
+          tone="primary"
+        />
+        <CoverageMetric
+          icon={AlertTriangle}
+          label="Atención manual"
+          value={dashboard.stats.requiresAttention}
+          tone="danger"
+        />
+      </div>
+    </section>
+  );
+}
+
+function AlertsPanel({
+  dashboard,
+  totalAlerts
+}: {
+  dashboard: Awaited<ReturnType<typeof getAdminDashboardStats>>;
+  totalAlerts: number;
+}) {
+  return (
+    <section className="surface-panel flex min-h-[26rem] flex-col gap-4 p-4 lg:p-5">
+      <DashboardPanelHeader
+        title="Alertas"
+        description="Incidencias que requieren revisión operativa."
+        action={
+          <Button asChild variant="secondary" size="sm">
+            <Link href="/admin/attention">
+              Atención requerida
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        }
+      />
+      <div className="grid flex-1 gap-3 sm:grid-cols-2">
+        <AlertMetric
+          icon={MailWarning}
+          label="Emails fallidos"
+          value={dashboard.alerts.failedEmails}
+        />
+        <AlertMetric
+          icon={TimerOff}
+          label="Titulares vencidos"
+          value={dashboard.alerts.expiredPrimaryInvitations}
+        />
+        <AlertMetric
+          icon={UserSearch}
+          label="Suplentes vencidos"
+          value={dashboard.alerts.expiredReplacementInvitations}
+        />
+        <AlertMetric
+          icon={AlertTriangle}
+          label="Turnos sin cobertura"
+          value={dashboard.alerts.uncoveredAssignments}
+        />
+      </div>
+      <Badge variant={totalAlerts ? "warning" : "outline"} className="w-fit">
+        {totalAlerts ? `${totalAlerts} activas` : "Sin alertas"}
+      </Badge>
+    </section>
+  );
+}
+
+function ReplacementCensusPanel({
+  dashboard
+}: {
+  dashboard: Awaited<ReturnType<typeof getAdminDashboardStats>>;
+}) {
+  return (
+    <section className="surface-panel flex min-h-[24rem] flex-col gap-4 p-4 lg:p-5 xl:row-span-2">
+      <DashboardPanelHeader
+        title="Censo de suplentes"
+        description={
+          dashboard.census.closesAt
+            ? `Cierra ${formatDisplayDate(
+                dashboard.census.closesAt,
+                "d 'de' MMMM, HH:mm"
+              )}`
+            : "Sin censo activo para esta semana"
+        }
+        badge={
+          <Badge
+            variant={dashboard.census.totalResponses ? "default" : "outline"}
+          >
+            {dashboard.census.status}
+          </Badge>
+        }
+      />
+
+      <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+        <CensusMetric
+          label="Invitados"
+          value={dashboard.census.totalResponses}
+        />
+        <CensusMetric
+          label="Respondieron"
+          value={dashboard.census.submittedResponses}
+        />
+        <CensusMetric
+          label="Pendientes"
+          value={dashboard.census.pendingResponses}
+        />
+      </div>
+
+      <div className="flex flex-1 flex-col justify-center rounded-lg border border-border/70 bg-background/35 p-5">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-sm text-muted-foreground">Respuesta del censo</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {dashboard.census.submittedResponses} de{" "}
+              {dashboard.census.totalResponses} respondieron
+            </p>
+          </div>
+          <p className="font-heading text-5xl font-semibold leading-none">
+            {dashboard.census.responseRate}%
+          </p>
+        </div>
+        <div className="mt-6 h-2.5 overflow-hidden rounded-full bg-secondary">
+          <div
+            className="h-full rounded-full bg-primary"
+            style={{ width: `${dashboard.census.responseRate}%` }}
+          />
+        </div>
+        <Badge
+          variant={dashboard.census.pendingResponses ? "warning" : "success"}
+          className="mt-5 w-fit"
+        >
+          {dashboard.census.pendingResponses
+            ? "Seguimiento pendiente"
+            : "Censo al día"}
+        </Badge>
+      </div>
+
+      <Button asChild variant="secondary" className="mt-auto w-full">
+        <Link href="/admin/replacements">Abrir censo de suplentes</Link>
+      </Button>
+    </section>
   );
 }
 
@@ -106,191 +323,11 @@ export default async function AdminDashboardPage() {
     dashboard.alerts.uncoveredAssignments;
 
   return (
-    <div className="flex min-h-full flex-col gap-3">
-      <div className="surface-panel flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="font-heading text-2xl font-semibold leading-tight">
-            Panel administrativo
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Operación diaria, cobertura y excepciones de la semana.
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-          <Button asChild variant="secondary" size="sm">
-            <Link href="/admin/attention">Atención requerida</Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link href="/admin/schedule">Horario semanal</Link>
-          </Button>
-        </div>
-      </div>
-
-      <section className="grid items-start gap-3 xl:grid-cols-[minmax(0,1.18fr)_minmax(340px,0.82fr)]">
-        <div className="space-y-3">
-          <div className="surface-panel space-y-4 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="font-heading text-xl font-semibold">
-                  Cobertura semanal
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {dashboard.weekLabel}
-                </p>
-              </div>
-              <Button asChild variant="secondary" size="sm">
-                <Link href="/admin/schedule">
-                  Horario semanal
-                  <ArrowUpRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
-
-            <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-              <CoverageMetric
-                icon={CheckCircle2}
-                label="Confirmadas"
-                value={dashboard.stats.confirmedAssignments}
-                tone="success"
-              />
-              <CoverageMetric
-                icon={ClipboardCheck}
-                label="Pendientes"
-                value={dashboard.stats.pendingConfirmations}
-                tone="warning"
-              />
-              <CoverageMetric
-                icon={UserSearch}
-                label="Buscando suplente"
-                value={dashboard.stats.needsReplacement}
-                tone="primary"
-              />
-              <CoverageMetric
-                icon={AlertTriangle}
-                label="Atención manual"
-                value={dashboard.stats.requiresAttention}
-                tone="danger"
-              />
-            </div>
-          </div>
-
-          <div className="surface-panel flex flex-col gap-3 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="font-heading text-xl font-semibold">Alertas</h2>
-                <p className="text-sm text-muted-foreground">
-                  Incidencias que requieren revisión operativa.
-                </p>
-              </div>
-              <Badge variant={totalAlerts ? "warning" : "outline"}>
-                {totalAlerts ? `${totalAlerts} activas` : "Sin alertas"}
-              </Badge>
-            </div>
-            <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-2">
-              <AlertMetric
-                icon={MailWarning}
-                label="Emails fallidos"
-                value={dashboard.alerts.failedEmails}
-              />
-              <AlertMetric
-                icon={TimerOff}
-                label="Titulares vencidos"
-                value={dashboard.alerts.expiredPrimaryInvitations}
-              />
-              <AlertMetric
-                icon={UserSearch}
-                label="Suplentes vencidos"
-                value={dashboard.alerts.expiredReplacementInvitations}
-              />
-              <AlertMetric
-                icon={AlertTriangle}
-                label="Turnos sin cobertura"
-                value={dashboard.alerts.uncoveredAssignments}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="surface-panel flex flex-col gap-4 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="font-heading text-xl font-semibold">
-                Censo de suplentes
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {dashboard.census.closesAt
-                  ? `Cierra ${formatDisplayDate(
-                      dashboard.census.closesAt,
-                      "d 'de' MMMM, HH:mm"
-                    )}`
-                  : "Sin censo activo para esta semana"}
-              </p>
-            </div>
-            <Badge
-              variant={dashboard.census.totalResponses ? "default" : "outline"}
-            >
-              {dashboard.census.status}
-            </Badge>
-          </div>
-
-          <div className="grid gap-2.5 sm:grid-cols-3">
-            <div className="flex min-h-[5.5rem] flex-col justify-between rounded-lg border border-border/70 bg-background/35 p-3">
-              <p className="text-sm text-muted-foreground">Invitados</p>
-              <p className="font-heading text-2xl font-semibold leading-none">
-                {dashboard.census.totalResponses}
-              </p>
-            </div>
-            <div className="flex min-h-[5.5rem] flex-col justify-between rounded-lg border border-border/70 bg-background/35 p-3">
-              <p className="text-sm text-muted-foreground">Respondieron</p>
-              <p className="font-heading text-2xl font-semibold leading-none">
-                {dashboard.census.submittedResponses}
-              </p>
-            </div>
-            <div className="flex min-h-[5.5rem] flex-col justify-between rounded-lg border border-border/70 bg-background/35 p-3">
-              <p className="text-sm text-muted-foreground">Pendientes</p>
-              <p className="font-heading text-2xl font-semibold leading-none">
-                {dashboard.census.pendingResponses}
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-border/70 bg-background/35 p-4">
-            <div>
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Respuesta</p>
-                  <p className="font-heading text-4xl font-semibold leading-none">
-                    {dashboard.census.responseRate}%
-                  </p>
-                </div>
-                <Badge
-                  variant={
-                    dashboard.census.pendingResponses ? "warning" : "success"
-                  }
-                >
-                  {dashboard.census.pendingResponses
-                    ? "Seguimiento pendiente"
-                    : "Censo al día"}
-                </Badge>
-              </div>
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="h-full rounded-full bg-primary"
-                  style={{ width: `${dashboard.census.responseRate}%` }}
-                />
-              </div>
-            </div>
-            <p className="mt-4 text-sm text-muted-foreground">
-              {dashboard.census.submittedResponses} de{" "}
-              {dashboard.census.totalResponses} suplentes respondieron.
-            </p>
-          </div>
-
-          <Button asChild variant="secondary" className="mt-auto w-full">
-            <Link href="/admin/replacements">Abrir censo de suplentes</Link>
-          </Button>
-        </div>
-      </section>
+    <div className="grid min-h-full gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.95fr)] xl:grid-rows-[auto_minmax(0,1fr)]">
+      <h1 className="sr-only">Panel administrativo</h1>
+      <CoveragePanel dashboard={dashboard} />
+      <ReplacementCensusPanel dashboard={dashboard} />
+      <AlertsPanel dashboard={dashboard} totalAlerts={totalAlerts} />
     </div>
   );
 }

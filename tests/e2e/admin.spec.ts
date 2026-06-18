@@ -7,7 +7,13 @@ test.describe("admin workspace", () => {
     await page.goto("/admin");
 
     await expect(
-      page.getByRole("heading", { name: /panel administrativo/i })
+      page.getByRole("heading", { name: /cobertura semanal/i })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /censo de suplentes/i })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /^alertas$/i })
     ).toBeVisible();
     await expect(
       page.getByRole("navigation").getByRole("link", {
@@ -67,9 +73,7 @@ test.describe("admin workspace", () => {
 
     await page.goto("/admin/assignments");
 
-    const detailLink = page
-      .locator('a[href^="/admin/assignments/"]')
-      .first();
+    const detailLink = page.locator('a[href^="/admin/assignments/"]').first();
 
     await expect(detailLink).toBeVisible();
     const detailHref = await detailLink.getAttribute("href");
