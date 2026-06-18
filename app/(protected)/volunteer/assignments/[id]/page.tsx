@@ -6,6 +6,7 @@ import { ConfirmationCard } from "@/components/assignments/confirmation-card";
 import { Button } from "@/components/ui/button";
 import { VolunteerAssignmentCard } from "@/components/volunteer/volunteer-assignment-card";
 import { getServerAuthSession } from "@/lib/auth/auth";
+import { canVolunteerRespondToAssignment } from "@/lib/volunteer-assignment";
 import { getAssignmentDetail } from "@/services/assignment.service";
 import { getVolunteerAssignmentRemindersById } from "@/services/volunteer.service";
 
@@ -33,6 +34,12 @@ export default async function VolunteerAssignmentDetailPage({
     if (!isParticipant) {
       redirect("/volunteer/assignments");
     }
+    const responseId = canVolunteerRespondToAssignment(
+      assignment,
+      session.user.volunteerProfileId
+    )
+      ? currentVolunteer?.responseId
+      : null;
     const remindersByAssignmentId = await getVolunteerAssignmentRemindersById({
       userId: session.user.id,
       assignmentIds: [assignment.id]
@@ -64,9 +71,9 @@ export default async function VolunteerAssignmentDetailPage({
           reminders={remindersByAssignmentId[assignment.id]}
           showDetailLink={false}
         />
-        {currentVolunteer?.responseId ? (
+        {responseId ? (
           <ConfirmationCard
-            responseId={currentVolunteer.responseId}
+            responseId={responseId}
             pointName={assignment.preachingPoint.name}
             date={assignment.date}
             timeSlot={assignment.timeSlot}

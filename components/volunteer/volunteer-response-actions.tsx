@@ -46,6 +46,14 @@ export function VolunteerResponseActions({
     text: string;
   } | null>(null);
 
+  if (currentStatus !== "PENDING") {
+    return (
+      <div className="rounded-lg border border-border/70 bg-background/35 px-3 py-2 text-sm text-muted-foreground">
+        {responseHelpText[currentStatus]}
+      </div>
+    );
+  }
+
   async function respond(intent: "confirm" | "decline") {
     setSubmitting(intent);
     setFeedback(null);
@@ -101,7 +109,7 @@ export function VolunteerResponseActions({
           type="button"
           size={compact ? "sm" : "default"}
           onClick={() => respond("confirm")}
-          disabled={submitting !== null || currentStatus === "CONFIRMED"}
+          disabled={submitting !== null}
         >
           <CheckCircle2 className="h-4 w-4" />
           {submitting === "confirm" ? "Guardando..." : "Confirmar"}
@@ -111,7 +119,7 @@ export function VolunteerResponseActions({
           variant="danger"
           size={compact ? "sm" : "default"}
           onClick={() => respond("decline")}
-          disabled={submitting !== null || currentStatus === "DECLINED"}
+          disabled={submitting !== null}
         >
           <CircleOff className="h-4 w-4" />
           {submitting === "decline" ? "Guardando..." : "No puedo asistir"}

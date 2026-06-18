@@ -10,7 +10,6 @@ import {
   UserRound
 } from "lucide-react";
 
-import { AutomationStateBadge } from "@/components/assignments/automation-state-badge";
 import { StatusBadge } from "@/components/assignments/status-badge";
 import { VolunteerResponseActions } from "@/components/volunteer/volunteer-response-actions";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +20,7 @@ import {
 } from "@/lib/constants/domain";
 import { cn, formatDisplayDate } from "@/lib/utils";
 import {
+  canVolunteerRespondToAssignment,
   getVolunteerAssignmentRoleLabel,
   getVolunteerAssignmentSlot
 } from "@/lib/volunteer-assignment";
@@ -105,6 +105,12 @@ export function VolunteerAssignmentCard({
   const responseStatus = volunteerSlot?.responseStatus ?? "PENDING";
   const responseSummary = getResponseSummary(responseStatus);
   const ResponseIcon = responseSummary.icon;
+  const responseId = canVolunteerRespondToAssignment(
+    assignment,
+    volunteerProfileId
+  )
+    ? volunteerSlot?.responseId
+    : null;
 
   return (
     <article
@@ -122,7 +128,6 @@ export function VolunteerAssignmentCard({
               {roleLabel}
             </Badge>
             <StatusBadge status={responseStatus} />
-            <AutomationStateBadge state={assignment.automationState} />
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
@@ -135,9 +140,6 @@ export function VolunteerAssignmentCard({
               Pareja {assignment.pairNumber}
             </p>
           </div>
-        </div>
-        <div className="shrink-0">
-          <StatusBadge status={assignment.status} />
         </div>
       </div>
 
@@ -204,11 +206,11 @@ export function VolunteerAssignmentCard({
         </p>
       </div>
 
-      {showResponseActions && volunteerSlot?.responseId ? (
+      {showResponseActions && responseId ? (
         <VolunteerResponseActions
-          responseId={volunteerSlot.responseId}
-          currentStatus={volunteerSlot.responseStatus}
-          initialNote={volunteerSlot.responseNote}
+          responseId={responseId}
+          currentStatus={responseStatus}
+          initialNote={volunteerSlot?.responseNote}
           compact={compact}
         />
       ) : null}

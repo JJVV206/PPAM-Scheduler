@@ -77,6 +77,18 @@ export default async function VolunteerDashboardPage() {
                 </Link>
               </Button>
             ) : null}
+            {dashboard.openSlots.length ? (
+              <Button
+                variant={focusAssignment ? "secondary" : "default"}
+                className="w-full sm:w-auto"
+                asChild
+              >
+                <Link href="/volunteer/open-slots">
+                  Ver vacantes
+                  <Sparkles className="h-4 w-4" />
+                </Link>
+              </Button>
+            ) : null}
             <Button variant="secondary" className="w-full sm:w-auto" asChild>
               <Link href="/volunteer/availability">
                 Actualizar disponibilidad

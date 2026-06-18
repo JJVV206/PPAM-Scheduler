@@ -8,9 +8,8 @@ test.describe("volunteer workspace", () => {
   }) => {
     await page.goto("/volunteer");
 
-    await expect(
-      page.getByRole("heading", { name: /panel de voluntario/i })
-    ).toBeVisible();
+    await expect(page.getByText(/^Hola,/i)).toBeVisible();
+    await expect(page.getByText(/vacantes para ti/i)).toBeVisible();
     await expect(
       page.getByRole("link", { name: /actualizar disponibilidad/i })
     ).toBeVisible();

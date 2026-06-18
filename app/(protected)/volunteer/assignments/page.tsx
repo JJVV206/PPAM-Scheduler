@@ -11,7 +11,7 @@ import {
 import { getServerAuthSession } from "@/lib/auth/auth";
 import { getVolunteerAssignmentRoleLabel } from "@/lib/volunteer-assignment";
 import { getVolunteerDashboardData } from "@/services/dashboard.service";
-import { CalendarDays, UserCircle2 } from "lucide-react";
+import { CalendarDays, Sparkles, UserCircle2 } from "lucide-react";
 
 type VolunteerAssignmentList = Awaited<
   ReturnType<typeof getVolunteerDashboardData>
@@ -49,12 +49,22 @@ export default async function VolunteerAssignmentsPage() {
             pendientes muestran los botones para responder.
           </p>
         </div>
-        <Button variant="secondary" className="w-full sm:w-auto" asChild>
-          <Link href="/volunteer/availability">
-            <UserCircle2 className="h-4 w-4" />
-            Disponibilidad
-          </Link>
-        </Button>
+        <div className="grid gap-2 sm:flex sm:items-center">
+          {dashboard.openSlots.length ? (
+            <Button className="w-full sm:w-auto" asChild>
+              <Link href="/volunteer/open-slots">
+                <Sparkles className="h-4 w-4" />
+                Ver vacantes
+              </Link>
+            </Button>
+          ) : null}
+          <Button variant="secondary" className="w-full sm:w-auto" asChild>
+            <Link href="/volunteer/availability">
+              <UserCircle2 className="h-4 w-4" />
+              Disponibilidad
+            </Link>
+          </Button>
+        </div>
       </section>
 
       <AssignmentSection
