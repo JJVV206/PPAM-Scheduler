@@ -360,7 +360,7 @@ describe("replacement census preparation", () => {
       censusId: "census-1",
       volunteerId: "volunteer-1",
       status: "SENT",
-      expiresAt: new Date("2026-06-18T12:00:00.000Z"),
+      expiresAt: new Date("2099-06-18T12:00:00.000Z"),
       respondedAt: null,
       metadata: {},
       census: {
