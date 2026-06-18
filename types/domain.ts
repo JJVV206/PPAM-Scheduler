@@ -96,7 +96,8 @@ export type AssignmentAutomationStateKey =
   | "EXPIRED"
   | "LOOKING_FOR_REPLACEMENT"
   | "REPLACEMENT_INVITED"
-  | "REQUIRES_INTERVENTION";
+  | "REQUIRES_INTERVENTION"
+  | "CANCELLED";
 
 export type AssignmentAutomationState = {
   key: AssignmentAutomationStateKey;

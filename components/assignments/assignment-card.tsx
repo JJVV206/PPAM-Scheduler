@@ -1,7 +1,6 @@
 import { Clock3, MapPin, Users2 } from "lucide-react";
 
 import { AutomationStateBadge } from "@/components/assignments/automation-state-badge";
-import { StatusBadge } from "@/components/assignments/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
 import { cn } from "@/lib/utils";
@@ -38,7 +37,6 @@ export function AssignmentCard({
             </p>
           </div>
           <div className="flex max-w-[11rem] flex-col items-end gap-1.5">
-            <StatusBadge status={assignment.status} />
             <AutomationStateBadge state={assignment.automationState} />
           </div>
         </div>

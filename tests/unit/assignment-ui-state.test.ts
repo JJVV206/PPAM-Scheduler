@@ -104,4 +104,64 @@ describe("assignment automation UI state", () => {
     expect(deriveAssignmentAutomationState(input).key).toBe("CONFIRMED");
     expect(isAssignmentRequiringAttention(input)).toBe(false);
   });
+
+  it("prioritizes resolved coverage over stale replacement invitations", () => {
+    const input = stateInput({
+      status: "CONFIRMED",
+      invitations: [
+        invitation({
+          type: "REPLACEMENT",
+          status: "SENT"
+        })
+      ],
+      volunteers: [volunteer("CONFIRMED")]
+    });
+
+    expect(deriveAssignmentAutomationState(input).key).toBe("CONFIRMED");
+    expect(isAssignmentRequiringAttention(input)).toBe(false);
+  });
+
+  it("treats accepted invitations as confirmed while the assignment catches up", () => {
+    const input = stateInput({
+      status: "PENDING_CONFIRMATION",
+      invitations: [invitation({ status: "ACCEPTED" })],
+      volunteers: [volunteer("PENDING")]
+    });
+
+    expect(deriveAssignmentAutomationState(input).key).toBe("CONFIRMED");
+  });
+
+  it("does not mark unsent assignments as confirmed", () => {
+    const input = stateInput({
+      status: "SCHEDULED",
+      volunteers: [volunteer("PENDING")]
+    });
+
+    expect(deriveAssignmentAutomationState(input).key).toBe(
+      "INVITATION_PENDING"
+    );
+  });
+
+  it("keeps cancelled assignments out of the attention queue", () => {
+    const input = stateInput({
+      status: "CANCELLED",
+      invitations: [invitation({ status: "SENT" })],
+      volunteers: [volunteer("PENDING")]
+    });
+
+    expect(deriveAssignmentAutomationState(input).key).toBe("CANCELLED");
+    expect(isAssignmentRequiringAttention(input)).toBe(false);
+  });
+
+  it("flags the latest failed invitation as requiring intervention", () => {
+    const input = stateInput({
+      invitations: [invitation({ status: "FAILED" })],
+      volunteers: [volunteer("PENDING")]
+    });
+
+    expect(deriveAssignmentAutomationState(input).key).toBe(
+      "REQUIRES_INTERVENTION"
+    );
+    expect(isAssignmentRequiringAttention(input)).toBe(true);
+  });
 });
