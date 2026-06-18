@@ -22,6 +22,7 @@ Production-ready MVP for managing weekly public preaching assignments with role-
 4. Inspect local emails at `http://localhost:8025`.
 
 Docker details are documented in `docs/docker.md`.
+Next.js cache recovery is documented in `docs/local-cache-recovery.md`.
 
 If local ports are already in use, start Docker with `APP_PORT=3002 NEXTAUTH_URL=http://localhost:3002 POSTGRES_HOST_PORT=5433 npm run docker:dev`.
 
@@ -33,6 +34,8 @@ If local ports are already in use, start Docker with `APP_PORT=3002 NEXTAUTH_URL
 4. Sync the schema with `npm run db:push`.
 5. Seed the database with `npm run db:seed`.
 6. Start the app with `npm run dev`.
+
+If local Next.js cache becomes stale, restart with `npm run dev:fresh`.
 
 ## Local Database
 
