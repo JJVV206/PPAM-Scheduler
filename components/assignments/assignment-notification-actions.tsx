@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { FeedbackMessage } from "@/components/ui/feedback-message";
+import {
+  buildAssignmentNotificationFeedback,
+  buildAssignmentNotificationNetworkErrorFeedback
+} from "@/lib/notifications/assignment-notification-feedback";
 
 type AssignmentNotificationActionsProps = {
   assignmentId: string;
@@ -28,26 +32,27 @@ export function AssignmentNotificationActions({
     setLoading(kind);
     setFeedback(null);
 
-    const response = await fetch(
-      `/api/assignments/${assignmentId}/notifications/${kind}`,
-      {
-        method: "POST"
+    try {
+      const response = await fetch(
+        `/api/assignments/${assignmentId}/notifications/${kind}`,
+        {
+          method: "POST"
+        }
+      );
+      const nextFeedback = await buildAssignmentNotificationFeedback(
+        response,
+        kind
+      );
+
+      setFeedback(nextFeedback);
+
+      if (response.ok) {
+        router.refresh();
       }
-    );
-    const result = await response.json();
-
-    setLoading(null);
-    setFeedback({
-      tone: response.ok ? "success" : "error",
-      text: response.ok
-        ? kind === "request"
-          ? `Invitaciones pendientes enviadas (${result.sentCount}).`
-          : `Emails reenviados (${result.sentCount}).`
-        : (result.error ?? "No fue posible completar la acción.")
-    });
-
-    if (response.ok) {
-      router.refresh();
+    } catch {
+      setFeedback(buildAssignmentNotificationNetworkErrorFeedback());
+    } finally {
+      setLoading(null);
     }
   }
 
