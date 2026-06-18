@@ -2,7 +2,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ArrowUpRight, Layers3, MapPin, Users2 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cn, formatCount } from "@/lib/utils";
 import type {
   AssignmentStatus,
   TimeSlot,
@@ -139,9 +139,7 @@ export function ScheduleSlotPreview({
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
           <div className="min-w-0">
             <p className="break-words text-[10px] font-semibold uppercase leading-tight tracking-[0.1em] text-muted-foreground xl:tracking-[0.14em]">
-              {pairCount
-                ? `${pairCount} pareja${pairCount === 1 ? "" : "s"}`
-                : "Libre"}
+              {pairCount ? formatCount(pairCount, "pareja") : "Libre"}
             </p>
           </div>
           <Link
@@ -186,18 +184,18 @@ export function ScheduleSlotPreview({
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             <Layers3 className="h-3.5 w-3.5" />
-            {pairCount
-              ? `${pairCount} pareja${pairCount === 1 ? "" : "s"}`
-              : "Sin parejas"}
+            {pairCount ? formatCount(pairCount, "pareja") : "Sin parejas"}
             <span className="text-border">•</span>
-            {pointCount} punto{pointCount === 1 ? "" : "s"}
+            {formatCount(pointCount, "punto")}
           </p>
           <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
             {pairCount
               ? needsAttentionCount
-                ? `${needsAttentionCount} pareja${
-                    needsAttentionCount === 1 ? "" : "s"
-                  } requieren atención en este horario.`
+                ? `${formatCount(
+                    needsAttentionCount,
+                    "pareja requiere",
+                    "parejas requieren"
+                  )} atención en este horario.`
                 : "Horario operativo con parejas activas."
               : "Abre este horario para registrar la primera pareja."}
           </p>
@@ -256,8 +254,7 @@ export function ScheduleSlotPreview({
               href={slotHref}
               className="inline-flex text-xs font-semibold text-primary transition hover:text-primary/80"
             >
-              +{hiddenPairsCount} pareja{hiddenPairsCount === 1 ? "" : "s"} más
-              en este horario
+              +{formatCount(hiddenPairsCount, "pareja")} más en este horario
             </Link>
           ) : null}
         </div>

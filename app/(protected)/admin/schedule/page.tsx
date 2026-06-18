@@ -1,5 +1,4 @@
-import { format, isSameMonth, isSameYear, startOfWeek } from "date-fns";
-import { es } from "date-fns/locale";
+import { format, startOfWeek } from "date-fns";
 
 import { EmptyState } from "@/components/forms/empty-state";
 import { AssignmentForm } from "@/components/assignments/assignment-form";
@@ -11,6 +10,7 @@ import { getWeeklySchedule } from "@/services/assignment.service";
 import { getPreachingPoints } from "@/services/point.service";
 import { getVolunteers } from "@/services/volunteer.service";
 import { db } from "@/lib/db/prisma";
+import { formatDateRange } from "@/lib/utils";
 
 type AdminSchedulePageProps = {
   searchParams?: Promise<{
@@ -28,26 +28,6 @@ const scheduleStateLegend = [
   { label: "Requiere atención", variant: "warning" as const }
 ];
 
-function formatSchedulePeriod(startDate: Date, endDate: Date) {
-  if (isSameMonth(startDate, endDate) && isSameYear(startDate, endDate)) {
-    return `Del ${format(startDate, "d", { locale: es })} al ${format(
-      endDate,
-      "d 'de' MMMM 'de' yyyy",
-      { locale: es }
-    )}`;
-  }
-
-  if (isSameYear(startDate, endDate)) {
-    return `Del ${format(startDate, "d 'de' MMMM", {
-      locale: es
-    })} al ${format(endDate, "d 'de' MMMM 'de' yyyy", { locale: es })}`;
-  }
-
-  return `Del ${format(startDate, "d 'de' MMMM 'de' yyyy", {
-    locale: es
-  })} al ${format(endDate, "d 'de' MMMM 'de' yyyy", { locale: es })}`;
-}
-
 export default async function AdminSchedulePage({
   searchParams
 }: AdminSchedulePageProps) {
@@ -62,7 +42,7 @@ export default async function AdminSchedulePage({
     startOfWeek(new Date(), { weekStartsOn: 1 }),
     "yyyy-MM-dd"
   );
-  const schedulePeriodLabel = formatSchedulePeriod(
+  const schedulePeriodLabel = formatDateRange(
     schedule.startDate,
     schedule.endDate
   );

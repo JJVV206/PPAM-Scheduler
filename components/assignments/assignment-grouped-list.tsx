@@ -18,7 +18,12 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
-import { cn, formatDisplayDate } from "@/lib/utils";
+import {
+  cn,
+  formatCount,
+  formatDateRange,
+  formatDisplayDate
+} from "@/lib/utils";
 import type {
   AssignmentDetailDto,
   PreachingPointSummary,
@@ -207,20 +212,16 @@ export function AssignmentGroupedList({
                   Semana
                 </p>
                 <h2 className="mt-1 font-heading text-lg font-semibold text-foreground">
-                  Del {formatDisplayDate(weekGroup.startDate, "d")} al{" "}
-                  {formatDisplayDate(weekGroup.endDate, "d 'de' MMMM yyyy")}
+                  {formatDateRange(weekGroup.startDate, weekGroup.endDate)}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {weekAssignments.length} pareja
-                  {weekAssignments.length === 1 ? "" : "s"} en{" "}
-                  {weekGroup.days.length} día
-                  {weekGroup.days.length === 1 ? "" : "s"}
+                  {formatCount(weekAssignments.length, "pareja")} en{" "}
+                  {formatCount(weekGroup.days.length, "día", "días")}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-md border border-success/20 bg-success/10 px-2 py-1 text-xs font-semibold text-success">
-                  {confirmedCount} confirmada
-                  {confirmedCount === 1 ? "" : "s"}
+                  {formatCount(confirmedCount, "confirmada")}
                 </span>
                 {attentionCount ? (
                   <span className="rounded-md border border-warning/20 bg-warning/10 px-2 py-1 text-xs font-semibold text-warning">
@@ -267,16 +268,16 @@ export function AssignmentGroupedList({
                           {formatDisplayDate(dayGroup.date, "EEEE d 'de' MMMM")}
                         </h3>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {dayGroup.assignments.length} pareja
-                          {dayGroup.assignments.length === 1 ? "" : "s"}{" "}
-                          programada
-                          {dayGroup.assignments.length === 1 ? "" : "s"}
+                          {formatCount(
+                            dayGroup.assignments.length,
+                            "pareja programada",
+                            "parejas programadas"
+                          )}
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-md border border-success/20 bg-success/10 px-2 py-1 text-xs font-semibold text-success">
-                          {dayCounts.confirmedCount} confirmada
-                          {dayCounts.confirmedCount === 1 ? "" : "s"}
+                          {formatCount(dayCounts.confirmedCount, "confirmada")}
                         </span>
                         {dayCounts.attentionCount ? (
                           <span className="rounded-md border border-warning/20 bg-warning/10 px-2 py-1 text-xs font-semibold text-warning">

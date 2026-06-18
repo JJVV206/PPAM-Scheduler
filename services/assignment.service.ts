@@ -45,7 +45,7 @@ import {
   sendPendingPrimaryInvitationsForAssignment
 } from "@/services/assignment-invitation.service";
 import { prepareScheduleWeekAutomation } from "@/services/schedule-week-preparation.service";
-import { safePercentage } from "@/lib/utils";
+import { formatDateRange, safePercentage } from "@/lib/utils";
 import { mergeJsonMetadata } from "@/lib/utils/safe-metadata";
 import { determineAssignmentStatus } from "@/services/assignment-engine";
 import { getSingletonPreachingPoint } from "@/services/point.service";
@@ -757,7 +757,9 @@ export async function updateAssignment(
         updatedFields,
         previousStatus: current.status,
         nextStatus: input.status,
-        previousVolunteerIds: input.volunteers ? currentVolunteerIds : undefined,
+        previousVolunteerIds: input.volunteers
+          ? currentVolunteerIds
+          : undefined,
         nextVolunteerIds: input.volunteers ? nextVolunteerIds : undefined,
         addedVolunteerIds: input.volunteers ? addedVolunteerIds : undefined,
         removedVolunteerIds: input.volunteers ? removedVolunteerIds : undefined,
@@ -923,7 +925,7 @@ export async function getWeeklySchedule(input?: {
   }
 
   return {
-    weekLabel: `Semana del ${weekStart.toLocaleDateString("es-MX")}`,
+    weekLabel: formatDateRange(weekStart, weekEnd),
     startDate: weekStart,
     endDate: weekEnd,
     days
@@ -941,7 +943,7 @@ export async function createScheduleWeek(input: {
     data: {
       startDate: weekStart,
       endDate: addDays(weekStart, 6),
-      label: `Semana del ${weekStart.toLocaleDateString("es-MX")}`,
+      label: formatDateRange(weekStart, addDays(weekStart, 6)),
       createdById: input.actorUserId
     }
   });
@@ -989,7 +991,7 @@ export async function duplicateScheduleWeek(input: {
     data: {
       startDate: weekStart,
       endDate: addDays(weekStart, 6),
-      label: `Semana del ${weekStart.toLocaleDateString("es-MX")}`,
+      label: formatDateRange(weekStart, addDays(weekStart, 6)),
       createdById: input.actorUserId
     }
   });
@@ -2173,7 +2175,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
     ).length ?? 0;
 
   return {
-    weekLabel: `Semana del ${weekStart.toLocaleDateString("es-MX")}`,
+    weekLabel: formatDateRange(weekStart, weekEnd),
     stats: {
       totalAssignments: assignments.length,
       confirmedAssignments: assignments.filter(
@@ -2198,7 +2200,10 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
       submittedResponses: submittedCensusResponses,
       pendingResponses: pendingCensusResponses,
       declinedResponses: declinedCensusResponses,
-      responseRate: safePercentage(submittedCensusResponses, totalCensusResponses)
+      responseRate: safePercentage(
+        submittedCensusResponses,
+        totalCensusResponses
+      )
     },
     alerts: {
       failedEmails,
@@ -2206,8 +2211,8 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
       expiredReplacementInvitations,
       uncoveredAssignments: requiresAttention.length
     },
-    todaysAssignments: details.filter(
-      (assignment) => isSameDay(assignment.date, today)
+    todaysAssignments: details.filter((assignment) =>
+      isSameDay(assignment.date, today)
     ),
     upcomingAssignments: details.filter(
       (assignment) => assignment.date >= today && assignment.date <= upcomingEnd
