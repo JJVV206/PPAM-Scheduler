@@ -51,7 +51,7 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
 
   return (
     <Card className="surface-panel h-fit min-w-0 self-start">
-      <CardHeader className="p-5 pb-3">
+      <CardHeader className="p-4 pb-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
             <CardTitle className="text-xl">{volunteer.name}</CardTitle>
@@ -74,8 +74,8 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-3 p-5 pt-0 md:grid-cols-2">
-        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2">
+      <CardContent className="grid gap-3 p-4 pt-0 md:grid-cols-2">
+        <div className="rounded-lg border border-border/60 bg-background/35 p-3 md:col-span-2">
           <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
             Contacto
           </p>
@@ -105,7 +105,7 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2">
+        <div className="rounded-lg border border-border/60 bg-background/35 p-3 md:col-span-2">
           <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
             Disponibilidad
           </p>
@@ -114,7 +114,7 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
               {availabilityDays.map(([dayOfWeek, slots]) => (
                 <div
                   key={dayOfWeek}
-                  className="rounded-2xl border border-white/5 bg-background/30 px-3 py-2"
+                  className="rounded-lg border border-border/60 bg-background/35 px-3 py-2"
                 >
                   <p className="flex items-center gap-2 text-sm font-medium">
                     <CalendarClock className="h-4 w-4 text-muted-foreground" />
@@ -138,12 +138,12 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
           )}
         </div>
 
-        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2">
+        <div className="rounded-lg border border-border/60 bg-background/35 p-3 md:col-span-2">
           <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
             Seguimiento
           </p>
           <div className="mt-3 grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(104px,1fr))]">
-            <div className="min-w-0 rounded-2xl border border-success/15 bg-success/10 p-2.5">
+            <div className="min-w-0 rounded-lg border border-success/15 bg-success/10 p-2.5">
               <p className="text-[10px] uppercase leading-tight tracking-[0.06em] text-success/80">
                 Confirm.
               </p>
@@ -154,7 +154,7 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
                 </p>
               </div>
             </div>
-            <div className="min-w-0 rounded-2xl border border-danger/15 bg-danger/10 p-2.5">
+            <div className="min-w-0 rounded-lg border border-danger/15 bg-danger/10 p-2.5">
               <p className="text-[10px] uppercase leading-tight tracking-[0.06em] text-danger/80">
                 Rechazos
               </p>
@@ -165,7 +165,7 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
                 </p>
               </div>
             </div>
-            <div className="min-w-0 rounded-2xl border border-warning/15 bg-warning/10 p-2.5">
+            <div className="min-w-0 rounded-lg border border-warning/15 bg-warning/10 p-2.5">
               <p className="text-[10px] uppercase leading-tight tracking-[0.06em] text-warning/80">
                 Sin resp.
               </p>
@@ -176,7 +176,7 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3.5 md:col-span-2">
+        <div className="rounded-lg border border-border/60 bg-background/35 p-3 md:col-span-2">
           <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
             Notas
           </p>

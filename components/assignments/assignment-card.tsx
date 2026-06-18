@@ -24,10 +24,8 @@ export function AssignmentCard({
   const point = assignment.preachingPoint;
 
   return (
-    <Card
-      className={cn("h-full border border-white/5 bg-white/[0.03]", className)}
-    >
-      <CardContent className="space-y-4 p-5">
+    <Card className={cn("h-full border-border/65 bg-background/25", className)}>
+      <CardContent className="space-y-3 p-3.5">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <p className="font-semibold">{point.name}</p>
@@ -39,7 +37,7 @@ export function AssignmentCard({
               Pareja {assignment.pairNumber}
             </p>
           </div>
-          <div className="flex max-w-[11rem] flex-col items-end gap-2">
+          <div className="flex max-w-[11rem] flex-col items-end gap-1.5">
             <StatusBadge status={assignment.status} />
             <AutomationStateBadge state={assignment.automationState} />
           </div>
@@ -59,7 +57,7 @@ export function AssignmentCard({
         </div>
 
         {"warnings" in assignment && assignment.warnings.length ? (
-          <div className="rounded-2xl border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
+          <div className="rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
             {assignment.warnings.join(" • ")}
           </div>
         ) : null}

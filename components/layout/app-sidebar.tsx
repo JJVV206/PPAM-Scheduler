@@ -18,7 +18,8 @@ import {
   Settings,
   UserCircle2,
   UserCheck,
-  Users
+  Users,
+  X
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -117,7 +118,7 @@ function NavigationContent({
   unreadNotificationCount
 }: NavigationContentProps) {
   return (
-    <nav className="space-y-2">
+    <nav className="space-y-1">
       {items.map((item) => {
         const active = isActiveRoute(pathname, item.href);
         const Icon = item.icon;
@@ -134,10 +135,10 @@ function NavigationContent({
             onPointerEnter={() => onPreload?.(item.href)}
             title={collapsed ? item.label : undefined}
             className={cn(
-              "flex items-center rounded-2xl text-sm font-medium text-muted-foreground transition hover:bg-white/5 hover:text-foreground",
-              collapsed ? "h-11 justify-center px-0" : "gap-3 px-4 py-3",
+              "flex items-center rounded-lg text-sm font-medium text-muted-foreground transition hover:bg-secondary/55 hover:text-foreground",
+              collapsed ? "h-10 justify-center px-0" : "gap-3 px-3 py-2.5",
               active &&
-                "bg-primary/15 text-primary shadow-[inset_0_0_0_1px_rgba(133,168,255,0.2)]"
+                "bg-primary/12 text-primary shadow-[inset_3px_0_0_hsl(var(--primary))]"
             )}
           >
             <span className="relative inline-flex shrink-0">
@@ -154,7 +155,7 @@ function NavigationContent({
               <>
                 <span className="min-w-0 flex-1 truncate">{item.label}</span>
                 {showNotificationCount ? (
-                  <span className="ml-auto rounded-full bg-danger/15 px-2 py-0.5 text-[11px] font-semibold leading-none text-danger">
+                  <span className="ml-auto rounded-md bg-danger/15 px-2 py-0.5 text-[11px] font-semibold leading-none text-danger">
                     {unreadNotificationCount > 99
                       ? "99+"
                       : unreadNotificationCount}
@@ -217,10 +218,10 @@ export function AppSidebar({
   return (
     <>
       <Dialog open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-        <div className="surface-panel flex items-center justify-between gap-3 px-4 py-3 lg:hidden">
+        <div className="surface-panel flex items-center justify-between gap-3 px-3 py-2.5 lg:hidden">
           <div className="min-w-0">
             <p className="font-heading text-lg font-semibold">PPAM</p>
-            <p className="truncate text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            <p className="truncate text-xs uppercase tracking-[0.12em] text-muted-foreground">
               {currentSectionLabel}
             </p>
           </div>
@@ -257,7 +258,7 @@ export function AppSidebar({
 
         <DialogContent
           hideCloseButton
-          className="left-auto right-3 top-3 h-[calc(100dvh-1.5rem)] max-h-none w-[min(22rem,calc(100vw-1.5rem))] max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-[32px] border border-primary/20 bg-[linear-gradient(180deg,rgba(28,40,66,0.98),rgba(19,30,53,0.98))] p-0 shadow-[0_24px_80px_rgba(3,10,26,0.6)] ease-out data-[state=closed]:duration-200 data-[state=open]:duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full lg:hidden"
+          className="left-auto right-3 top-3 h-[calc(100dvh-1.5rem)] max-h-none w-[min(22rem,calc(100vw-1.5rem))] max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-xl border border-border bg-surface p-0 shadow-soft ease-out data-[state=closed]:duration-200 data-[state=open]:duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full lg:hidden"
         >
           <DialogHeader className="sr-only">
             <DialogTitle>Navegación</DialogTitle>
@@ -265,11 +266,11 @@ export function AppSidebar({
           </DialogHeader>
 
           <div className="flex h-full min-h-0 flex-col">
-            <div className="border-white/6 border-b bg-gradient-to-b from-primary/10 to-transparent px-5 pb-4 pt-5">
+            <div className="border-b border-border/70 bg-surface-elevated/60 px-4 pb-4 pt-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-primary/20 shadow-[0_10px_24px_rgba(102,145,255,0.18)]">
+                    <div className="flex h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-primary/25">
                       <Image
                         src="/favicon.png"
                         alt=""
@@ -283,7 +284,7 @@ export function AppSidebar({
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary/80">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary/80">
                       Sección actual
                     </p>
                     <p className="font-heading text-lg font-semibold text-foreground">
@@ -296,31 +297,19 @@ export function AppSidebar({
                   <Button
                     variant="outline"
                     size="icon"
-                    className="shrink-0 rounded-full border-white/10 bg-white/[0.04] text-muted-foreground shadow-[0_10px_30px_rgba(0,0,0,0.2)] hover:bg-white/[0.08] hover:text-foreground"
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
                   >
                     <span className="sr-only">Cerrar navegación</span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-4 w-4"
-                    >
-                      <path d="M18 6 6 18" />
-                      <path d="m6 6 12 12" />
-                    </svg>
+                    <X className="h-4 w-4" />
                   </Button>
                 </DialogClose>
               </div>
             </div>
 
-            <div className="flex h-full min-h-0 flex-col justify-between px-5 pb-5 pt-4">
-              <div className="space-y-4 overflow-y-auto pr-1">
+            <div className="flex h-full min-h-0 flex-col justify-between px-4 pb-4 pt-3">
+              <div className="space-y-3 overflow-y-auto pr-1">
                 <div className="px-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     Secciones
                   </p>
                 </div>
@@ -334,10 +323,10 @@ export function AppSidebar({
                 />
               </div>
 
-              <div className="border-white/6 mt-5 space-y-3 border-t pt-5">
+              <div className="mt-4 space-y-2 border-t border-border/70 pt-4">
                 <button
                   type="button"
-                  className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm text-muted-foreground transition hover:bg-white/[0.04] hover:text-foreground"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-secondary/55 hover:text-foreground"
                   onClick={() => setMobileNavOpen(false)}
                 >
                   <LifeBuoy className="h-4 w-4" />
@@ -345,7 +334,7 @@ export function AppSidebar({
                 </button>
                 <Button
                   variant="ghost"
-                  className="w-full justify-start rounded-2xl px-4"
+                  className="w-full justify-start px-3"
                   onClick={() => {
                     setMobileNavOpen(false);
                     void signOut({ callbackUrl: "/login" });
@@ -364,11 +353,11 @@ export function AppSidebar({
         className={cn(
           "surface-panel hidden h-full shrink-0 flex-col justify-between transition-[width,min-width,padding] duration-200 ease-out lg:flex",
           desktopCollapsed
-            ? "w-[76px] min-w-[76px] p-3"
-            : "w-[244px] min-w-[244px] p-4 xl:w-[256px] xl:min-w-[256px] 2xl:w-[280px] 2xl:min-w-[280px] 2xl:p-5"
+            ? "w-[68px] min-w-[68px] p-2.5"
+            : "w-[232px] min-w-[232px] p-3 xl:w-[244px] xl:min-w-[244px]"
         )}
       >
-        <div className={cn("space-y-7", desktopCollapsed && "space-y-5")}>
+        <div className={cn("space-y-5", desktopCollapsed && "space-y-4")}>
           <div
             className={cn(
               "flex gap-3",
@@ -385,8 +374,8 @@ export function AppSidebar({
             >
               <div
                 className={cn(
-                  "flex h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-primary/20 shadow-glow",
-                  desktopCollapsed && "h-11 w-11"
+                  "flex h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-primary/25",
+                  desktopCollapsed && "h-10 w-10"
                 )}
               >
                 <Image
@@ -444,7 +433,7 @@ export function AppSidebar({
 
         <div
           className={cn(
-            "space-y-3 border-t border-border/60 pt-5",
+            "space-y-2 border-t border-border/60 pt-4",
             desktopCollapsed && "flex flex-col items-center"
           )}
         >
@@ -454,8 +443,8 @@ export function AppSidebar({
             className={cn(
               "flex items-center text-sm text-muted-foreground transition hover:text-foreground",
               desktopCollapsed
-                ? "h-10 w-10 justify-center rounded-2xl px-0 py-0 hover:bg-white/5"
-                : "gap-3 px-4 py-2"
+                ? "h-9 w-9 justify-center rounded-lg px-0 py-0 hover:bg-secondary/55"
+                : "gap-3 rounded-lg px-3 py-2 hover:bg-secondary/55"
             )}
           >
             <LifeBuoy className="h-4 w-4 shrink-0" />

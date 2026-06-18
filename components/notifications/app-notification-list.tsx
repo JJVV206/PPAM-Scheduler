@@ -96,7 +96,7 @@ export function AppNotificationList({
       tone: response.ok ? "success" : "error",
       text: response.ok
         ? "Notificación marcada como leída."
-        : result.error ?? "No fue posible actualizar la notificación."
+        : (result.error ?? "No fue posible actualizar la notificación.")
     });
 
     if (response.ok) {
@@ -118,7 +118,7 @@ export function AppNotificationList({
       tone: response.ok ? "success" : "error",
       text: response.ok
         ? "Notificaciones marcadas como leídas."
-        : result.error ?? "No fue posible actualizar las notificaciones."
+        : (result.error ?? "No fue posible actualizar las notificaciones.")
     });
 
     if (response.ok) {
@@ -164,10 +164,7 @@ export function AppNotificationList({
         ) : null}
       </div>
 
-      <FeedbackMessage
-        tone={feedback?.tone}
-        message={feedback?.text}
-      />
+      <FeedbackMessage tone={feedback?.tone} message={feedback?.text} />
 
       <div className="grid gap-3">
         {notifications.map((notification) => {
@@ -218,7 +215,7 @@ export function AppNotificationList({
                   <Button variant="secondary" size="sm" asChild>
                     <Link href={href}>
                       <ExternalLink className="h-4 w-4" />
-                      Ver
+                      Ver detalles
                     </Link>
                   </Button>
                   {unread ? (
@@ -234,7 +231,7 @@ export function AppNotificationList({
                       ) : (
                         <Check className="h-4 w-4" />
                       )}
-                      Leída
+                      Marcar leída
                     </Button>
                   ) : null}
                 </div>

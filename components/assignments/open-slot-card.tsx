@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Users2 } from "lucide-react";
+import { CalendarDays, Clock3, MapPin, Users2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -93,8 +93,14 @@ export function OpenSlotCard({
           </div>
         </div>
         <div className="grid gap-3 text-sm text-muted-foreground">
-          <p>{formatDisplayDate(openSlot.date, "EEEE d 'de' MMM")}</p>
-          <p>{TIME_SLOT_DEFINITIONS[openSlot.timeSlot].label}</p>
+          <p className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4" />
+            {formatDisplayDate(openSlot.date, "EEEE d 'de' MMM")}
+          </p>
+          <p className="flex items-center gap-2">
+            <Clock3 className="h-4 w-4" />
+            {TIME_SLOT_DEFINITIONS[openSlot.timeSlot].label}
+          </p>
           <p className="flex items-center gap-2">
             <Users2 className="h-4 w-4" />
             Faltan{" "}
@@ -103,7 +109,7 @@ export function OpenSlotCard({
               .join(" y ")}
           </p>
           {openSlot.notes ? (
-            <p className="rounded-2xl bg-white/[0.03] p-3 text-foreground">
+            <p className="rounded-lg bg-background/35 p-3 text-foreground">
               {openSlot.notes}
             </p>
           ) : null}
@@ -133,7 +139,7 @@ export function OpenSlotCard({
               {submitting ? "Asignando..." : "Asignar reemplazo"}
             </Button>
             {selectedVolunteer ? (
-              <div className="rounded-2xl bg-background/40 px-3 py-2 text-xs text-muted-foreground">
+              <div className="rounded-lg bg-background/40 px-3 py-2 text-xs text-muted-foreground">
                 {selectedVolunteer.preferredAreas.includes(openSlot.area)
                   ? "Elegible por preferencia de zona y disponibilidad."
                   : "Elegible por disponibilidad en esta franja y sin conflicto activo."}{" "}
@@ -143,13 +149,19 @@ export function OpenSlotCard({
             ) : null}
           </div>
         ) : (
-          <Button
-            className="w-full"
-            onClick={handleAssign}
-            disabled={!selectedVolunteerId || submitting}
-          >
-            {submitting ? "Aceptando..." : "Aceptar asignación"}
-          </Button>
+          <div className="space-y-3">
+            <div className="rounded-lg border border-border/70 bg-background/35 px-3 py-2 text-sm text-muted-foreground">
+              Si aceptas, este turno quedará asignado a tu nombre como
+              reemplazo.
+            </div>
+            <Button
+              className="w-full"
+              onClick={handleAssign}
+              disabled={!selectedVolunteerId || submitting}
+            >
+              {submitting ? "Aceptando..." : "Puedo cubrir este turno"}
+            </Button>
+          </div>
         )}
         <FeedbackMessage message={feedback?.text} tone={feedback?.tone} />
       </CardContent>

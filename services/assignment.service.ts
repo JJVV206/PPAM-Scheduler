@@ -1035,6 +1035,28 @@ export async function duplicateScheduleWeek(input: {
   return targetWeek;
 }
 
+async function assertVolunteerCanRespondToAssignment(input: {
+  tx: Prisma.TransactionClient;
+  assignmentId: string;
+  volunteerProfileId: string;
+}) {
+  const assignedVolunteer = await input.tx.assignmentVolunteer.findUnique({
+    where: {
+      assignmentId_volunteerId: {
+        assignmentId: input.assignmentId,
+        volunteerId: input.volunteerProfileId
+      }
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (!assignedVolunteer) {
+    throw new AppError("No puedes responder esta asignación.", 403);
+  }
+}
+
 export async function confirmAssignment(input: {
   assignmentId: string;
   volunteerProfileId: string;
@@ -1042,6 +1064,12 @@ export async function confirmAssignment(input: {
 }) {
   const now = new Date();
   const assignment = await db.$transaction(async (tx) => {
+    await assertVolunteerCanRespondToAssignment({
+      tx,
+      assignmentId: input.assignmentId,
+      volunteerProfileId: input.volunteerProfileId
+    });
+
     await tx.assignmentResponse.upsert({
       where: {
         assignmentId_volunteerId: {
@@ -1118,6 +1146,12 @@ export async function declineAssignment(input: {
 }) {
   const now = new Date();
   const assignment = await db.$transaction(async (tx) => {
+    await assertVolunteerCanRespondToAssignment({
+      tx,
+      assignmentId: input.assignmentId,
+      volunteerProfileId: input.volunteerProfileId
+    });
+
     await tx.assignmentResponse.upsert({
       where: {
         assignmentId_volunteerId: {
@@ -1920,14 +1954,46 @@ export async function assignReplacementVolunteer(input: {
   volunteerId: string;
   actorUserId: string;
   position?: VolunteerPosition;
+  requireOpenSlot?: boolean;
 }) {
   const assignment = await db.assignment.findUniqueOrThrow({
     where: { id: input.assignmentId },
     include: {
       volunteers: true,
+      responses: true,
       preachingPoint: true
     }
   });
+
+  const openPositions = [
+    ...new Set([
+      ...(["FIRST", "SECOND"] as VolunteerPosition[]).filter(
+        (position) =>
+          !assignment.volunteers.some((slot) => slot.position === position)
+      ),
+      ...assignment.responses
+        .filter((response) => response.responseStatus === "DECLINED")
+        .map((response) => {
+          const slot = assignment.volunteers.find(
+            (volunteer) => volunteer.volunteerId === response.volunteerId
+          );
+          return slot?.position;
+        })
+        .filter(Boolean)
+    ])
+  ] as VolunteerPosition[];
+
+  if (input.requireOpenSlot && !openPositions.length) {
+    throw new AppError("Esta asignación no tiene una vacante disponible.", 409);
+  }
+
+  if (
+    input.requireOpenSlot &&
+    input.position &&
+    !openPositions.includes(input.position)
+  ) {
+    throw new AppError("La posición seleccionada no está vacante.", 409);
+  }
 
   await assertNoVolunteerConflicts({
     assignmentId: input.assignmentId,
@@ -1938,11 +2004,10 @@ export async function assignReplacementVolunteer(input: {
 
   const targetPosition =
     input.position ??
-    (["FIRST", "SECOND"] as VolunteerPosition[]).find(
-      (position) =>
-        !assignment.volunteers.some((slot) => slot.position === position)
-    ) ??
-    assignment.volunteers[assignment.volunteers.length - 1]?.position;
+    selectReplacementAssignmentPosition({
+      volunteers: assignment.volunteers,
+      responses: assignment.responses
+    });
 
   if (!targetPosition) {
     throw new AppError(

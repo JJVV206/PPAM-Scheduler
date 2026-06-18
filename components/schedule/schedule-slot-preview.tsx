@@ -27,7 +27,7 @@ const compactStatusMap: Record<
 > = {
   SCHEDULED: {
     label: "Programada",
-    className: "border-white/10 bg-secondary text-secondary-foreground"
+    className: "border-border/70 bg-secondary text-secondary-foreground"
   },
   PENDING_CONFIRMATION: {
     label: "Pendiente",
@@ -71,7 +71,7 @@ function getCompactSlotSummary(input: {
   if (!input.pairCount) {
     return {
       label: "Disponible",
-      className: "border-white/10 bg-secondary/35 text-secondary-foreground"
+      className: "border-border/70 bg-secondary/35 text-secondary-foreground"
     };
   }
 
@@ -130,16 +130,18 @@ export function ScheduleSlotPreview({
     return (
       <div
         className={cn(
-          "flex h-full min-h-[96px] min-w-0 flex-col overflow-hidden rounded-[16px] border p-2.5 xl:p-3",
+          "flex h-full min-h-[88px] min-w-0 flex-col overflow-hidden rounded-lg border p-2",
           primaryPair
-            ? "border-primary/10 bg-white/[0.05]"
-            : "border-white/8 bg-white/[0.04]"
+            ? "border-primary/20 bg-primary/[0.04]"
+            : "border-border/65 bg-background/30"
         )}
       >
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
           <div className="min-w-0">
             <p className="break-words text-[10px] font-semibold uppercase leading-tight tracking-[0.1em] text-muted-foreground xl:tracking-[0.14em]">
-              {pairCount ? `${pairCount} pareja${pairCount === 1 ? "" : "s"}` : "Libre"}
+              {pairCount
+                ? `${pairCount} pareja${pairCount === 1 ? "" : "s"}`
+                : "Libre"}
             </p>
           </div>
           <Link
@@ -156,7 +158,7 @@ export function ScheduleSlotPreview({
             <div className="flex min-h-0 flex-1 items-end">
               <span
                 className={cn(
-                  "inline-flex min-h-8 w-full max-w-full items-center justify-center break-words rounded-full border px-2 py-1.5 text-center text-[10px] font-bold leading-tight tracking-[0.01em] shadow-[0_10px_30px_rgba(5,10,24,0.18)] ring-1 ring-white/5 xl:text-[11px]",
+                  "inline-flex min-h-7 w-full max-w-full items-center justify-center break-words rounded-md border px-2 py-1 text-center text-[10px] font-bold leading-tight tracking-[0.01em] xl:text-[11px]",
                   compactSummary.className
                 )}
               >
@@ -179,7 +181,7 @@ export function ScheduleSlotPreview({
   }
 
   return (
-    <div className="space-y-3 rounded-[18px] border border-white/8 bg-white/[0.04] p-3.5">
+    <div className="space-y-3 rounded-lg border border-border/70 bg-background/35 p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -202,7 +204,7 @@ export function ScheduleSlotPreview({
         </div>
         <Link
           href={slotHref}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/15 hover:text-primary"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/15 hover:text-primary"
         >
           Ver horario
           <ArrowUpRight className="h-3.5 w-3.5" />
@@ -215,7 +217,7 @@ export function ScheduleSlotPreview({
             <Link
               key={pair.id}
               href={`/admin/assignments/${pair.id}`}
-              className="group flex items-start justify-between gap-3 rounded-2xl border border-white/6 bg-background/30 px-3 py-2.5 transition hover:border-primary/25 hover:bg-background/45"
+              className="group flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-background/35 px-3 py-2.5 transition hover:border-primary/30 hover:bg-background/50"
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -224,7 +226,7 @@ export function ScheduleSlotPreview({
                   </span>
                   <span
                     className={cn(
-                      "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none",
+                      "inline-flex rounded-md border px-2 py-0.5 text-[10px] font-semibold leading-none",
                       compactStatusMap[pair.status].className
                     )}
                   >
@@ -260,7 +262,7 @@ export function ScheduleSlotPreview({
           ) : null}
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-border/70 bg-background/25 px-3 py-3 text-xs text-muted-foreground">
+        <div className="rounded-lg border border-dashed border-border/70 bg-background/35 px-3 py-3 text-xs text-muted-foreground">
           Sin parejas asignadas todavía.
         </div>
       )}

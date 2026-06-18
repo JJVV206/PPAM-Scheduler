@@ -14,7 +14,7 @@ const compactStatusMap: Record<
 > = {
   SCHEDULED: {
     label: "Programada",
-    className: "border-white/10 bg-secondary text-secondary-foreground"
+    className: "border-border/70 bg-secondary text-secondary-foreground"
   },
   PENDING_CONFIRMATION: {
     label: "Pendiente",
@@ -53,7 +53,7 @@ export function SchedulePointGroup({ group }: SchedulePointGroupProps) {
         <Link
           key={pair.id}
           href={`/admin/assignments/${pair.id}`}
-          className="group flex min-h-16 items-center justify-between gap-2 rounded-[18px] border border-white/8 bg-white/[0.04] px-2.5 py-2 transition hover:border-primary/30 hover:bg-white/[0.06]"
+          className="group flex min-h-14 items-center justify-between gap-2 rounded-lg border border-border/65 bg-background/35 px-2.5 py-2 transition hover:border-primary/30 hover:bg-background/50"
         >
           <div className="min-w-0 flex-1">
             <p className="overflow-hidden text-[12px] font-semibold leading-tight text-foreground">
@@ -65,7 +65,7 @@ export function SchedulePointGroup({ group }: SchedulePointGroupProps) {
               </span>
               <span
                 className={cn(
-                  "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none",
+                  "inline-flex rounded-md border px-2 py-0.5 text-[10px] font-semibold leading-none",
                   compactStatusMap[pair.status].className
                 )}
               >

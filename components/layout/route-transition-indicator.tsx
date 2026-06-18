@@ -87,7 +87,7 @@ export function RouteTransitionIndicator() {
       role="status"
     >
       <div className="h-1 w-full overflow-hidden bg-primary/10">
-        <div className="h-full w-1/2 animate-[navigation-progress_1.1s_ease-in-out_infinite] rounded-r-full bg-primary shadow-[0_0_18px_rgba(133,168,255,0.75)]" />
+        <div className="h-full w-1/2 animate-[navigation-progress_1.1s_ease-in-out_infinite] rounded-r-full bg-primary shadow-[0_0_18px_hsl(var(--primary)/0.45)]" />
       </div>
       <span className="sr-only">Cargando página</span>
     </div>

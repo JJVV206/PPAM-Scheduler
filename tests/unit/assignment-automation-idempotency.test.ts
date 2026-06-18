@@ -634,7 +634,7 @@ describe("assignment automation idempotency QA", () => {
     ).toEqual(expect.arrayContaining(["INVITATION_EXPIRED", "REPLACEMENT_REQUIRED"]));
   });
 
-  it("expires replacement invitations after their window so the next automation run can try another candidate", async () => {
+  it("expires replacement invitations after their response window", async () => {
     const now = new Date(2026, 5, 16, 21, 0, 0);
     mocks.db.assignmentInvitation.findMany.mockResolvedValue([
       {
@@ -681,6 +681,120 @@ describe("assignment automation idempotency QA", () => {
         ([call]) => call.data.actionType
       )
     ).toEqual(expect.arrayContaining(["INVITATION_EXPIRED", "REPLACEMENT_REQUIRED"]));
+  });
+
+  it("expires a timed-out replacement and invites the next candidate in the same automation run", async () => {
+    const now = new Date(2026, 5, 16, 21, 0, 0);
+    let replacementQueueLookupCount = 0;
+
+    mocks.db.assignment.findMany.mockImplementation(async ({ where }) => {
+      if (where?.responses?.some?.responseStatus === "CONFIRMED") {
+        return [];
+      }
+
+      if (where?.status === "NEEDS_REPLACEMENT") {
+        replacementQueueLookupCount += 1;
+        return replacementQueueLookupCount === 1
+          ? [
+              {
+                id: "assignment-1"
+              }
+            ]
+          : [];
+      }
+
+      return [];
+    });
+    mocks.db.assignment.findUniqueOrThrow.mockResolvedValue(
+      replacementAssignment("NEEDS_REPLACEMENT")
+    );
+    mocks.db.assignmentInvitation.findMany.mockImplementation(async ({ where }) => {
+      if (where?.type?.in?.includes("REPLACEMENT") && where?.expiresAt?.lte) {
+        return [
+          {
+            ...sentReplacementInvitation(),
+            expiresAt: now,
+            assignment: {
+              id: "assignment-1",
+              status: "PENDING_CONFIRMATION"
+            }
+          }
+        ];
+      }
+
+      if (where?.type === "REPLACEMENT" && where?.status === "PENDING") {
+        return [
+          pendingReplacementInvitation({
+            id: "invitation-replacement-2",
+            volunteerId: "replacement-2",
+            userId: "user-replacement-2",
+            userName: "Bea"
+          })
+        ];
+      }
+
+      return [];
+    });
+    mocks.db.volunteerProfile.findMany.mockResolvedValue([
+      replacementVolunteer({
+        id: "replacement-2",
+        name: "Bea",
+        email: "bea@example.org",
+        weeklyAvailability: [
+          {
+            timeSlot: null,
+            available: true
+          }
+        ]
+      })
+    ]);
+    mocks.db.assignmentInvitation.findFirst.mockResolvedValue(null);
+    mocks.db.assignmentInvitation.create.mockImplementation(async ({ data }) => ({
+      id: `invitation-${data.volunteerId}`,
+      ...data,
+      metadata: data.metadata ?? {}
+    }));
+    mocks.db.assignmentInvitation.update.mockResolvedValue({
+      emailAttempts: 1,
+      metadata: {}
+    });
+    mocks.db.user.findUnique.mockResolvedValue({
+      id: "user-replacement-2",
+      email: "bea@example.org"
+    });
+    mocks.db.notificationLog.create.mockResolvedValue({
+      id: "notification-sent",
+      status: "SENT",
+      sentAt: now,
+      errorMessage: null
+    });
+    mocks.tx.assignmentInvitation.updateMany.mockResolvedValue({ count: 1 });
+    mocks.tx.assignmentResponse.findUnique.mockResolvedValue(null);
+
+    const result = await processAssignmentAutomationRun({
+      now,
+      automationRunId: "same-run-replacement-timeout"
+    });
+
+    expect(result.expireTimedOutReplacementInvitations).toMatchObject({
+      processedCount: 1,
+      expiredCount: 1,
+      replacementRequiredCount: 1
+    });
+    expect(result.inviteNextAvailableReplacement).toMatchObject({
+      processedCount: 1,
+      invitedCount: 1,
+      sentCount: 1
+    });
+    expect(mocks.db.assignmentInvitation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          assignmentId: "assignment-1",
+          volunteerId: "replacement-2",
+          type: "REPLACEMENT"
+        })
+      })
+    );
   });
 
   it("creates an internal admin alert when a critical invitation email fails", async () => {

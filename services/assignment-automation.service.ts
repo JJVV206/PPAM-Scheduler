@@ -2975,6 +2975,16 @@ export async function processAssignmentAutomationRun(
       alreadyMarkedCount: 0
     }
   );
+  const expireTimedOutReplacementInvitationsResult = await runAutomationStep(
+    () => expireTimedOutReplacementInvitations({ now, automationRunId }),
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      expiredCount: 0,
+      reconciledCount: 0,
+      replacementRequiredCount: 0
+    }
+  );
   const inviteNextAvailableReplacementResult = await runAutomationStep(
     () => inviteNextAvailableReplacement({ now, automationRunId }),
     {
@@ -2995,16 +3005,6 @@ export async function processAssignmentAutomationRun(
       sentCount: 0,
       failedCount: 0,
       duplicateCount: 0
-    }
-  );
-  const expireTimedOutReplacementInvitationsResult = await runAutomationStep(
-    () => expireTimedOutReplacementInvitations({ now, automationRunId }),
-    {
-      processedCount: 0,
-      skippedCount: 0,
-      expiredCount: 0,
-      reconciledCount: 0,
-      replacementRequiredCount: 0
     }
   );
   const sendDueAssignmentRemindersResult = await runAutomationStep(
@@ -3052,9 +3052,9 @@ export async function processAssignmentAutomationRun(
     sendReplacementCensusRemindersResult,
     closeExpiredReplacementCensusResult,
     processAssignmentsNeedingReplacementResult,
+    expireTimedOutReplacementInvitationsResult,
     inviteNextAvailableReplacementResult,
     sendReplacementResponseRemindersResult,
-    expireTimedOutReplacementInvitationsResult,
     sendDueAssignmentRemindersResult,
     createDueAppNotificationsResult,
     notifyAdminsForUnresolvedAssignmentsResult

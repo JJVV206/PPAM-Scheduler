@@ -140,15 +140,15 @@ export function VolunteerTable({ volunteers }: VolunteerTableProps) {
   }
 
   return (
-    <div className="space-y-5">
-      <FilterBar className="rounded-2xl">
+    <div className="space-y-4">
+      <FilterBar>
         <SearchInput
           value={search}
           onChange={setSearch}
           placeholder="Buscar por nombre, correo, teléfono o área"
           className="min-w-0 flex-1"
         />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:flex md:items-center">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:flex md:items-center">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full md:w-44">
               <SelectValue placeholder="Estado" />
@@ -173,7 +173,7 @@ export function VolunteerTable({ volunteers }: VolunteerTableProps) {
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center justify-between gap-3 md:ml-auto">
+        <div className="flex items-center justify-between gap-2 md:ml-auto">
           <p className="whitespace-nowrap text-sm text-muted-foreground">
             {filteredVolunteers.length} de {volunteers.length}
           </p>
@@ -267,15 +267,17 @@ export function VolunteerTable({ volunteers }: VolunteerTableProps) {
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="grid min-w-[140px] gap-1 text-xs text-muted-foreground">
+                    <div className="grid min-w-[130px] gap-1 text-xs text-muted-foreground">
                       <span>{volunteer.confirmationCount} confirmadas</span>
                       <span>{volunteer.declineCount} rechazos</span>
                       <span>{volunteer.noResponseCount} sin respuesta</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="secondary" asChild>
-                      <Link href={`/admin/volunteers/${volunteer.id}`}>Ver</Link>
+                    <Button variant="secondary" size="sm" asChild>
+                      <Link href={`/admin/volunteers/${volunteer.id}`}>
+                        Ver
+                      </Link>
                     </Button>
                   </TableCell>
                 </TableRow>

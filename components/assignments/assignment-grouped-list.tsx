@@ -186,7 +186,7 @@ export function AssignmentGroupedList({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {weekGroups.map((weekGroup) => {
         const weekAssignments = weekGroup.days.flatMap(
           (dayGroup) => dayGroup.assignments
@@ -198,14 +198,14 @@ export function AssignmentGroupedList({
         return (
           <section
             key={weekGroup.key}
-            className="border-white/8 overflow-hidden rounded-[28px] border bg-white/[0.018]"
+            className="overflow-hidden rounded-lg border border-border/70 bg-background/20"
           >
-            <div className="border-white/8 flex flex-col gap-4 border-b bg-white/[0.025] px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-3 border-b border-border/65 bg-surface-elevated/40 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   Semana
                 </p>
-                <h2 className="mt-1 font-heading text-xl font-semibold text-foreground">
+                <h2 className="mt-1 font-heading text-lg font-semibold text-foreground">
                   Del {formatDisplayDate(weekGroup.startDate, "d")} al{" "}
                   {formatDisplayDate(weekGroup.endDate, "d 'de' MMMM yyyy")}
                 </h2>
@@ -217,12 +217,12 @@ export function AssignmentGroupedList({
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-success/20 bg-success/10 px-3 py-1 text-xs font-semibold text-success">
+                <span className="rounded-md border border-success/20 bg-success/10 px-2 py-1 text-xs font-semibold text-success">
                   {confirmedCount} confirmada
                   {confirmedCount === 1 ? "" : "s"}
                 </span>
                 {attentionCount ? (
-                  <span className="rounded-full border border-warning/20 bg-warning/10 px-3 py-1 text-xs font-semibold text-warning">
+                  <span className="rounded-md border border-warning/20 bg-warning/10 px-2 py-1 text-xs font-semibold text-warning">
                     {attentionCount} por revisar
                   </span>
                 ) : null}
@@ -258,11 +258,11 @@ export function AssignmentGroupedList({
                 return (
                   <section
                     key={dayGroup.key}
-                    className="border-white/6 overflow-hidden rounded-[24px] border bg-white/[0.025]"
+                    className="overflow-hidden rounded-lg border border-border/60 bg-background/25"
                   >
-                    <div className="border-white/6 flex flex-col gap-3 border-b bg-white/[0.025] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-3 border-b border-border/60 bg-surface-elevated/30 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0">
-                        <h3 className="font-heading text-lg font-semibold capitalize text-foreground">
+                        <h3 className="font-heading text-base font-semibold capitalize text-foreground">
                           {formatDisplayDate(dayGroup.date, "EEEE d 'de' MMMM")}
                         </h3>
                         <p className="mt-1 text-sm text-muted-foreground">
@@ -273,12 +273,12 @@ export function AssignmentGroupedList({
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full border border-success/20 bg-success/10 px-3 py-1 text-xs font-semibold text-success">
+                        <span className="rounded-md border border-success/20 bg-success/10 px-2 py-1 text-xs font-semibold text-success">
                           {dayCounts.confirmedCount} confirmada
                           {dayCounts.confirmedCount === 1 ? "" : "s"}
                         </span>
                         {dayCounts.attentionCount ? (
-                          <span className="rounded-full border border-warning/20 bg-warning/10 px-3 py-1 text-xs font-semibold text-warning">
+                          <span className="rounded-md border border-warning/20 bg-warning/10 px-2 py-1 text-xs font-semibold text-warning">
                             {dayCounts.attentionCount} por revisar
                           </span>
                         ) : null}
@@ -357,11 +357,11 @@ export function AssignmentGroupedList({
                         </Table>
                       </div>
 
-                      <div className="grid gap-3 p-3 lg:hidden">
+                      <div className="grid gap-2.5 p-3 lg:hidden">
                         {dayGroup.assignments.map((assignment) => (
                           <article
                             key={assignment.id}
-                            className="border-white/6 rounded-[20px] border bg-background/25 p-4"
+                            className="rounded-lg border border-border/60 bg-background/35 p-3"
                           >
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                               <div className="min-w-0 space-y-2">

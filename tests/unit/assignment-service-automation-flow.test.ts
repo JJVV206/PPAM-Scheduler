@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => {
       createMany: vi.fn(),
       delete: vi.fn(),
       deleteMany: vi.fn(),
+      findUnique: vi.fn(),
       update: vi.fn()
     },
     appNotification: {
@@ -108,7 +109,10 @@ vi.mock("@/services/assignment-invitation.service", () => ({
 }));
 
 import {
+  assignReplacementVolunteer,
+  confirmAssignment,
   createWeeklyAssignment,
+  declineAssignment,
   duplicateScheduleWeek,
   respondToAssignmentInvitation,
   updateAssignment
@@ -232,6 +236,20 @@ function setupAssignmentDefaults() {
     };
   });
   mocks.tx.assignmentResponse.findMany.mockResolvedValue([]);
+  mocks.tx.assignmentVolunteer.findUnique.mockImplementation(
+    async ({
+      where
+    }: {
+      where: {
+        assignmentId_volunteerId: {
+          assignmentId: string;
+          volunteerId: string;
+        };
+      };
+    }) => ({
+      id: `slot-${where.assignmentId_volunteerId.volunteerId}`
+    })
+  );
   mocks.tx.assignment.findUniqueOrThrow.mockResolvedValue(
     assignmentDetail({
       volunteers: [
@@ -554,6 +572,101 @@ describe("assignment automation orchestration", () => {
     expect(mocks.inviteNextAvailableReplacementForAssignment).toHaveBeenCalledWith({
       assignmentId: "assignment-1"
     });
+  });
+
+  it("blocks direct confirmation when the volunteer is not assigned", async () => {
+    mocks.tx.assignmentVolunteer.findUnique.mockResolvedValue(null);
+
+    await expect(
+      confirmAssignment({
+        assignmentId: "assignment-1",
+        volunteerProfileId: "volunteer-3"
+      })
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    expect(mocks.tx.assignmentResponse.upsert).not.toHaveBeenCalled();
+    expect(mocks.tx.volunteerProfile.update).not.toHaveBeenCalled();
+  });
+
+  it("blocks direct decline when the volunteer is not assigned", async () => {
+    mocks.tx.assignmentVolunteer.findUnique.mockResolvedValue(null);
+
+    await expect(
+      declineAssignment({
+        assignmentId: "assignment-1",
+        volunteerProfileId: "volunteer-3",
+        note: "No puedo apoyar"
+      })
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    expect(mocks.tx.assignmentResponse.upsert).not.toHaveBeenCalled();
+    expect(mocks.tx.assignment.update).not.toHaveBeenCalledWith({
+      where: { id: "assignment-1" },
+      data: { status: "NEEDS_REPLACEMENT" }
+    });
+    expect(mocks.inviteNextAvailableReplacementForAssignment).not.toHaveBeenCalled();
+  });
+
+  it("assigns a manual replacement to the declined volunteer position", async () => {
+    mocks.db.assignment.findUniqueOrThrow.mockResolvedValueOnce(
+      assignmentDetail({
+        status: "NEEDS_REPLACEMENT",
+        volunteers: [
+          assignmentSlot("volunteer-1", "FIRST"),
+          assignmentSlot("volunteer-2", "SECOND")
+        ],
+        responses: [
+          response("volunteer-1", "DECLINED"),
+          response("volunteer-2", "CONFIRMED")
+        ]
+      })
+    );
+
+    await assignReplacementVolunteer({
+      assignmentId: "assignment-1",
+      volunteerId: "replacement-1",
+      actorUserId: "admin-1"
+    });
+
+    expect(mocks.tx.assignmentVolunteer.delete).toHaveBeenCalledWith({
+      where: { id: "slot-volunteer-1" }
+    });
+    expect(mocks.tx.assignmentVolunteer.create).toHaveBeenCalledWith({
+      data: {
+        assignmentId: "assignment-1",
+        volunteerId: "replacement-1",
+        position: "FIRST",
+        isReplacement: true
+      }
+    });
+  });
+
+  it("blocks self-service replacement when the assignment has no open slot", async () => {
+    mocks.db.assignment.findUniqueOrThrow.mockResolvedValueOnce(
+      assignmentDetail({
+        status: "SCHEDULED",
+        volunteers: [
+          assignmentSlot("volunteer-1", "FIRST"),
+          assignmentSlot("volunteer-2", "SECOND")
+        ],
+        responses: [
+          response("volunteer-1", "PENDING"),
+          response("volunteer-2", "PENDING")
+        ]
+      })
+    );
+
+    await expect(
+      assignReplacementVolunteer({
+        assignmentId: "assignment-1",
+        volunteerId: "replacement-1",
+        actorUserId: "volunteer-user",
+        requireOpenSlot: true
+      })
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(mocks.tx.assignmentVolunteer.create).not.toHaveBeenCalled();
+    expect(mocks.tx.assignmentVolunteer.delete).not.toHaveBeenCalled();
   });
 
   it("accepts a replacement invitation and assigns the volunteer as confirmed replacement", async () => {

@@ -77,7 +77,7 @@ export default async function AdminScheduleSlotPage({
   return (
     <div className="flex min-h-full flex-col gap-5 pb-6 lg:h-full lg:min-h-0 lg:overflow-hidden lg:pb-0">
       <div className="sticky top-0 z-20 bg-background/85 pb-2 pt-1 backdrop-blur lg:static lg:shrink-0 lg:bg-transparent lg:pb-0 lg:pt-0 lg:backdrop-blur-none">
-        <div className="surface-panel rounded-[28px] px-5 py-4">
+        <div className="surface-panel px-4 py-3">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div className="space-y-3">
@@ -129,8 +129,8 @@ export default async function AdminScheduleSlotPage({
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
-                <p className="flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              <div className="rounded-lg border border-border/60 bg-background/35 p-3">
+                <p className="flex items-center gap-2 text-xs uppercase tracking-[0.12em] text-muted-foreground">
                   <Layers3 className="h-3.5 w-3.5" />
                   Parejas
                 </p>
@@ -138,8 +138,8 @@ export default async function AdminScheduleSlotPage({
                   {assignments.length}
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
-                <p className="flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              <div className="rounded-lg border border-border/60 bg-background/35 p-3">
+                <p className="flex items-center gap-2 text-xs uppercase tracking-[0.12em] text-muted-foreground">
                   <Clock3 className="h-3.5 w-3.5" />
                   Franja
                 </p>
@@ -147,8 +147,8 @@ export default async function AdminScheduleSlotPage({
                   {TIME_SLOT_DEFINITIONS[timeSlot].label}
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
-                <p className="flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              <div className="rounded-lg border border-border/60 bg-background/35 p-3">
+                <p className="flex items-center gap-2 text-xs uppercase tracking-[0.12em] text-muted-foreground">
                   <ShieldAlert className="h-3.5 w-3.5" />
                   Atención
                 </p>
@@ -160,8 +160,8 @@ export default async function AdminScheduleSlotPage({
                     : "Todo al día"}
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
-                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              <div className="rounded-lg border border-border/60 bg-background/35 p-3">
+                <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
                   Puntos activos
                 </p>
                 <p className="mt-2 text-sm font-semibold">
@@ -175,7 +175,7 @@ export default async function AdminScheduleSlotPage({
         </div>
       </div>
 
-      <div className="surface-panel min-w-0 rounded-[28px] p-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+      <div className="surface-panel min-w-0 p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
         <div className="mb-4">
           <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
             Parejas del horario
@@ -194,9 +194,9 @@ export default async function AdminScheduleSlotPage({
               {assignments.map((assignment) => (
                 <section
                   key={assignment.id}
-                  className="rounded-[24px] border border-white/5 bg-white/[0.03] p-4 sm:p-5"
+                  className="rounded-lg border border-border/60 bg-background/25 p-3 sm:p-4"
                 >
-                  <div className="mb-4 flex flex-col gap-3 border-b border-white/5 pb-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="mb-4 flex flex-col gap-3 border-b border-border/60 pb-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                         Pareja {assignment.pairNumber}

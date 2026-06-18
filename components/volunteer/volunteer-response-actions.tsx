@@ -22,6 +22,14 @@ const responseStatusLabels: Record<ResponseStatus, string> = {
   DECLINED: "Rechazada"
 };
 
+const responseHelpText: Record<ResponseStatus, string> = {
+  PENDING:
+    "Confirma si asistirás. Si no puedes, avisa aquí para que se busque cobertura.",
+  CONFIRMED: "Tu asistencia ya quedó confirmada para este turno.",
+  DECLINED:
+    "Ya avisaste que no podrás asistir. Tu nota ayuda a entender el motivo."
+};
+
 export function VolunteerResponseActions({
   responseId,
   currentStatus,
@@ -71,15 +79,19 @@ export function VolunteerResponseActions({
 
   return (
     <div className={compact ? "space-y-2.5" : "space-y-3"}>
+      <div className="rounded-lg border border-border/70 bg-background/35 px-3 py-2 text-sm text-muted-foreground">
+        {responseHelpText[currentStatus]}
+      </div>
+
       <div className="grid gap-2">
         <label className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          Nota opcional
+          Motivo o nota opcional
         </label>
         <Textarea
           value={note}
           onChange={(event) => setNote(event.target.value)}
           rows={compact ? 2 : 3}
-          placeholder="Agrega una nota breve si hace falta."
+          placeholder="Ej. Estoy fuera, tuve un imprevisto o puedo llegar unos minutos tarde."
           className={compact ? "min-h-[72px]" : undefined}
         />
       </div>
@@ -92,17 +104,17 @@ export function VolunteerResponseActions({
           disabled={submitting !== null || currentStatus === "CONFIRMED"}
         >
           <CheckCircle2 className="h-4 w-4" />
-          {submitting === "confirm" ? "Guardando..." : "Sí podré asistir"}
+          {submitting === "confirm" ? "Guardando..." : "Confirmar"}
         </Button>
         <Button
           type="button"
-          variant="secondary"
+          variant="danger"
           size={compact ? "sm" : "default"}
           onClick={() => respond("decline")}
           disabled={submitting !== null || currentStatus === "DECLINED"}
         >
           <CircleOff className="h-4 w-4" />
-          {submitting === "decline" ? "Guardando..." : "No podré asistir"}
+          {submitting === "decline" ? "Guardando..." : "No puedo asistir"}
         </Button>
       </div>
 

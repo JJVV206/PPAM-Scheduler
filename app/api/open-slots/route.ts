@@ -38,7 +38,8 @@ export async function POST(request: Request) {
       assignmentId: body.assignmentId,
       volunteerId,
       actorUserId: auth.session.user.id,
-      position: body.position
+      position: body.position,
+      requireOpenSlot: true
     });
 
     revalidateAssignmentViews({

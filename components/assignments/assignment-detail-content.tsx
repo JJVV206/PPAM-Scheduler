@@ -167,8 +167,8 @@ function InvitationList({
           key={invitation.id}
           className={
             compact
-              ? "rounded-2xl border border-white/5 bg-white/[0.03] p-3"
-              : "rounded-2xl border border-white/5 bg-white/[0.03] p-4"
+              ? "rounded-lg border border-border/60 bg-background/35 p-3"
+              : "rounded-lg border border-border/60 bg-background/35 p-4"
           }
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
@@ -224,7 +224,7 @@ export function AssignmentDetailContent({
     return (
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="space-y-5">
-          <Card className="bg-white/[0.03]">
+          <Card className="bg-background/25">
             <CardContent className="space-y-5 p-6">
               <div className="flex flex-wrap items-center gap-3">
                 <StatusBadge status={assignment.status} />
@@ -240,7 +240,7 @@ export function AssignmentDetailContent({
               </p>
 
               <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
+                <div className="rounded-lg border border-border/60 bg-background/35 p-4">
                   <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
                     Área
                   </p>
@@ -249,7 +249,7 @@ export function AssignmentDetailContent({
                     {assignment.preachingPoint.area}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
+                <div className="rounded-lg border border-border/60 bg-background/35 p-4">
                   <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
                     Horario
                   </p>
@@ -258,7 +258,7 @@ export function AssignmentDetailContent({
                     {TIME_SLOT_DEFINITIONS[assignment.timeSlot].label}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
+                <div className="rounded-lg border border-border/60 bg-background/35 p-4">
                   <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
                     Pareja
                   </p>
@@ -268,7 +268,7 @@ export function AssignmentDetailContent({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
+              <div className="rounded-lg border border-border/60 bg-background/35 p-4">
                 <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
                   Notas
                 </p>
@@ -280,7 +280,7 @@ export function AssignmentDetailContent({
             </CardContent>
           </Card>
 
-          <Card className="bg-white/[0.03]">
+          <Card className="bg-background/25">
             <CardContent className="space-y-4 p-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -298,7 +298,7 @@ export function AssignmentDetailContent({
             </CardContent>
           </Card>
 
-          <Card className="bg-white/[0.03]">
+          <Card className="bg-background/25">
             <CardContent className="space-y-4 p-6">
               <p className="flex items-center gap-2 font-semibold">
                 <Users2 className="h-4 w-4" />
@@ -308,7 +308,7 @@ export function AssignmentDetailContent({
                 {assignment.volunteers.map((volunteer) => (
                   <div
                     key={volunteer.assignmentVolunteerId}
-                    className="rounded-2xl border border-white/5 bg-white/[0.03] p-4"
+                    className="rounded-lg border border-border/60 bg-background/35 p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -333,7 +333,7 @@ export function AssignmentDetailContent({
             </CardContent>
           </Card>
 
-          <Card className="bg-white/[0.03]">
+          <Card className="bg-background/25">
             <CardContent className="space-y-4 p-6">
               <p className="font-semibold">Actividad</p>
               <div className="space-y-3">
@@ -344,7 +344,7 @@ export function AssignmentDetailContent({
                     return (
                       <div
                         key={entry.id}
-                        className="rounded-2xl border border-white/5 bg-background/40 p-4"
+                        className="rounded-lg border border-border/60 bg-background/40 p-4"
                       >
                         <p className="text-sm font-medium">
                           {ASSIGNMENT_ACTIVITY_LABELS[entry.actionType]}
@@ -375,7 +375,7 @@ export function AssignmentDetailContent({
         </div>
 
         <div className="space-y-5 xl:sticky xl:top-6">
-          <Card className="bg-white/[0.03]">
+          <Card className="bg-background/25">
             <CardContent className="space-y-4 p-6">
               <div className="space-y-2">
                 <p className="font-semibold">Confirmaciones</p>
@@ -392,7 +392,7 @@ export function AssignmentDetailContent({
           </Card>
 
           {preachingPoints && volunteers ? (
-            <Card className="bg-white/[0.03]">
+            <Card className="bg-background/25">
               <CardContent className="space-y-4 p-6">
                 <div>
                   <p className="font-semibold">Overrides manuales</p>
@@ -418,7 +418,7 @@ export function AssignmentDetailContent({
 
   return (
     <div className="space-y-4">
-      <Card className="bg-white/[0.03]">
+      <Card className="bg-background/25">
         <CardContent className={compact ? "space-y-4 p-5" : "space-y-5 p-6"}>
           <div className={compact ? "space-y-2.5" : "space-y-3"}>
             <div className="flex flex-wrap items-center gap-2">
@@ -461,8 +461,8 @@ export function AssignmentDetailContent({
                   key={volunteer.assignmentVolunteerId}
                   className={
                     compact
-                      ? "rounded-2xl border border-white/5 bg-white/[0.03] p-3"
-                      : "rounded-2xl border border-white/5 bg-white/[0.03] p-4"
+                      ? "rounded-lg border border-border/60 bg-background/35 p-3"
+                      : "rounded-lg border border-border/60 bg-background/35 p-4"
                   }
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -495,8 +495,8 @@ export function AssignmentDetailContent({
             <div
               className={
                 compact
-                  ? "rounded-2xl border border-warning/20 bg-warning/10 p-3 text-xs text-warning"
-                  : "rounded-2xl border border-warning/20 bg-warning/10 p-4 text-sm text-warning"
+                  ? "rounded-lg border border-warning/20 bg-warning/10 p-3 text-xs text-warning"
+                  : "rounded-lg border border-warning/20 bg-warning/10 p-4 text-sm text-warning"
               }
             >
               {assignment.warnings.join(" • ")}
@@ -505,9 +505,9 @@ export function AssignmentDetailContent({
         </CardContent>
       </Card>
 
-      <Card className="bg-white/[0.03]">
+      <Card className="bg-background/25">
         <CardContent className="space-y-3 p-5">
-          <details className="rounded-2xl border border-border/60 bg-background/30 p-4">
+          <details className="rounded-lg border border-border/60 bg-background/35 p-4">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold">
               Proceso automático
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -525,7 +525,7 @@ export function AssignmentDetailContent({
         </CardContent>
       </Card>
 
-      <Card className="bg-white/[0.03]">
+      <Card className="bg-background/25">
         <CardContent className={compact ? "space-y-3 p-5" : "space-y-4 p-6"}>
           <div className="space-y-2">
             <p className="font-semibold">Confirmaciones</p>
@@ -548,7 +548,7 @@ export function AssignmentDetailContent({
 
           {preachingPoints && volunteers ? (
             compact ? (
-              <details className="rounded-2xl border border-border/60 bg-background/30 p-4">
+              <details className="rounded-lg border border-border/60 bg-background/35 p-4">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold">
                   Overrides manuales
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -577,7 +577,7 @@ export function AssignmentDetailContent({
           ) : null}
 
           {compact ? (
-            <details className="rounded-2xl border border-border/60 bg-background/30 p-4">
+            <details className="rounded-lg border border-border/60 bg-background/35 p-4">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold">
                 Actividad
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -590,7 +590,7 @@ export function AssignmentDetailContent({
                     return (
                       <div
                         key={entry.id}
-                        className="rounded-2xl border border-white/5 bg-background/40 p-3"
+                        className="rounded-lg border border-border/60 bg-background/40 p-3"
                       >
                         <p className="text-sm font-medium">
                           {ASSIGNMENT_ACTIVITY_LABELS[entry.actionType]}

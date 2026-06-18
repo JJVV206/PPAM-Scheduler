@@ -80,7 +80,8 @@ export default async function AdminSettingsPage() {
       <div>
         <h1 className="font-heading text-4xl font-semibold">Configuración</h1>
         <p className="text-sm text-muted-foreground">
-          Configura la anticipación de confirmación, la cadencia de recordatorios y los canales de entrega.
+          Configura la anticipación de confirmación, la cadencia de
+          recordatorios y los canales de entrega.
         </p>
       </div>
 
@@ -116,7 +117,7 @@ export default async function AdminSettingsPage() {
                   </span>
                 ) : null}
               </div>
-              <div className="rounded-2xl border border-border/70 bg-background/25 px-4">
+              <div className="rounded-lg border border-border/70 bg-background/35 px-4">
                 <ConfigRow
                   label="Duración"
                   value={lastRun ? `${lastRun.durationMs} ms` : "Pendiente"}
@@ -127,7 +128,9 @@ export default async function AdminSettingsPage() {
                 />
                 <ConfigRow
                   label="Resumen guardado"
-                  value={lastRun?.summarySaved ? "Sí" : lastRun ? "No" : "Pendiente"}
+                  value={
+                    lastRun?.summarySaved ? "Sí" : lastRun ? "No" : "Pendiente"
+                  }
                 />
               </div>
             </CardContent>
@@ -138,7 +141,7 @@ export default async function AdminSettingsPage() {
               <CardTitle>Remitente y templates</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-2xl border border-border/70 bg-background/25 px-4">
+              <div className="rounded-lg border border-border/70 bg-background/35 px-4">
                 <ConfigRow label="Email" value={email.status} />
                 <ConfigRow label="Proveedor" value={email.provider} />
                 <ConfigRow label="Servidor" value={email.host} />
@@ -170,7 +173,7 @@ export default async function AdminSettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div className="rounded-2xl border border-border/70 bg-background/25 px-4">
+            <div className="rounded-lg border border-border/70 bg-background/35 px-4">
               <ConfigRow
                 label="Tiempo respuesta titular"
                 value={`${automationSettings.primaryResponseTimeoutHours} horas`}
@@ -184,7 +187,7 @@ export default async function AdminSettingsPage() {
                 value={`${automationSettings.replacementResponseTimeoutHours} horas`}
               />
             </div>
-            <div className="rounded-2xl border border-border/70 bg-background/25 px-4">
+            <div className="rounded-lg border border-border/70 bg-background/35 px-4">
               <ConfigRow
                 label="Recordatorios suplente"
                 value={`${automationSettings.replacementReminderOffsetsHours.join(", ")} horas`}
@@ -198,7 +201,7 @@ export default async function AdminSettingsPage() {
                 value={`${automationSettings.finalReminderHours} horas antes`}
               />
             </div>
-            <div className="rounded-2xl border border-border/70 bg-background/25 px-4">
+            <div className="rounded-lg border border-border/70 bg-background/35 px-4">
               <ConfigRow
                 label="Tiempo respuesta censo"
                 value={`${automationSettings.censusResponseTimeoutHours} horas`}

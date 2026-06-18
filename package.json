@@ -13,6 +13,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed",
+    "e2e:ui": "playwright test --ui",
+    "e2e:report": "playwright show-report",
     "db:start": "bash scripts/db-start.sh",
     "db:stop": "bash scripts/db-stop.sh",
     "db:status": "bash scripts/db-status.sh",
@@ -32,6 +37,8 @@
     "qa:smoke": "tsx scripts/qa-production-smoke.ts",
     "qa:data:seed": "tsx scripts/qa-data.ts seed",
     "qa:data:cleanup": "tsx scripts/qa-data.ts cleanup",
+    "e2e:data:seed": "tsx scripts/e2e-data.ts seed",
+    "e2e:data:cleanup": "tsx scripts/e2e-data.ts cleanup",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:fake-users": "tsx scripts/seed-fake-volunteers.ts",
     "postinstall": "prisma generate",
@@ -80,6 +87,7 @@
     "zustand": "^5.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.9.0",
     "@types/nodemailer": "^6.4.17",

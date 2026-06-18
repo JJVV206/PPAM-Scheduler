@@ -17,6 +17,7 @@ Use this checklist before promoting a build to real PPAM production traffic.
 
 ```bash
 npm run ready:prod
+npm run test:e2e
 npm audit --omit=dev
 ```
 

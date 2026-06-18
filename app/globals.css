@@ -4,44 +4,55 @@
 
 @layer base {
   :root {
-    --background: 220 68% 8%;
-    --foreground: 216 38% 93%;
-    --card: 217 44% 13%;
-    --card-foreground: 216 40% 96%;
-    --popover: 220 48% 11%;
-    --popover-foreground: 216 40% 96%;
-    --primary: 220 100% 73%;
-    --primary-foreground: 221 72% 12%;
-    --secondary: 217 35% 20%;
-    --secondary-foreground: 217 38% 94%;
-    --muted: 218 31% 18%;
-    --muted-foreground: 217 18% 68%;
-    --accent: 214 90% 61%;
-    --accent-foreground: 216 40% 96%;
-    --danger: 4 86% 63%;
+    --background: 222 16% 8%;
+    --foreground: 210 22% 93%;
+    --card: 220 14% 12%;
+    --card-foreground: 210 24% 95%;
+    --popover: 220 14% 10%;
+    --popover-foreground: 210 24% 95%;
+    --primary: 174 68% 43%;
+    --primary-foreground: 176 55% 8%;
+    --secondary: 218 12% 18%;
+    --secondary-foreground: 210 18% 94%;
+    --muted: 218 12% 16%;
+    --muted-foreground: 216 10% 68%;
+    --accent: 205 82% 56%;
+    --accent-foreground: 210 24% 96%;
+    --danger: 2 76% 62%;
     --danger-foreground: 0 0% 100%;
-    --warning: 29 94% 63%;
-    --warning-foreground: 222 45% 10%;
-    --success: 148 58% 49%;
-    --success-foreground: 216 45% 8%;
-    --border: 217 33% 23%;
-    --input: 217 33% 23%;
-    --ring: 220 100% 73%;
-    --surface: 217 44% 13%;
-    --surface-elevated: 217 38% 16%;
-    --surface-brand: 220 73% 61%;
-    --radius: 1.1rem;
+    --warning: 38 90% 58%;
+    --warning-foreground: 40 60% 8%;
+    --success: 151 55% 44%;
+    --success-foreground: 155 45% 8%;
+    --border: 218 12% 24%;
+    --input: 218 12% 26%;
+    --ring: 174 68% 43%;
+    --surface: 220 14% 12%;
+    --surface-elevated: 220 13% 15%;
+    --surface-brand: 174 68% 36%;
+    --radius: 0.5rem;
   }
 
   * {
     @apply border-border;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+    scrollbar-color: hsl(var(--border)) transparent;
+    scrollbar-width: thin;
   }
 
   *::-webkit-scrollbar {
-    width: 0;
-    height: 0;
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: hsl(var(--border));
+    background-clip: padding-box;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
   }
 
   html {
@@ -50,10 +61,7 @@
 
   body {
     @apply min-h-screen bg-background font-sans text-foreground antialiased;
-    background-image:
-      radial-gradient(circle at top, rgba(107, 151, 255, 0.12), transparent 34%),
-      radial-gradient(circle at bottom right, rgba(24, 84, 214, 0.12), transparent 28%),
-      linear-gradient(180deg, rgba(3, 17, 41, 0.98), rgba(4, 18, 42, 1));
+    background-image: linear-gradient(180deg, hsl(222 16% 9%), hsl(222 18% 7%));
   }
 
   @keyframes navigation-progress {
@@ -77,10 +85,10 @@
   }
 
   .surface-panel {
-    @apply rounded-3xl border border-border/80 bg-surface/90 shadow-soft backdrop-blur;
+    @apply rounded-lg border border-border/80 bg-surface shadow-soft;
   }
 
   .surface-elevated {
-    @apply rounded-3xl border border-white/5 bg-surface-elevated/95 shadow-glow;
+    @apply rounded-lg border border-border/70 bg-surface-elevated shadow-soft;
   }
 }
