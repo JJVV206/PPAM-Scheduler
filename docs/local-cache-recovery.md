@@ -24,6 +24,15 @@ For a one-step fresh dev start:
 npm run dev:fresh
 ```
 
+You can verify the clean server path with:
+
+```bash
+npm run typecheck
+```
+
+For a browser-level check after recovery, reseed E2E data and run the focused
+admin smoke or the full suite from `docs/qa-e2e.md`.
+
 ## Docker Behavior
 
 Docker keeps the app cache isolated from the host cache:

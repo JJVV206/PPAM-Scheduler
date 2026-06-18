@@ -16,21 +16,22 @@ The direct URL does not use the pooler host.
 
 ## 2. Vercel environment variables
 
-Add these variables in Vercel Project Settings -> Environment Variables for Production:
+Add these variables in Vercel Project Settings -> Environment Variables for
+Production:
 
 - `DATABASE_URL`
 - `DIRECT_URL`
 - `NEXTAUTH_SECRET`
 - `NEXTAUTH_URL`
 - `CRON_SECRET`
-- `RESEND_API_KEY`
-- `RESEND_FROM`
-- `SMTP_HOST`
-- `SMTP_PORT`
-- `SMTP_SECURE`
-- `SMTP_USER`
-- `SMTP_PASS`
-- `SMTP_FROM`
+- `RESEND_API_KEY` when using Resend API for production email
+- `RESEND_FROM` when using Resend API for production email
+- `SMTP_HOST` only when using SMTP fallback instead of Resend
+- `SMTP_PORT` only when using SMTP fallback instead of Resend
+- `SMTP_SECURE` only when using SMTP fallback instead of Resend
+- `SMTP_USER` only when the SMTP provider requires auth
+- `SMTP_PASS` only when the SMTP provider requires auth
+- `SMTP_FROM` only when using SMTP fallback instead of Resend
 
 Generate `NEXTAUTH_SECRET` with:
 
@@ -63,6 +64,18 @@ test, Resend allows `onboarding@resend.dev` only for approved test recipients.
 Before sending invitations to real volunteers, verify `ppam.services` in Resend
 and use a sender from that domain. SMTP variables are optional fallback values
 when `RESEND_API_KEY` and `RESEND_FROM` are not configured.
+
+Do not configure production to use Mailpit. Mailpit is local-only and should
+only be used through:
+
+```txt
+SMTP_HOST=localhost
+SMTP_PORT=1025
+SMTP_SECURE=false
+SMTP_FROM=PPAM Scheduler <no-reply@ppam.local>
+```
+
+Use `docs/qa-e2e.md` for the local Mailpit validation workflow.
 
 ## 3. Apply migrations
 
@@ -144,6 +157,10 @@ Use `QA_REQUIRE_EMAIL_READY=true` when SMTP must be part of the gate:
 QA_REQUIRE_EMAIL_READY=true npm run qa:smoke
 ```
 
+Production smoke QA intentionally avoids creating assignments or sending
+emails. Validate one controlled production email manually with a test volunteer
+after Resend domain verification is complete.
+
 ## 7. Controlled QA data
 
 QA write scripts are disabled unless you explicitly opt in:
@@ -156,3 +173,18 @@ ALLOW_QA_DATA_WRITE=true npm run qa:data:cleanup
 The seed script only creates users with the safe prefix
 `qa+ppam-...@example.invalid`. Cleanup only deletes users matching that prefix.
 Do not use these scripts for real volunteers.
+
+## 8. Release command checklist
+
+Before promoting a deployment:
+
+```bash
+npm run typecheck
+npm run lint
+npm run test
+npm run test:e2e
+npm run build
+```
+
+For local E2E against Docker Postgres on `5433`, run the seed and E2E commands
+with explicit database URLs as documented in `docs/qa-e2e.md`.

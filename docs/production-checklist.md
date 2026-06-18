@@ -12,13 +12,31 @@ Use this checklist before promoting a build to real PPAM production traffic.
 - Confirm `CRON_SECRET` is a strong random value.
 - Confirm `RESEND_API_KEY` and `RESEND_FROM` are configured when email readiness is required.
 - Confirm the Resend sender domain is verified before sending to real volunteers.
+- Confirm `RESEND_FROM` uses a verified domain email, not `onboarding@resend.dev`, before production traffic.
 - Confirm SMTP variables only if using SMTP instead of Resend API.
+- Confirm Vercel domain aliases point to the intended production deployment.
+- Confirm the Neon production branch is not the local/dev branch.
 - Run:
 
 ```bash
+npm run typecheck
+npm run lint
 npm run ready:prod
 npm run test:e2e
 npm audit --omit=dev
+```
+
+For local E2E with the Docker database mapped to port `5433`, use:
+
+```bash
+ALLOW_E2E_DATA_WRITE=true \
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/ppam_scheduler?schema=public" \
+DIRECT_URL="postgresql://postgres:postgres@localhost:5433/ppam_scheduler?schema=public" \
+npm run e2e:data:seed
+
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/ppam_scheduler?schema=public" \
+DIRECT_URL="postgresql://postgres:postgres@localhost:5433/ppam_scheduler?schema=public" \
+npm run test:e2e
 ```
 
 ## Database
@@ -31,6 +49,7 @@ npm run prod:migrate
 
 - Do not run `prisma db push` against production.
 - Do not run demo seed scripts against production.
+- Do not run E2E or QA write seeds against production.
 
 ## Deploy
 
@@ -86,6 +105,8 @@ The smoke test covers:
 - schedule week API
 - admin role isolation from volunteer API
 
+It does not create volunteers, assignments, invitations, or emails.
+
 ## Controlled QA Data
 
 Only run write QA with explicit confirmation:
@@ -96,6 +117,30 @@ ALLOW_QA_DATA_WRITE=true npm run qa:data:cleanup
 ```
 
 Cleanup only removes users matching `qa+ppam-...@example.invalid`.
+
+## Manual Release Checks
+
+After deploy, verify these pages with the production admin account:
+
+- `/admin`
+- `/admin/schedule`
+- `/admin/assignments`
+- `/admin/assignments/[id]`
+- `/admin/replacements`
+- `/admin/attention`
+- `/admin/volunteers`
+- `/admin/settings`
+
+Then verify a volunteer account can access:
+
+- `/volunteer`
+- `/volunteer/assignments`
+- `/volunteer/availability`
+- `/volunteer/profile`
+
+For email readiness, send one controlled assignment invitation to a test
+volunteer using the production sender domain and confirm delivery in the
+recipient inbox. Do not use a real weekly rollout as the first email test.
 
 ## Rollback
 
