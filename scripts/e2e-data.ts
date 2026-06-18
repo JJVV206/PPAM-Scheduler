@@ -4,6 +4,12 @@ import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 
 const E2E_EMAIL_PREFIX = "e2e+ppam-";
 const E2E_EMAIL_DOMAIN = "@example.invalid";
+const E2E_WEEK_LABEL = "E2E QA Week";
+const E2E_WEEK_START = new Date("2026-07-20T00:00:00.000Z");
+const E2E_WEEK_END = addDays(E2E_WEEK_START, 6);
+const E2E_EMAIL_INVITATION_TOKEN = "e2e-email-flow-token";
+const E2E_PUBLIC_CONFIRMATION_TOKEN = "e2e-public-confirmation-token";
+const E2E_VOLUNTEER_PENDING_TOKEN = "e2e-volunteer-pending-token";
 
 const adminEmail =
   process.env.E2E_ADMIN_EMAIL ?? `${E2E_EMAIL_PREFIX}admin${E2E_EMAIL_DOMAIN}`;
@@ -24,6 +30,17 @@ function assertWriteAllowed() {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is required.");
   }
+}
+
+function addDays(date: Date, days: number) {
+  const nextDate = new Date(date);
+
+  nextDate.setUTCDate(nextDate.getUTCDate() + days);
+  return nextDate;
+}
+
+function addHours(date: Date, hours: number) {
+  return new Date(date.getTime() + hours * 60 * 60 * 1000);
 }
 
 async function ensurePreachingPoint() {
@@ -51,6 +68,11 @@ async function ensurePreachingPoint() {
       },
       {
         preachingPointId: point.id,
+        dayOfWeek: "TUESDAY",
+        timeSlot: "SLOT_11_13"
+      },
+      {
+        preachingPointId: point.id,
         dayOfWeek: "SATURDAY",
         timeSlot: "SLOT_09_11"
       }
@@ -59,6 +81,138 @@ async function ensurePreachingPoint() {
   });
 
   return point;
+}
+
+async function resetE2eAssignments() {
+  await db.scheduleWeek.deleteMany({
+    where: {
+      OR: [
+        {
+          label: {
+            startsWith: E2E_WEEK_LABEL
+          }
+        },
+        {
+          startDate: E2E_WEEK_START,
+          endDate: E2E_WEEK_END
+        }
+      ]
+    }
+  });
+}
+
+async function seedAssignmentFixtures(input: {
+  adminUserId: string;
+  pointId: string;
+  volunteerProfileId: string;
+}) {
+  await resetE2eAssignments();
+
+  const week = await db.scheduleWeek.create({
+    data: {
+      startDate: E2E_WEEK_START,
+      endDate: E2E_WEEK_END,
+      label: E2E_WEEK_LABEL,
+      createdById: input.adminUserId
+    }
+  });
+  const expiresAt = addHours(new Date(), 48);
+  const fixtures = [
+    {
+      date: E2E_WEEK_START,
+      dayOfWeek: "MONDAY" as const,
+      timeSlot: "SLOT_09_11" as const,
+      pairNumber: 1,
+      notes: "E2E email notification flow",
+      token: E2E_EMAIL_INVITATION_TOKEN,
+      invitationStatus: "PENDING" as const
+    },
+    {
+      date: addDays(E2E_WEEK_START, 1),
+      dayOfWeek: "TUESDAY" as const,
+      timeSlot: "SLOT_11_13" as const,
+      pairNumber: 1,
+      notes: "E2E public confirmation flow",
+      token: E2E_PUBLIC_CONFIRMATION_TOKEN,
+      invitationStatus: "SENT" as const
+    },
+    {
+      date: addDays(E2E_WEEK_START, 5),
+      dayOfWeek: "SATURDAY" as const,
+      timeSlot: "SLOT_09_11" as const,
+      pairNumber: 1,
+      notes: "E2E volunteer pending flow",
+      token: E2E_VOLUNTEER_PENDING_TOKEN,
+      invitationStatus: "SENT" as const
+    }
+  ];
+
+  for (const fixture of fixtures) {
+    await db.assignment.create({
+      data: {
+        scheduleWeekId: week.id,
+        date: fixture.date,
+        dayOfWeek: fixture.dayOfWeek,
+        timeSlot: fixture.timeSlot,
+        preachingPointId: input.pointId,
+        pairNumber: fixture.pairNumber,
+        status: "PENDING_CONFIRMATION",
+        notes: fixture.notes,
+        volunteers: {
+          create: {
+            volunteerId: input.volunteerProfileId,
+            position: "FIRST"
+          }
+        },
+        responses: {
+          create: {
+            volunteerId: input.volunteerProfileId,
+            responseStatus: "PENDING"
+          }
+        },
+        invitations: {
+          create: {
+            volunteerId: input.volunteerProfileId,
+            type: "PRIMARY",
+            status: fixture.invitationStatus,
+            token: fixture.token,
+            expiresAt,
+            sentAt: fixture.invitationStatus === "SENT" ? new Date() : null,
+            metadata: {
+              source: "e2e_seed"
+            }
+          }
+        },
+        activities: {
+          create: [
+            {
+              actorUserId: input.adminUserId,
+              actionType: "ASSIGNED",
+              metadata: {
+                source: "e2e_seed"
+              }
+            },
+            {
+              actorUserId: input.adminUserId,
+              actionType: "INVITATION_CREATED",
+              metadata: {
+                source: "e2e_seed",
+                invitationType: "PRIMARY",
+                volunteerProfileId: input.volunteerProfileId
+              }
+            }
+          ]
+        }
+      }
+    });
+  }
+
+  return {
+    publicConfirmationToken: E2E_PUBLIC_CONFIRMATION_TOKEN,
+    volunteerPendingToken: E2E_VOLUNTEER_PENDING_TOKEN,
+    emailInvitationToken: E2E_EMAIL_INVITATION_TOKEN,
+    weekId: week.id
+  };
 }
 
 async function seed() {
@@ -145,6 +299,11 @@ async function seed() {
   });
 
   const point = await ensurePreachingPoint();
+  const assignmentFixtures = await seedAssignmentFixtures({
+    adminUserId: admin.id,
+    pointId: point.id,
+    volunteerProfileId: volunteerProfile.id
+  });
 
   console.log(
     JSON.stringify(
@@ -153,7 +312,8 @@ async function seed() {
         pointId: point.id,
         status: "seeded",
         volunteerEmail,
-        volunteerProfileId: volunteerProfile.id
+        volunteerProfileId: volunteerProfile.id,
+        ...assignmentFixtures
       },
       null,
       2
@@ -163,6 +323,8 @@ async function seed() {
 
 async function cleanup() {
   assertWriteAllowed();
+
+  await resetE2eAssignments();
 
   const users = await db.user.findMany({
     where: {

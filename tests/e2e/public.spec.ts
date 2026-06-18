@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { expectStatus } from "./support/assertions";
+import { e2eAssignmentFixtures } from "./support/fixtures";
 
 test.describe("public and unauthenticated service checks", () => {
   test("loads login and redirects protected admin route to login", async ({
@@ -44,5 +45,24 @@ test.describe("public and unauthenticated service checks", () => {
     ).toBeVisible();
     await expect(page.getByText(/el enlace no es válido/i)).toBeVisible();
   });
-});
 
+  test("lets a volunteer confirm from a public assignment invitation link", async ({
+    page
+  }) => {
+    await page.goto(
+      `/confirm-assignment/${e2eAssignmentFixtures.publicConfirmationToken}`
+    );
+
+    await expect(
+      page.getByRole("heading", { name: /confirma tu asistencia/i })
+    ).toBeVisible();
+    await expect(page.getByText(/hospital dr josé g\. parres/i)).toBeVisible();
+
+    await page.getByRole("button", { name: /^confirmar$/i }).click();
+
+    await expect(page.getByText(/respuesta registrada/i)).toBeVisible();
+    await expect(
+      page.getByText(/confirmaste tu asistencia/i)
+    ).toBeVisible();
+  });
+});

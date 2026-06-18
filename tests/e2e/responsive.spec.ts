@@ -20,4 +20,22 @@ test.describe("mobile responsive smoke", () => {
       await expectNoHorizontalOverflow(page);
     }
   });
+
+  test("keeps critical admin pages stable on laptop viewport", async ({
+    page
+  }) => {
+    test.slow();
+
+    await page.setViewportSize({ width: 1366, height: 768 });
+
+    for (const path of ["/admin", "/admin/schedule", "/admin/assignments"]) {
+      const response = await page.goto(path, {
+        waitUntil: "domcontentloaded"
+      });
+
+      expect(response?.status()).toBeLessThan(500);
+      await expect(page.locator("body")).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+    }
+  });
 });

@@ -1,6 +1,33 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "@playwright/test";
 
 import { expectNoHorizontalOverflow, expectStatus } from "./support/assertions";
+import { e2eUsers } from "./support/config";
+import { e2eAssignmentFixtures, e2eAssignmentNotes } from "./support/fixtures";
+import {
+  clearMailpitInbox,
+  getMailpitMessageDetail,
+  waitForMailpitMessage
+} from "./support/mailpit";
+
+type AssignmentApiItem = {
+  id: string;
+  notes: string | null;
+};
+
+async function getAssignmentIdByNote(
+  request: APIRequestContext,
+  note: string
+) {
+  const response = await request.get("/api/assignments");
+
+  await expectStatus(response, 200);
+
+  const assignments = (await response.json()) as AssignmentApiItem[];
+  const assignment = assignments.find((item) => item.notes === note);
+
+  expect(assignment, `Expected E2E assignment with note "${note}"`).toBeTruthy();
+  return assignment!.id;
+}
 
 test.describe("admin workspace", () => {
   test("loads the admin dashboard and primary navigation", async ({ page }) => {
@@ -105,5 +132,44 @@ test.describe("admin workspace", () => {
       page.getByRole("link", { name: /abrir horario de/i }).first()
     ).toBeVisible();
     await expectNoHorizontalOverflow(page);
+  });
+
+  test("sends an assignment invitation email through Mailpit", async ({
+    page,
+    request
+  }) => {
+    test.slow();
+
+    await clearMailpitInbox(request);
+    const assignmentId = await getAssignmentIdByNote(
+      request,
+      e2eAssignmentNotes.emailFlow
+    );
+    const sentAfter = new Date();
+
+    await page.goto(`/admin/assignments/${assignmentId}`);
+    await expect(
+      page.getByRole("heading", { name: /hospital dr josé g\. parres/i })
+    ).toBeVisible();
+
+    await page
+      .getByRole("button", { name: /enviar invitación pendiente/i })
+      .click();
+
+    await expect(
+      page.getByText(/invitaciones pendientes enviadas \(1\)/i)
+    ).toBeVisible();
+
+    const message = await waitForMailpitMessage(request, {
+      subject: "Confirma tu asignación titular de PPAM",
+      to: e2eUsers.volunteer.email,
+      createdAfter: sentAfter
+    });
+    const detail = await getMailpitMessageDetail(request, message.ID);
+    const body = `${detail.Text ?? ""}\n${detail.HTML ?? ""}`;
+
+    expect(body).toContain(
+      `/confirm-assignment/${e2eAssignmentFixtures.emailInvitationToken}`
+    );
   });
 });

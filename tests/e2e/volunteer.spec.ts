@@ -1,6 +1,36 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "@playwright/test";
 
 import { expectNoHorizontalOverflow, expectStatus } from "./support/assertions";
+import { e2eAssignmentNotes } from "./support/fixtures";
+
+type VolunteerDashboardAssignment = {
+  id: string;
+  notes: string | null;
+};
+
+type VolunteerDashboardResponse = {
+  pendingConfirmations: VolunteerDashboardAssignment[];
+  upcomingAssignments: VolunteerDashboardAssignment[];
+};
+
+async function getVolunteerAssignmentIdByNote(
+  request: APIRequestContext,
+  note: string
+) {
+  const response = await request.get("/api/dashboard/volunteer");
+
+  await expectStatus(response, 200);
+
+  const dashboard = (await response.json()) as VolunteerDashboardResponse;
+  const assignments = [
+    ...dashboard.pendingConfirmations,
+    ...dashboard.upcomingAssignments
+  ];
+  const assignment = assignments.find((item) => item.notes === note);
+
+  expect(assignment, `Expected E2E volunteer assignment "${note}"`).toBeTruthy();
+  return assignment!.id;
+}
 
 test.describe("volunteer workspace", () => {
   test("loads volunteer dashboard and key self-service actions", async ({
@@ -56,5 +86,37 @@ test.describe("volunteer workspace", () => {
       await expect(page).not.toHaveURL(/\/login$/);
       await expect(page.locator("body")).toBeVisible();
     }
+  });
+
+  test("shows pending assignment actions and opens assignment detail", async ({
+    page,
+    request
+  }) => {
+    const assignmentId = await getVolunteerAssignmentIdByNote(
+      request,
+      e2eAssignmentNotes.volunteerPending
+    );
+
+    await page.goto("/volunteer/assignments");
+
+    await expect(
+      page.getByRole("heading", { name: /pendientes de respuesta/i })
+    ).toBeVisible();
+    await expect(page.getByText(/necesita respuesta/i).first()).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^confirmar$/i }).first()
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /no puedo asistir/i }).first()
+    ).toBeVisible();
+
+    await page.goto(`/volunteer/assignments/${assignmentId}`);
+
+    await expect(
+      page.getByRole("heading", { name: /hospital dr josé g\. parres/i })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^confirmar$/i })
+    ).toBeVisible();
   });
 });
