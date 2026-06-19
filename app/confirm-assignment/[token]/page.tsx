@@ -29,12 +29,12 @@ function InvitationUnavailableCard({
     EXPIRED: {
       icon: Clock3,
       title: "Invitación expirada",
-      body: "El tiempo para responder esta invitación terminó."
+      body: "El tiempo para responder esta invitación terminó. Si todavía puedes asistir, avisa al administrador."
     },
     RESPONDED: {
       icon: CheckCircle2,
       title: "Respuesta registrada",
-      body: "Esta invitación ya fue respondida."
+      body: "Esta invitación ya fue respondida y no necesita otra acción desde este enlace."
     },
     FAILED: {
       icon: MailX,
@@ -47,8 +47,8 @@ function InvitationUnavailableCard({
 
   return (
     <Card className="surface-elevated mx-auto max-w-xl">
-      <CardContent className="space-y-6 p-8 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white/8">
+      <CardContent className="space-y-5 p-5 text-center sm:p-8">
+        <div className="bg-white/8 mx-auto flex h-12 w-12 items-center justify-center rounded-full">
           <Icon className="h-6 w-6 text-primary" />
         </div>
         <div className="space-y-3">
@@ -59,10 +59,18 @@ function InvitationUnavailableCard({
           <p className="text-sm leading-6 text-muted-foreground">{copy.body}</p>
         </div>
         {hasAssignmentContext ? (
-          <div className="rounded-3xl bg-background/60 p-5 text-sm text-muted-foreground">
-            <p>{formatDisplayDate(context.date, "EEEE d 'de' MMMM")}</p>
+          <div className="rounded-lg border border-border/70 bg-background/60 p-4 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">{context.pointName}</p>
+            <p className="mt-1">
+              {formatDisplayDate(context.date, "EEEE d 'de' MMMM")}
+            </p>
             <p>{TIME_SLOT_DEFINITIONS[context.timeSlot].label}</p>
-            <p>{context.pointName}</p>
+            {context.state === "RESPONDED" && context.respondedAt ? (
+              <p className="mt-3 rounded-lg bg-white/[0.04] px-3 py-2">
+                Respondida el{" "}
+                {formatDisplayDate(context.respondedAt, "d 'de' MMM, h:mm a")}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </CardContent>
@@ -77,7 +85,7 @@ export default async function ConfirmAssignmentPage({
   const context = await getAssignmentInvitationConfirmationContext(token);
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center px-3 py-6 sm:px-4 sm:py-10">
       {context.state === "READY" ? (
         <ConfirmationCard
           invitationToken={context.token}

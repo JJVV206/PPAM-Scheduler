@@ -23,7 +23,7 @@ export function PageShell({
           role={role}
           unreadNotificationCount={unreadNotificationCount}
         />
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
           {children}
         </main>
       </div>

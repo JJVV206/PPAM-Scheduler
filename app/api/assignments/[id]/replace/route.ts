@@ -1,8 +1,7 @@
-import { requireSession } from "@/lib/auth/guards";
+import { requireRole } from "@/lib/auth/guards";
 import { revalidateAssignmentViews } from "@/lib/cache/revalidate-assignment-views";
 import { replacementAssignmentSchema } from "@/lib/validations/assignment";
 import { assignReplacementVolunteer } from "@/services/assignment.service";
-import { AppError } from "@/services/errors";
 import { handleRouteError, ok } from "@/lib/utils/api";
 
 type AssignmentReplaceRouteContext = {
@@ -14,23 +13,14 @@ export async function POST(
   { params }: AssignmentReplaceRouteContext
 ) {
   try {
-    const auth = await requireSession();
+    const auth = await requireRole(["ADMIN"]);
     if ("error" in auth) return auth.error;
     const { id } = await params;
     const body = replacementAssignmentSchema.parse(await request.json());
 
-    const volunteerId =
-      auth.session.user.role === "ADMIN"
-        ? body.volunteerId
-        : auth.session.user.volunteerProfileId;
-
-    if (!volunteerId) {
-      throw new AppError("Debes seleccionar un voluntario.", 400);
-    }
-
     const result = await assignReplacementVolunteer({
       assignmentId: id,
-      volunteerId,
+      volunteerId: body.volunteerId,
       position: body.position,
       actorUserId: auth.session.user.id
     });

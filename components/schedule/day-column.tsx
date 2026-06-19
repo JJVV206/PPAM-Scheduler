@@ -15,7 +15,12 @@ export function DayColumn({ day }: DayColumnProps) {
   ).length;
 
   return (
-    <section className="surface-panel space-y-4 p-4">
+    <section
+      aria-label={`Horario de ${format(day.date, "EEEE d 'de' MMMM", {
+        locale: es
+      })}`}
+      className="surface-panel space-y-3 p-3"
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-heading text-xl font-semibold capitalize">
@@ -25,13 +30,13 @@ export function DayColumn({ day }: DayColumnProps) {
             {format(day.date, "d 'de' MMM", { locale: es })}
           </p>
         </div>
-        <span className="rounded-full border border-white/8 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        <span className="rounded-md border border-border/70 bg-background/35 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
           {occupiedSlotCount
             ? `${occupiedSlotCount} horario${occupiedSlotCount > 1 ? "s" : ""}`
             : "Libre"}
         </span>
       </div>
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {TIME_SLOTS.map((timeSlot) => (
           <TimeSlotBlock
             key={timeSlot}

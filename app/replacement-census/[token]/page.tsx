@@ -4,7 +4,7 @@ import { AlertCircle, CheckCircle2, Clock3, MailX } from "lucide-react";
 import { ReplacementCensusForm } from "@/components/replacement-census/replacement-census-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { DAYS_OF_WEEK } from "@/lib/constants/domain";
-import { formatDisplayDate } from "@/lib/utils";
+import { formatDateRange, formatDisplayDate } from "@/lib/utils";
 import {
   getReplacementCensusResponseContext,
   type ReplacementCensusResponseContext
@@ -60,7 +60,7 @@ function UnavailableCensusCard({
   return (
     <Card className="surface-elevated mx-auto max-w-xl">
       <CardContent className="space-y-6 p-8 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white/8">
+        <div className="bg-white/8 mx-auto flex h-12 w-12 items-center justify-center rounded-full">
           <Icon className="h-6 w-6 text-primary" />
         </div>
         <div className="space-y-3">
@@ -72,10 +72,7 @@ function UnavailableCensusCard({
         </div>
         {hasContext ? (
           <div className="rounded-3xl bg-background/60 p-5 text-sm text-muted-foreground">
-            <p>
-              {formatDisplayDate(context.weekStart, "d 'de' MMMM")} al{" "}
-              {formatDisplayDate(context.weekEnd, "d 'de' MMMM 'de' yyyy")}
-            </p>
+            <p>{formatDateRange(context.weekStart, context.weekEnd)}</p>
             <p>
               Cierre:{" "}
               {formatDisplayDate(
@@ -108,8 +105,7 @@ export default async function ReplacementCensusPage({
               Hola {context.volunteerName}, indica tu disponibilidad
             </h1>
             <p className="text-sm text-muted-foreground">
-              Semana del {formatDisplayDate(context.weekStart, "d 'de' MMMM")}{" "}
-              al {formatDisplayDate(context.weekEnd, "d 'de' MMMM 'de' yyyy")}.
+              {formatDateRange(context.weekStart, context.weekEnd)}.
             </p>
           </div>
           <ReplacementCensusForm

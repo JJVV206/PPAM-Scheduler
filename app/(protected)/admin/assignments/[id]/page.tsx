@@ -30,7 +30,7 @@ export default async function AdminAssignmentDetailPage({
     return (
       <div className="flex min-h-full flex-col gap-5 pb-6">
         <div className="sticky top-0 z-20 bg-background/85 pb-2 pt-1 backdrop-blur">
-          <div className="surface-panel rounded-[28px] px-5 py-4">
+          <div className="surface-panel px-4 py-3">
             <div className="space-y-3">
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/admin/schedule">

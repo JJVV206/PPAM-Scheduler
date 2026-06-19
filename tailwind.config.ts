@@ -20,7 +20,13 @@ const config: Config = {
     },
     extend: {
       fontFamily: {
-        sans: ["Avenir Next", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],
+        sans: [
+          "Avenir Next",
+          "Segoe UI",
+          "Helvetica Neue",
+          "Arial",
+          "sans-serif"
+        ],
         heading: ["Sora", "Avenir Next", "Segoe UI", "sans-serif"]
       },
       colors: {
@@ -59,8 +65,8 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)"
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(133, 168, 255, 0.14), 0 24px 80px rgba(1, 18, 44, 0.45)",
-        soft: "0 18px 40px rgba(1, 18, 44, 0.35)"
+        glow: "0 0 0 1px hsl(var(--primary) / 0.16), 0 20px 50px rgba(0, 0, 0, 0.28)",
+        soft: "0 14px 34px rgba(0, 0, 0, 0.22)"
       },
       backgroundImage: {
         "dashboard-radial":

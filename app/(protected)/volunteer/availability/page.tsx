@@ -18,8 +18,8 @@ export default async function VolunteerAvailabilityPage() {
           Mi disponibilidad
         </h1>
         <p className="text-sm text-muted-foreground">
-          Define los horarios recurrentes de la semana en los que estás
-          disponible para servir.
+          Mantén al día tus horarios habituales y las fechas en que no podrás
+          servir.
         </p>
       </div>
       <AvailabilitySelector

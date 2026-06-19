@@ -69,7 +69,7 @@ const week = {
   id: "week-1",
   startDate: new Date("2026-06-15T00:00:00.000Z"),
   endDate: new Date("2026-06-21T00:00:00.000Z"),
-  label: "Semana del 15/6/2026",
+  label: "Del 15 al 21 de junio de 2026",
   createdById: "admin-1",
   createdAt: new Date("2026-06-10T00:00:00.000Z")
 };
@@ -119,7 +119,9 @@ beforeEach(() => {
     censusResponseTimeoutHours: 72
   });
   mocks.tx.appNotification.findFirst.mockResolvedValue(null);
-  mocks.tx.appNotification.create.mockResolvedValue({ id: "app-notification-1" });
+  mocks.tx.appNotification.create.mockResolvedValue({
+    id: "app-notification-1"
+  });
 });
 
 describe("replacement census preparation", () => {
@@ -358,7 +360,7 @@ describe("replacement census preparation", () => {
       censusId: "census-1",
       volunteerId: "volunteer-1",
       status: "SENT",
-      expiresAt: new Date("2026-06-18T12:00:00.000Z"),
+      expiresAt: new Date("2099-06-18T12:00:00.000Z"),
       respondedAt: null,
       metadata: {},
       census: {
@@ -426,7 +428,9 @@ describe("replacement census preparation", () => {
       status: "SUBMITTED",
       savedAvailabilityCount: 8
     });
-    expect(mocks.tx.replacementWeeklyAvailability.createMany).toHaveBeenCalledWith(
+    expect(
+      mocks.tx.replacementWeeklyAvailability.createMany
+    ).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.arrayContaining([
           expect.objectContaining({

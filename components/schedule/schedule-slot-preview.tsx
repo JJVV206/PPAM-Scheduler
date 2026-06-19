@@ -2,7 +2,8 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ArrowUpRight, Layers3, MapPin, Users2 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
+import { cn, formatCount, formatDisplayDate } from "@/lib/utils";
 import type {
   AssignmentStatus,
   TimeSlot,
@@ -27,7 +28,7 @@ const compactStatusMap: Record<
 > = {
   SCHEDULED: {
     label: "Programada",
-    className: "border-white/10 bg-secondary text-secondary-foreground"
+    className: "border-border/70 bg-secondary text-secondary-foreground"
   },
   PENDING_CONFIRMATION: {
     label: "Pendiente",
@@ -63,6 +64,30 @@ function buildScheduleSlotHref(date: Date, timeSlot: TimeSlot) {
   return `/admin/schedule/${format(date, "yyyy-MM-dd")}/${timeSlot}`;
 }
 
+function getSlotActionLabel({
+  date,
+  timeSlot,
+  pairCount,
+  pointCount
+}: {
+  date: Date;
+  timeSlot: TimeSlot;
+  pairCount: number;
+  pointCount: number;
+}) {
+  const dateLabel = formatDisplayDate(date, "EEEE d 'de' MMMM");
+  const timeLabel = TIME_SLOT_DEFINITIONS[timeSlot].label;
+
+  return `Abrir horario de ${dateLabel}, ${timeLabel}. ${formatCount(
+    pairCount,
+    "pareja"
+  )} y ${formatCount(pointCount, "punto")}.`;
+}
+
+function getPairActionLabel(pair: PreviewPair) {
+  return `Ver detalle de pareja ${pair.pairNumber} en ${pair.preachingPointName}`;
+}
+
 function getCompactSlotSummary(input: {
   pairCount: number;
   confirmedCount: number;
@@ -71,7 +96,7 @@ function getCompactSlotSummary(input: {
   if (!input.pairCount) {
     return {
       label: "Disponible",
-      className: "border-white/10 bg-secondary/35 text-secondary-foreground"
+      className: "border-border/70 bg-secondary/35 text-secondary-foreground"
     };
   }
 
@@ -125,26 +150,32 @@ export function ScheduleSlotPreview({
     confirmedCount,
     needsAttentionCount
   });
+  const slotActionLabel = getSlotActionLabel({
+    date,
+    timeSlot,
+    pairCount,
+    pointCount
+  });
 
   if (compact) {
     return (
       <div
         className={cn(
-          "flex h-full min-h-[96px] min-w-0 flex-col overflow-hidden rounded-[16px] border p-2.5 xl:p-3",
+          "flex h-full min-h-[88px] min-w-0 flex-col overflow-hidden rounded-lg border p-2",
           primaryPair
-            ? "border-primary/10 bg-white/[0.05]"
-            : "border-white/8 bg-white/[0.04]"
+            ? "border-primary/20 bg-primary/[0.04]"
+            : "border-border/65 bg-background/30"
         )}
       >
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
           <div className="min-w-0">
             <p className="break-words text-[10px] font-semibold uppercase leading-tight tracking-[0.1em] text-muted-foreground xl:tracking-[0.14em]">
-              {pairCount ? `${pairCount} pareja${pairCount === 1 ? "" : "s"}` : "Libre"}
+              {pairCount ? formatCount(pairCount, "pareja") : "Libre"}
             </p>
           </div>
           <Link
             href={slotHref}
-            aria-label="Abrir horario"
+            aria-label={slotActionLabel}
             className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary transition hover:bg-primary/15 hover:text-primary"
           >
             <ArrowUpRight className="h-3.5 w-3.5" />
@@ -156,7 +187,7 @@ export function ScheduleSlotPreview({
             <div className="flex min-h-0 flex-1 items-end">
               <span
                 className={cn(
-                  "inline-flex min-h-8 w-full max-w-full items-center justify-center break-words rounded-full border px-2 py-1.5 text-center text-[10px] font-bold leading-tight tracking-[0.01em] shadow-[0_10px_30px_rgba(5,10,24,0.18)] ring-1 ring-white/5 xl:text-[11px]",
+                  "inline-flex min-h-7 w-full max-w-full items-center justify-center break-words rounded-md border px-2 py-1 text-center text-[10px] font-bold leading-tight tracking-[0.01em] xl:text-[11px]",
                   compactSummary.className
                 )}
               >
@@ -168,6 +199,7 @@ export function ScheduleSlotPreview({
           <div className="mt-2 flex flex-1 items-end">
             <Link
               href={slotHref}
+              aria-label={slotActionLabel}
               className="inline-flex max-w-full break-words text-[11px] font-medium leading-tight text-primary/90 transition hover:text-primary"
             >
               Abrir horario
@@ -179,30 +211,31 @@ export function ScheduleSlotPreview({
   }
 
   return (
-    <div className="space-y-3 rounded-[18px] border border-white/8 bg-white/[0.04] p-3.5">
+    <div className="space-y-3 rounded-lg border border-border/70 bg-background/35 p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             <Layers3 className="h-3.5 w-3.5" />
-            {pairCount
-              ? `${pairCount} pareja${pairCount === 1 ? "" : "s"}`
-              : "Sin parejas"}
+            {pairCount ? formatCount(pairCount, "pareja") : "Sin parejas"}
             <span className="text-border">•</span>
-            {pointCount} punto{pointCount === 1 ? "" : "s"}
+            {formatCount(pointCount, "punto")}
           </p>
           <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
             {pairCount
               ? needsAttentionCount
-                ? `${needsAttentionCount} pareja${
-                    needsAttentionCount === 1 ? "" : "s"
-                  } requieren atención en este horario.`
+                ? `${formatCount(
+                    needsAttentionCount,
+                    "pareja requiere",
+                    "parejas requieren"
+                  )} atención en este horario.`
                 : "Horario operativo con parejas activas."
               : "Abre este horario para registrar la primera pareja."}
           </p>
         </div>
         <Link
           href={slotHref}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/15 hover:text-primary"
+          aria-label={slotActionLabel}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/15 hover:text-primary"
         >
           Ver horario
           <ArrowUpRight className="h-3.5 w-3.5" />
@@ -215,7 +248,8 @@ export function ScheduleSlotPreview({
             <Link
               key={pair.id}
               href={`/admin/assignments/${pair.id}`}
-              className="group flex items-start justify-between gap-3 rounded-2xl border border-white/6 bg-background/30 px-3 py-2.5 transition hover:border-primary/25 hover:bg-background/45"
+              aria-label={getPairActionLabel(pair)}
+              className="group flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-background/35 px-3 py-2.5 transition hover:border-primary/30 hover:bg-background/50"
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -224,7 +258,7 @@ export function ScheduleSlotPreview({
                   </span>
                   <span
                     className={cn(
-                      "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none",
+                      "inline-flex rounded-md border px-2 py-0.5 text-[10px] font-semibold leading-none",
                       compactStatusMap[pair.status].className
                     )}
                   >
@@ -252,15 +286,15 @@ export function ScheduleSlotPreview({
           {hiddenPairsCount > 0 ? (
             <Link
               href={slotHref}
+              aria-label={`${slotActionLabel} Ver todas las parejas ocultas.`}
               className="inline-flex text-xs font-semibold text-primary transition hover:text-primary/80"
             >
-              +{hiddenPairsCount} pareja{hiddenPairsCount === 1 ? "" : "s"} más
-              en este horario
+              +{formatCount(hiddenPairsCount, "pareja")} más en este horario
             </Link>
           ) : null}
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-border/70 bg-background/25 px-3 py-3 text-xs text-muted-foreground">
+        <div className="rounded-lg border border-dashed border-border/70 bg-background/35 px-3 py-3 text-xs text-muted-foreground">
           Sin parejas asignadas todavía.
         </div>
       )}

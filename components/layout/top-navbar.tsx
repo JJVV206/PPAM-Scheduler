@@ -22,7 +22,9 @@ export function TopNavbar({ role, userName }: TopNavbarProps) {
         </Button>
         <div>
           <p className="font-heading text-lg font-semibold">
-            {role === "ADMIN" ? "Consola de coordinación" : "Portal del voluntario"}
+            {role === "ADMIN"
+              ? "Consola de coordinación"
+              : "Portal del voluntario"}
           </p>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <CalendarRange className="h-4 w-4" />
@@ -34,9 +36,11 @@ export function TopNavbar({ role, userName }: TopNavbarProps) {
         <Button variant="ghost" size="icon">
           <Bell className="h-4 w-4" />
         </Button>
-        <div className="flex items-center gap-3 rounded-2xl bg-white/5 px-3 py-2">
+        <div className="flex items-center gap-3 rounded-lg bg-secondary/45 px-3 py-2">
           <Avatar className="h-9 w-9">
-            <AvatarFallback>{userName.slice(0, 2).toUpperCase()}</AvatarFallback>
+            <AvatarFallback>
+              {userName.slice(0, 2).toUpperCase()}
+            </AvatarFallback>
           </Avatar>
           <div className="hidden text-left md:block">
             <p className="text-sm font-semibold">{userName}</p>

@@ -22,6 +22,8 @@ Production-ready MVP for managing weekly public preaching assignments with role-
 4. Inspect local emails at `http://localhost:8025`.
 
 Docker details are documented in `docs/docker.md`.
+Next.js cache recovery is documented in `docs/local-cache-recovery.md`.
+Local browser QA and Mailpit validation are documented in `docs/qa-e2e.md`.
 
 If local ports are already in use, start Docker with `APP_PORT=3002 NEXTAUTH_URL=http://localhost:3002 POSTGRES_HOST_PORT=5433 npm run docker:dev`.
 
@@ -33,6 +35,8 @@ If local ports are already in use, start Docker with `APP_PORT=3002 NEXTAUTH_URL
 4. Sync the schema with `npm run db:push`.
 5. Seed the database with `npm run db:seed`.
 6. Start the app with `npm run dev`.
+
+If local Next.js cache becomes stale, restart with `npm run dev:fresh`.
 
 ## Local Database
 
@@ -93,4 +97,5 @@ Notes:
 - If Resend/SMTP is missing or invalid in production, password reset and assignment emails will fail explicitly instead of being marked as sent.
 - The app is configured with `output: "standalone"` to support container deployment.
 - Vercel + Neon deployment steps are documented in `docs/deploy-vercel.md`.
+- The release command checklist is documented in `docs/deployment-checklist.md`.
 - The production checklist is documented in `docs/production-checklist.md`.

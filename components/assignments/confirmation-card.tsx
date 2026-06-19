@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, CircleOff } from "lucide-react";
+import {
+  CalendarDays,
+  CheckCircle2,
+  CircleOff,
+  Clock3,
+  MapPin
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,7 +44,20 @@ export function ConfirmationCard({
     text: string;
   } | null>(null);
   const [completed, setCompleted] = useState(false);
+  const [completedIntent, setCompletedIntent] = useState<
+    "confirm" | "decline" | null
+  >(null);
   const isReplacementInvitation = invitationType === "REPLACEMENT";
+  const title = isReplacementInvitation
+    ? "¿Puedes cubrir este turno?"
+    : "Confirma tu asistencia";
+  const intro = isReplacementInvitation
+    ? "Te invitaron como suplente. Responde si puedes cubrir esta asignación."
+    : "Revisa los datos del turno y responde si podrás asistir.";
+  const completedText =
+    completedIntent === "confirm"
+      ? "Tu asistencia quedó confirmada. Puedes cerrar esta pantalla."
+      : "Registramos que no puedes asistir. Se buscará cobertura si hace falta.";
 
   async function respond(intent: "confirm" | "decline") {
     setSubmitting(intent);
@@ -61,45 +80,94 @@ export function ConfirmationCard({
       tone: response.ok ? "success" : "error",
       text: response.ok
         ? intent === "confirm"
-          ? "Respuesta guardada: sí podrás asistir."
-          : "Respuesta guardada: no podrás asistir."
-        : result.error
+          ? "Respuesta guardada: confirmaste tu asistencia."
+          : "Respuesta guardada: avisaste que no puedes asistir."
+        : (result.error ?? "No fue posible guardar tu respuesta.")
     });
     setCompleted(response.ok);
+    setCompletedIntent(response.ok ? intent : null);
     setSubmitting(null);
   }
 
   return (
     <Card className="surface-elevated mx-auto max-w-xl">
-      <CardContent className="space-y-6 p-8">
+      <CardContent className="space-y-5 p-5 sm:p-8">
         <div className="space-y-3 text-center">
-          <p className="text-xs uppercase tracking-[0.26em] text-muted-foreground">
+          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
             {isReplacementInvitation
               ? "Invitación de suplente"
               : "Confirmación de asignación"}
           </p>
-          <h1 className="text-balance font-heading text-4xl font-semibold">
-            {isReplacementInvitation
-              ? "Puedes cubrir como suplente el "
-              : "Tienes una asignación para el "}
-            {formatDisplayDate(date, "EEEE")} en el horario{" "}
-            {TIME_SLOT_DEFINITIONS[timeSlot].label} en {pointName}.
+          <h1 className="text-balance font-heading text-3xl font-semibold sm:text-4xl">
+            {title}
           </h1>
+          <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">
+            {intro}
+          </p>
         </div>
-        <div className="rounded-3xl bg-background/60 p-5 text-sm text-muted-foreground">
-          <p>{formatDisplayDate(date, "EEEE d 'de' MMMM")}</p>
-          <p>{TIME_SLOT_DEFINITIONS[timeSlot].label}</p>
-          <p>{pointName}</p>
+
+        <div className="grid gap-2 rounded-lg border border-border/70 bg-background/60 p-3 text-sm sm:grid-cols-3">
+          <div className="rounded-lg bg-white/[0.03] px-3 py-2">
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <CalendarDays className="h-4 w-4" />
+              Fecha
+            </p>
+            <p className="mt-1 font-medium">
+              {formatDisplayDate(date, "EEEE d 'de' MMMM")}
+            </p>
+          </div>
+          <div className="rounded-lg bg-white/[0.03] px-3 py-2">
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Clock3 className="h-4 w-4" />
+              Horario
+            </p>
+            <p className="mt-1 font-medium">
+              {TIME_SLOT_DEFINITIONS[timeSlot].label}
+            </p>
+          </div>
+          <div className="rounded-lg bg-white/[0.03] px-3 py-2">
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <MapPin className="h-4 w-4" />
+              Punto
+            </p>
+            <p className="mt-1 font-medium">{pointName}</p>
+          </div>
         </div>
+
+        {completed ? (
+          <div className="rounded-lg border border-success/35 bg-success/[0.08] px-4 py-3 text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">
+              Respuesta registrada.
+            </span>{" "}
+            {completedText}
+          </div>
+        ) : (
+          <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+            <div className="rounded-lg border border-border/70 bg-background/35 px-3 py-2">
+              <span className="font-semibold text-foreground">
+                Si confirmas:
+              </span>{" "}
+              el turno queda registrado como confirmado.
+            </div>
+            <div className="rounded-lg border border-border/70 bg-background/35 px-3 py-2">
+              <span className="font-semibold text-foreground">
+                Si no puedes:
+              </span>{" "}
+              se avisará para buscar cobertura.
+            </div>
+          </div>
+        )}
+
         <div className="grid gap-2">
           <label className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            Nota opcional
+            Motivo o nota opcional
           </label>
           <Textarea
             value={note}
             onChange={(event) => setNote(event.target.value)}
             rows={3}
-            placeholder="Agrega una nota breve si hace falta."
+            placeholder="Ej. Estoy fuera, tuve un imprevisto o puedo llegar unos minutos tarde."
+            disabled={completed}
           />
         </div>
         <div className="space-y-3">
@@ -110,17 +178,17 @@ export function ConfirmationCard({
             disabled={completed || submitting !== null}
           >
             <CheckCircle2 className="h-4 w-4" />
-            {submitting === "confirm" ? "Guardando..." : "Sí podré asistir"}
+            {submitting === "confirm" ? "Guardando..." : "Confirmar"}
           </Button>
           <Button
-            variant="secondary"
+            variant="danger"
             className="w-full"
             size="lg"
             onClick={() => respond("decline")}
             disabled={completed || submitting !== null}
           >
             <CircleOff className="h-4 w-4" />
-            {submitting === "decline" ? "Guardando..." : "No podré asistir"}
+            {submitting === "decline" ? "Guardando..." : "No puedo asistir"}
           </Button>
         </div>
         <FeedbackMessage

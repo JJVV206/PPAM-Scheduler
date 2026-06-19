@@ -50,7 +50,7 @@ export function FeedbackMessage({
     <div
       role={tone === "error" ? "alert" : "status"}
       className={cn(
-        "flex items-start gap-2 rounded-2xl border px-3 py-2 text-sm",
+        "flex items-start gap-2 rounded-lg border px-3 py-2 text-sm",
         toneMap[tone].container,
         className
       )}

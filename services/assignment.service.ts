@@ -45,7 +45,7 @@ import {
   sendPendingPrimaryInvitationsForAssignment
 } from "@/services/assignment-invitation.service";
 import { prepareScheduleWeekAutomation } from "@/services/schedule-week-preparation.service";
-import { safePercentage } from "@/lib/utils";
+import { formatDateRange, safePercentage } from "@/lib/utils";
 import { mergeJsonMetadata } from "@/lib/utils/safe-metadata";
 import { determineAssignmentStatus } from "@/services/assignment-engine";
 import { getSingletonPreachingPoint } from "@/services/point.service";
@@ -757,7 +757,9 @@ export async function updateAssignment(
         updatedFields,
         previousStatus: current.status,
         nextStatus: input.status,
-        previousVolunteerIds: input.volunteers ? currentVolunteerIds : undefined,
+        previousVolunteerIds: input.volunteers
+          ? currentVolunteerIds
+          : undefined,
         nextVolunteerIds: input.volunteers ? nextVolunteerIds : undefined,
         addedVolunteerIds: input.volunteers ? addedVolunteerIds : undefined,
         removedVolunteerIds: input.volunteers ? removedVolunteerIds : undefined,
@@ -923,7 +925,7 @@ export async function getWeeklySchedule(input?: {
   }
 
   return {
-    weekLabel: `Semana del ${weekStart.toLocaleDateString("es-MX")}`,
+    weekLabel: formatDateRange(weekStart, weekEnd),
     startDate: weekStart,
     endDate: weekEnd,
     days
@@ -941,7 +943,7 @@ export async function createScheduleWeek(input: {
     data: {
       startDate: weekStart,
       endDate: addDays(weekStart, 6),
-      label: `Semana del ${weekStart.toLocaleDateString("es-MX")}`,
+      label: formatDateRange(weekStart, addDays(weekStart, 6)),
       createdById: input.actorUserId
     }
   });
@@ -989,7 +991,7 @@ export async function duplicateScheduleWeek(input: {
     data: {
       startDate: weekStart,
       endDate: addDays(weekStart, 6),
-      label: `Semana del ${weekStart.toLocaleDateString("es-MX")}`,
+      label: formatDateRange(weekStart, addDays(weekStart, 6)),
       createdById: input.actorUserId
     }
   });
@@ -1035,6 +1037,28 @@ export async function duplicateScheduleWeek(input: {
   return targetWeek;
 }
 
+async function assertVolunteerCanRespondToAssignment(input: {
+  tx: Prisma.TransactionClient;
+  assignmentId: string;
+  volunteerProfileId: string;
+}) {
+  const assignedVolunteer = await input.tx.assignmentVolunteer.findUnique({
+    where: {
+      assignmentId_volunteerId: {
+        assignmentId: input.assignmentId,
+        volunteerId: input.volunteerProfileId
+      }
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (!assignedVolunteer) {
+    throw new AppError("No puedes responder esta asignación.", 403);
+  }
+}
+
 export async function confirmAssignment(input: {
   assignmentId: string;
   volunteerProfileId: string;
@@ -1042,6 +1066,12 @@ export async function confirmAssignment(input: {
 }) {
   const now = new Date();
   const assignment = await db.$transaction(async (tx) => {
+    await assertVolunteerCanRespondToAssignment({
+      tx,
+      assignmentId: input.assignmentId,
+      volunteerProfileId: input.volunteerProfileId
+    });
+
     await tx.assignmentResponse.upsert({
       where: {
         assignmentId_volunteerId: {
@@ -1118,6 +1148,12 @@ export async function declineAssignment(input: {
 }) {
   const now = new Date();
   const assignment = await db.$transaction(async (tx) => {
+    await assertVolunteerCanRespondToAssignment({
+      tx,
+      assignmentId: input.assignmentId,
+      volunteerProfileId: input.volunteerProfileId
+    });
+
     await tx.assignmentResponse.upsert({
       where: {
         assignmentId_volunteerId: {
@@ -1920,14 +1956,46 @@ export async function assignReplacementVolunteer(input: {
   volunteerId: string;
   actorUserId: string;
   position?: VolunteerPosition;
+  requireOpenSlot?: boolean;
 }) {
   const assignment = await db.assignment.findUniqueOrThrow({
     where: { id: input.assignmentId },
     include: {
       volunteers: true,
+      responses: true,
       preachingPoint: true
     }
   });
+
+  const openPositions = [
+    ...new Set([
+      ...(["FIRST", "SECOND"] as VolunteerPosition[]).filter(
+        (position) =>
+          !assignment.volunteers.some((slot) => slot.position === position)
+      ),
+      ...assignment.responses
+        .filter((response) => response.responseStatus === "DECLINED")
+        .map((response) => {
+          const slot = assignment.volunteers.find(
+            (volunteer) => volunteer.volunteerId === response.volunteerId
+          );
+          return slot?.position;
+        })
+        .filter(Boolean)
+    ])
+  ] as VolunteerPosition[];
+
+  if (input.requireOpenSlot && !openPositions.length) {
+    throw new AppError("Esta asignación no tiene una vacante disponible.", 409);
+  }
+
+  if (
+    input.requireOpenSlot &&
+    input.position &&
+    !openPositions.includes(input.position)
+  ) {
+    throw new AppError("La posición seleccionada no está vacante.", 409);
+  }
 
   await assertNoVolunteerConflicts({
     assignmentId: input.assignmentId,
@@ -1938,11 +2006,10 @@ export async function assignReplacementVolunteer(input: {
 
   const targetPosition =
     input.position ??
-    (["FIRST", "SECOND"] as VolunteerPosition[]).find(
-      (position) =>
-        !assignment.volunteers.some((slot) => slot.position === position)
-    ) ??
-    assignment.volunteers[assignment.volunteers.length - 1]?.position;
+    selectReplacementAssignmentPosition({
+      volunteers: assignment.volunteers,
+      responses: assignment.responses
+    });
 
   if (!targetPosition) {
     throw new AppError(
@@ -2108,7 +2175,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
     ).length ?? 0;
 
   return {
-    weekLabel: `Semana del ${weekStart.toLocaleDateString("es-MX")}`,
+    weekLabel: formatDateRange(weekStart, weekEnd),
     stats: {
       totalAssignments: assignments.length,
       confirmedAssignments: assignments.filter(
@@ -2133,7 +2200,10 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
       submittedResponses: submittedCensusResponses,
       pendingResponses: pendingCensusResponses,
       declinedResponses: declinedCensusResponses,
-      responseRate: safePercentage(submittedCensusResponses, totalCensusResponses)
+      responseRate: safePercentage(
+        submittedCensusResponses,
+        totalCensusResponses
+      )
     },
     alerts: {
       failedEmails,
@@ -2141,8 +2211,8 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
       expiredReplacementInvitations,
       uncoveredAssignments: requiresAttention.length
     },
-    todaysAssignments: details.filter(
-      (assignment) => isSameDay(assignment.date, today)
+    todaysAssignments: details.filter((assignment) =>
+      isSameDay(assignment.date, today)
     ),
     upcomingAssignments: details.filter(
       (assignment) => assignment.date >= today && assignment.date <= upcomingEnd

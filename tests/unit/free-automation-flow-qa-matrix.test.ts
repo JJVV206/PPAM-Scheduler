@@ -135,7 +135,7 @@ const module16MinimumTests = [
   {
     requirement: "Suplente expira a las 12h y se intenta otro candidato.",
     coverage: [
-      "assignment-automation-idempotency: expires replacement invitations after their window so the next automation run can try another candidate"
+      "assignment-automation-idempotency: expires a timed-out replacement and invites the next candidate in the same automation run"
     ]
   },
   {

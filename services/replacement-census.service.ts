@@ -11,7 +11,7 @@ import type {
 import { db } from "@/lib/db/prisma";
 import { DEFAULT_CENSUS_RESPONSE_TIMEOUT_HOURS } from "@/lib/constants/app";
 import { getAppBaseUrl } from "@/lib/env/config";
-import { formatDisplayDate } from "@/lib/utils";
+import { formatDateRange, formatDisplayDate } from "@/lib/utils";
 import {
   compactJsonMetadata,
   mergeJsonMetadata
@@ -32,20 +32,21 @@ export const ACTIVE_REPLACEMENT_CENSUS_RESPONSE_STATUSES = [
 
 type ReplacementCensusClient = Prisma.TransactionClient | typeof db;
 
-type PendingReplacementCensusResponse = Prisma.ReplacementCensusResponseGetPayload<{
-  include: {
-    census: {
-      include: {
-        scheduleWeek: true;
+type PendingReplacementCensusResponse =
+  Prisma.ReplacementCensusResponseGetPayload<{
+    include: {
+      census: {
+        include: {
+          scheduleWeek: true;
+        };
+      };
+      volunteer: {
+        include: {
+          user: true;
+        };
       };
     };
-    volunteer: {
-      include: {
-        user: true;
-      };
-    };
-  };
-}>;
+  }>;
 
 export type ReplacementCensusAvailabilityInput = {
   date: Date;
@@ -103,10 +104,7 @@ function mergeMetadata(
 }
 
 function buildWeekLabel(input: { startDate: Date; endDate: Date }) {
-  return `Semana del ${formatDisplayDate(
-    input.startDate,
-    "d 'de' MMMM"
-  )} al ${formatDisplayDate(input.endDate, "d 'de' MMMM 'de' yyyy")}`;
+  return formatDateRange(input.startDate, input.endDate);
 }
 
 function getReplacementCensusResponseAvailability(input: {
@@ -127,7 +125,10 @@ function getReplacementCensusResponseAvailability(input: {
     return "FAILED" as const;
   }
 
-  if (input.status === "EXPIRED" || input.expiresAt <= (input.now ?? new Date())) {
+  if (
+    input.status === "EXPIRED" ||
+    input.expiresAt <= (input.now ?? new Date())
+  ) {
     return "EXPIRED" as const;
   }
 
@@ -135,7 +136,9 @@ function getReplacementCensusResponseAvailability(input: {
 }
 
 function buildWeekDays(input: { startDate: Date }) {
-  return Array.from({ length: 7 }).map((_, index) => addDays(input.startDate, index));
+  return Array.from({ length: 7 }).map((_, index) =>
+    addDays(input.startDate, index)
+  );
 }
 
 function hasAvailableDay(input: ReplacementCensusAvailabilityInput[]) {
@@ -245,7 +248,11 @@ async function createResponseWithUniqueToken(input: {
   expiresAt: Date;
   metadata: Prisma.InputJsonObject;
 }) {
-  for (let attempt = 1; attempt <= MAX_TOKEN_GENERATION_ATTEMPTS; attempt += 1) {
+  for (
+    let attempt = 1;
+    attempt <= MAX_TOKEN_GENERATION_ATTEMPTS;
+    attempt += 1
+  ) {
     try {
       return await input.client.replacementCensusResponse.create({
         data: {
@@ -257,7 +264,10 @@ async function createResponseWithUniqueToken(input: {
         }
       });
     } catch (error) {
-      if (isUniqueTokenConflict(error) && attempt < MAX_TOKEN_GENERATION_ATTEMPTS) {
+      if (
+        isUniqueTokenConflict(error) &&
+        attempt < MAX_TOKEN_GENERATION_ATTEMPTS
+      ) {
         continue;
       }
 
@@ -278,7 +288,9 @@ export async function openReplacementCensusForWeek(input: {
   closesAt?: Date;
   metadata?: Record<string, unknown>;
 }) {
-  const settings = input.closesAt ? null : await getAssignmentAutomationSettings();
+  const settings = input.closesAt
+    ? null
+    : await getAssignmentAutomationSettings();
   const closesAt =
     input.closesAt ??
     addHours(
@@ -539,7 +551,9 @@ async function sendReplacementCensusResponseEmail(
     };
   } catch (error) {
     const errorMessage =
-      error instanceof Error ? error.message : "No fue posible enviar el censo.";
+      error instanceof Error
+        ? error.message
+        : "No fue posible enviar el censo.";
     await markCensusResponseFailed({
       response,
       attemptedMetadata: attempt.metadata,

@@ -243,7 +243,7 @@ export function AssignmentAdminActions({
           <label className="text-sm font-medium">Día detectado</label>
           <div
             className={cn(
-              "rounded-2xl border border-border/70 bg-background/35 text-muted-foreground",
+              "rounded-lg border border-border/70 bg-background/35 text-muted-foreground",
               compact ? "px-4 py-2.5 text-sm" : "px-4 py-3 text-sm"
             )}
           >

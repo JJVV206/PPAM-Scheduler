@@ -40,7 +40,6 @@ const ACTIVE_INVITATION_STATUSES: AssignmentInvitationStatus[] = [
 
 const ATTENTION_ACTIVITY_TYPES: AssignmentActivityType[] = [
   "ADMIN_ALERTED",
-  "INVITATION_FAILED",
   "NO_REPLACEMENT_AVAILABLE"
 ];
 
@@ -52,7 +51,7 @@ const AUTOMATION_STATES: Record<
     key: "INVITATION_PENDING",
     label: "Invitación pendiente",
     description:
-      "La invitación existe, pero todavía no queda registrada como enviada.",
+      "El flujo todavía no tiene un email enviado para solicitar confirmación.",
     tone: "warning"
   },
   EMAIL_SENT: {
@@ -110,6 +109,13 @@ const AUTOMATION_STATES: Record<
     description:
       "El sistema detectó una condición que necesita revisión manual del administrador.",
     tone: "danger"
+  },
+  CANCELLED: {
+    key: "CANCELLED",
+    label: "Cancelada",
+    description:
+      "La asignación fue cancelada y ya no participa en el flujo automático.",
+    tone: "neutral"
   }
 };
 
@@ -162,24 +168,26 @@ export function deriveAssignmentAutomationState(
   const hasDeclinedResponse = input.volunteers.some(
     (volunteer) => volunteer.responseStatus === "DECLINED"
   );
-  const hasFailedInvitation = sortedInvitations.some(
-    (invitation) => invitation.status === "FAILED"
-  );
-
-  if (activeReplacementInvitation) {
-    return AUTOMATION_STATES.REPLACEMENT_INVITED;
-  }
+  const latestInvitationFailed = latestInvitation?.status === "FAILED";
 
   if (isCovered(input)) {
     return AUTOMATION_STATES.CONFIRMED;
   }
 
-  if (
-    input.status === "CANCELLED" ||
-    hasFailedInvitation ||
-    hasAttentionActivity(input.timeline)
-  ) {
+  if (latestInvitation?.status === "ACCEPTED") {
+    return AUTOMATION_STATES.CONFIRMED;
+  }
+
+  if (input.status === "CANCELLED") {
+    return AUTOMATION_STATES.CANCELLED;
+  }
+
+  if (latestInvitationFailed || hasAttentionActivity(input.timeline)) {
     return AUTOMATION_STATES.REQUIRES_INTERVENTION;
+  }
+
+  if (activeReplacementInvitation) {
+    return AUTOMATION_STATES.REPLACEMENT_INVITED;
   }
 
   if (input.status === "NEEDS_REPLACEMENT") {
@@ -214,25 +222,15 @@ export function deriveAssignmentAutomationState(
       : AUTOMATION_STATES.EMAIL_SENT;
   }
 
-  if (latestInvitation?.status === "ACCEPTED") {
-    return AUTOMATION_STATES.CONFIRMED;
-  }
-
   if (!sortedInvitations.length && hasPendingResponse) {
     return AUTOMATION_STATES.INVITATION_PENDING;
   }
 
-  return AUTOMATION_STATES.CONFIRMED;
+  return AUTOMATION_STATES.INVITATION_PENDING;
 }
 
 export function isAssignmentRequiringAttention(
   input: AssignmentAutomationStateInput
 ) {
-  if (
-    ["CONFIRMED", "COMPLETED", "REASSIGNED", "CANCELLED"].includes(input.status)
-  ) {
-    return false;
-  }
-
   return deriveAssignmentAutomationState(input).key === "REQUIRES_INTERVENTION";
 }

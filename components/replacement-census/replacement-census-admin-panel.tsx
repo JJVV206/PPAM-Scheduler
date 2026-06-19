@@ -149,7 +149,7 @@ function StatCard({
   return (
     <Card className="surface-elevated">
       <CardContent className="flex items-center gap-3 p-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+        <div className="bg-primary/12 flex h-9 w-9 items-center justify-center rounded-lg text-primary">
           <Icon className="h-5 w-5" />
         </div>
         <div>
@@ -178,11 +178,11 @@ export function ReplacementCensusAdminPanel({
   const weekDays = buildWeekDays(selectedWeekStart);
 
   return (
-    <div className="space-y-5">
-      <section className="surface-panel px-4 py-4 sm:px-5">
+    <div className="space-y-4">
+      <section className="surface-panel px-4 py-3">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="font-heading text-3xl font-semibold sm:text-4xl">
+            <h1 className="font-heading text-2xl font-semibold sm:text-3xl">
               Suplentes
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -238,10 +238,10 @@ export function ReplacementCensusAdminPanel({
       </div>
 
       <Card className="surface-panel">
-        <CardContent className="space-y-4 p-4 sm:p-5">
+        <CardContent className="space-y-4 p-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="font-heading text-2xl font-semibold">
+              <h2 className="font-heading text-xl font-semibold">
                 Estado del censo
               </h2>
               <p className="text-sm text-muted-foreground">
@@ -317,7 +317,7 @@ export function ReplacementCensusAdminPanel({
               </Table>
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-border/70 bg-background/25 px-4 py-8 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-border/70 bg-background/35 px-4 py-8 text-center text-sm text-muted-foreground">
               No hay respuestas de censo para esta semana.
             </div>
           )}
@@ -347,13 +347,15 @@ export function ReplacementCensusAdminPanel({
               method="PATCH"
               weekDays={weekDays}
               compact
-              initialAvailability={selectedResponse.availability.map((item) => ({
-                date: item.date.toISOString().slice(0, 10),
-                dayOfWeek: item.dayOfWeek,
-                timeSlot: item.timeSlot,
-                available: item.available,
-                notes: item.notes
-              }))}
+              initialAvailability={selectedResponse.availability.map(
+                (item) => ({
+                  date: item.date.toISOString().slice(0, 10),
+                  dayOfWeek: item.dayOfWeek,
+                  timeSlot: item.timeSlot,
+                  available: item.available,
+                  notes: item.notes
+                })
+              )}
               onSaved={() => setEditingResponseId(null)}
             />
           ) : null}

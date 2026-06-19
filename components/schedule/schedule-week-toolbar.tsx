@@ -128,7 +128,7 @@ export function ScheduleWeekToolbar({
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-2.5 lg:flex-row lg:flex-wrap lg:items-center">
+    <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
       <div className="grid w-full min-w-0 gap-2 sm:grid-cols-3 lg:flex lg:w-auto lg:flex-wrap lg:items-center">
         <Button
           type="button"
@@ -197,7 +197,7 @@ export function ScheduleWeekToolbar({
                 <button
                   type="button"
                   onClick={() => setMode("EMPTY")}
-                  className={`rounded-2xl border px-4 py-3 text-left transition-colors ${
+                  className={`rounded-lg border px-3 py-3 text-left transition-colors ${
                     mode === "EMPTY"
                       ? "border-primary bg-primary/15 text-foreground"
                       : "border-border/70 bg-background/35 text-muted-foreground"
@@ -211,7 +211,7 @@ export function ScheduleWeekToolbar({
                 <button
                   type="button"
                   onClick={() => setMode("DUPLICATE")}
-                  className={`rounded-2xl border px-4 py-3 text-left transition-colors ${
+                  className={`rounded-lg border px-3 py-3 text-left transition-colors ${
                     mode === "DUPLICATE"
                       ? "border-primary bg-primary/15 text-foreground"
                       : "border-border/70 bg-background/35 text-muted-foreground"

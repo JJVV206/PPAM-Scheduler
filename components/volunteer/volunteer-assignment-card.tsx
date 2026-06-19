@@ -1,13 +1,15 @@
 import Link from "next/link";
 import {
+  AlertTriangle,
   BellRing,
   CalendarDays,
+  CheckCircle2,
   Clock3,
+  CircleOff,
   MapPin,
   UserRound
 } from "lucide-react";
 
-import { AutomationStateBadge } from "@/components/assignments/automation-state-badge";
 import { StatusBadge } from "@/components/assignments/status-badge";
 import { VolunteerResponseActions } from "@/components/volunteer/volunteer-response-actions";
 import { Badge } from "@/components/ui/badge";
@@ -18,11 +20,13 @@ import {
 } from "@/lib/constants/domain";
 import { cn, formatDisplayDate } from "@/lib/utils";
 import {
+  canVolunteerRespondToAssignment,
   getVolunteerAssignmentRoleLabel,
   getVolunteerAssignmentSlot
 } from "@/lib/volunteer-assignment";
 import type {
   AssignmentDetailDto,
+  ResponseStatus,
   VolunteerAssignmentReminderDto
 } from "@/types/domain";
 
@@ -54,6 +58,33 @@ function getReminderText(reminders: VolunteerAssignmentReminderDto[]) {
   } recibido${reminders.length === 1 ? "" : "s"} • ${typeLabel} ${date}`;
 }
 
+function getResponseSummary(status: ResponseStatus) {
+  if (status === "CONFIRMED") {
+    return {
+      icon: CheckCircle2,
+      title: "Asistencia confirmada",
+      body: "Tu turno quedó confirmado. Revisa los recordatorios antes de asistir.",
+      className: "border-success/35 bg-success/[0.08] text-success"
+    };
+  }
+
+  if (status === "DECLINED") {
+    return {
+      icon: CircleOff,
+      title: "Avisaste que no puedes asistir",
+      body: "Tu respuesta quedó registrada y el equipo buscará cobertura si hace falta.",
+      className: "border-danger/35 bg-danger/[0.08] text-danger"
+    };
+  }
+
+  return {
+    icon: AlertTriangle,
+    title: "Necesita respuesta",
+    body: "Confirma si asistirás o avisa si no puedes para buscar cobertura a tiempo.",
+    className: "border-warning/35 bg-warning/[0.08] text-warning"
+  };
+}
+
 export function VolunteerAssignmentCard({
   assignment,
   volunteerProfileId,
@@ -71,11 +102,21 @@ export function VolunteerAssignmentCard({
     assignment,
     volunteerProfileId
   );
+  const responseStatus = volunteerSlot?.responseStatus ?? "PENDING";
+  const responseSummary = getResponseSummary(responseStatus);
+  const ResponseIcon = responseSummary.icon;
+  const responseId = canVolunteerRespondToAssignment(
+    assignment,
+    volunteerProfileId
+  )
+    ? volunteerSlot?.responseId
+    : null;
 
   return (
     <article
       className={cn(
-        "border-white/6 rounded-[24px] border bg-white/[0.03] p-4",
+        "rounded-lg border border-border/70 bg-white/[0.03] p-4",
+        responseStatus === "PENDING" && "border-warning/35 bg-warning/[0.03]",
         compact ? "space-y-3" : "space-y-4",
         className
       )}
@@ -86,63 +127,102 @@ export function VolunteerAssignmentCard({
             <Badge variant={roleLabel === "Suplente" ? "default" : "secondary"}>
               {roleLabel}
             </Badge>
-            <StatusBadge status={volunteerSlot?.responseStatus ?? "PENDING"} />
-            <AutomationStateBadge state={assignment.automationState} />
+            <StatusBadge status={responseStatus} />
           </div>
           <div>
-            <p className="font-semibold text-foreground">
-              {assignment.preachingPoint.name}
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Tu turno
             </p>
+            <h2 className="mt-1 font-heading text-xl font-semibold text-foreground">
+              {assignment.preachingPoint.name}
+            </h2>
             <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
               Pareja {assignment.pairNumber}
             </p>
           </div>
         </div>
-        <div className="shrink-0">
-          <StatusBadge status={assignment.status} />
+      </div>
+
+      <div className="grid gap-2 text-sm sm:grid-cols-2">
+        <div className="rounded-lg border border-border/60 bg-background/30 px-3 py-2">
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <CalendarDays className="h-4 w-4 shrink-0" />
+            Fecha
+          </p>
+          <p className="mt-1 font-medium">
+            {formatDisplayDate(assignment.date, "EEEE d 'de' MMM")}
+          </p>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-background/30 px-3 py-2">
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock3 className="h-4 w-4 shrink-0" />
+            Horario
+          </p>
+          <p className="mt-1 font-medium">
+            {TIME_SLOT_DEFINITIONS[assignment.timeSlot].label}
+          </p>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-background/30 px-3 py-2">
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <MapPin className="h-4 w-4 shrink-0" />
+            Zona
+          </p>
+          <p className="mt-1 font-medium">{assignment.preachingPoint.area}</p>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-background/30 px-3 py-2">
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <UserRound className="h-4 w-4 shrink-0" />
+            Tipo
+          </p>
+          <p className="mt-1 font-medium">
+            {roleLabel === "Suplente" ? "Suplente" : "Titular"}
+          </p>
         </div>
       </div>
 
-      <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-        <p className="flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 shrink-0" />
-          {formatDisplayDate(assignment.date, "EEEE d 'de' MMM")}
-        </p>
-        <p className="flex items-center gap-2">
-          <Clock3 className="h-4 w-4 shrink-0" />
-          {TIME_SLOT_DEFINITIONS[assignment.timeSlot].label}
-        </p>
-        <p className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 shrink-0" />
-          {assignment.preachingPoint.area}
-        </p>
-        <p className="flex items-center gap-2">
-          <UserRound className="h-4 w-4 shrink-0" />
-          {roleLabel === "Suplente"
-            ? "Asignación como suplente"
-            : "Asignación titular"}
+      <div
+        className={cn(
+          "rounded-lg border px-3 py-2 text-sm",
+          responseSummary.className
+        )}
+      >
+        <p className="flex items-start gap-2">
+          <ResponseIcon className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            <span className="font-semibold text-foreground">
+              {responseSummary.title}.
+            </span>{" "}
+            <span className="text-muted-foreground">
+              {responseSummary.body}
+            </span>
+          </span>
         </p>
       </div>
 
-      <div className="rounded-2xl border border-white/5 bg-background/30 px-3 py-2 text-sm text-muted-foreground">
+      <div className="rounded-lg border border-border/60 bg-background/30 px-3 py-2 text-sm text-muted-foreground">
         <p className="flex items-start gap-2">
           <BellRing className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{getReminderText(reminders)}</span>
         </p>
       </div>
 
-      {showResponseActions && volunteerSlot?.responseId ? (
+      {showResponseActions && responseId ? (
         <VolunteerResponseActions
-          responseId={volunteerSlot.responseId}
-          currentStatus={volunteerSlot.responseStatus}
-          initialNote={volunteerSlot.responseNote}
+          responseId={responseId}
+          currentStatus={responseStatus}
+          initialNote={volunteerSlot?.responseNote}
           compact={compact}
         />
       ) : null}
 
       {showDetailLink ? (
-        <div className="flex justify-end border-t border-white/5 pt-3">
-          <Button variant="secondary" size={compact ? "sm" : "default"} asChild>
+        <div className="flex border-t border-border/60 pt-3 sm:justify-end">
+          <Button
+            variant="secondary"
+            size={compact ? "sm" : "default"}
+            className="w-full sm:w-auto"
+            asChild
+          >
             <Link href={`/volunteer/assignments/${assignment.id}`}>
               Ver detalles
             </Link>

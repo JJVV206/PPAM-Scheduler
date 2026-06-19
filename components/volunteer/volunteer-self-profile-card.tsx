@@ -79,15 +79,17 @@ export function VolunteerSelfProfileCard({
               </Badge>
             </div>
           </div>
-          <Button variant="secondary" asChild>
-            <Link href="/volunteer/availability">Actualizar disponibilidad</Link>
+          <Button variant="secondary" className="w-full sm:w-auto" asChild>
+            <Link href="/volunteer/availability">
+              Actualizar disponibilidad
+            </Link>
           </Button>
         </div>
       </CardHeader>
       <CardContent className="grid gap-4 p-5 pt-2">
-        <section className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
+        <section className="rounded-lg border border-border/70 bg-white/[0.03] p-4">
           <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-            Contacto
+            Datos de contacto
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] gap-3">
@@ -111,7 +113,7 @@ export function VolunteerSelfProfileCard({
           </div>
         </section>
 
-        <section className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
+        <section className="rounded-lg border border-border/70 bg-white/[0.03] p-4">
           <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
             Preferencias
           </p>
@@ -131,7 +133,7 @@ export function VolunteerSelfProfileCard({
           )}
         </section>
 
-        <section className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
+        <section className="rounded-lg border border-border/70 bg-white/[0.03] p-4">
           <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
             Disponibilidad general
           </p>
@@ -140,7 +142,7 @@ export function VolunteerSelfProfileCard({
               {availabilityDays.map(([dayOfWeek, slots]) => (
                 <div
                   key={dayOfWeek}
-                  className="rounded-2xl border border-white/5 bg-background/30 px-3 py-2.5"
+                  className="rounded-lg border border-border/60 bg-background/30 px-3 py-2.5"
                 >
                   <p className="flex items-center gap-2 text-sm font-medium">
                     <CalendarClock className="h-4 w-4 text-muted-foreground" />

@@ -52,7 +52,7 @@ export default async function AdminVolunteerProfilePage({
 
     return (
       <div className="flex min-h-full flex-col gap-4 pb-4">
-        <div className="surface-panel rounded-[28px] px-5 py-3.5">
+        <div className="surface-panel px-4 py-3">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-2.5">
               <div className="flex flex-wrap items-center gap-2">
@@ -127,7 +127,7 @@ export default async function AdminVolunteerProfilePage({
                         key={assignment.id}
                         assignment={assignment}
                         action={
-                          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/5 pt-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3">
                             <div>
                               <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                 {formatDisplayDate(
@@ -155,7 +155,7 @@ export default async function AdminVolunteerProfilePage({
                   <EmptyState
                     title="Sin asignaciones registradas"
                     description="Este voluntario todavía no tiene historial. Cuando participe en una pareja, aparecerá aquí con acceso directo al detalle."
-                    className="min-h-[240px] border border-white/5 bg-white/[0.02]"
+                    className="min-h-[240px] border border-border/60 bg-background/25"
                   />
                 )}
               </CardContent>
@@ -183,14 +183,14 @@ function VolunteerMetricCard({
   tone = "default"
 }: VolunteerMetricCardProps) {
   const toneMap = {
-    default: "border-white/5 bg-white/[0.03] text-primary",
+    default: "border-border/60 bg-background/35 text-primary",
     success: "border-success/15 bg-success/10 text-success",
     warning: "border-warning/15 bg-warning/10 text-warning",
     danger: "border-danger/15 bg-danger/10 text-danger"
   } as const;
 
   return (
-    <div className="min-w-0 rounded-[22px] border border-white/5 bg-white/[0.03] px-4 py-3">
+    <div className="min-w-0 rounded-lg border border-border/60 bg-background/35 px-3 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1.5">
           <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -200,7 +200,7 @@ function VolunteerMetricCard({
             {value}
           </p>
         </div>
-        <div className={`rounded-2xl border p-2.5 ${toneMap[tone]}`}>
+        <div className={`rounded-lg border p-2.5 ${toneMap[tone]}`}>
           <Icon className="h-4 w-4" />
         </div>
       </div>

@@ -316,7 +316,7 @@ export function AssignmentForm({
           {triggerLabel}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-[1080px] overflow-hidden p-5 sm:p-6">
+      <DialogContent className="max-w-[1080px] overflow-hidden">
         <DialogHeader className="space-y-1 pr-8">
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>
@@ -324,29 +324,29 @@ export function AssignmentForm({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {lockDateAndTime ? (
-              <div className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-4">
-                <p className="text-xs uppercase tracking-[0.16em] text-primary/80">
+              <div className="rounded-lg border border-primary/20 bg-primary/10 px-3 py-3">
+                <p className="text-xs uppercase tracking-[0.12em] text-primary/80">
                   Horario seleccionado
                 </p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                  <div className="border-white/6 rounded-2xl border bg-background/25 px-3 py-2.5">
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                  <div className="rounded-lg border border-border/60 bg-background/35 px-3 py-2.5">
+                    <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                       Día
                     </p>
                     <p className="mt-1 text-sm font-semibold text-foreground">
                       {DAY_LABELS[selectedDayOfWeek]}
                     </p>
                   </div>
-                  <div className="border-white/6 rounded-2xl border bg-background/25 px-3 py-2.5">
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                  <div className="rounded-lg border border-border/60 bg-background/35 px-3 py-2.5">
+                    <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                       Fecha
                     </p>
                     <p className="mt-1 text-sm font-semibold text-foreground">
                       {selectedDateLabel}
                     </p>
                   </div>
-                  <div className="border-white/6 rounded-2xl border bg-background/25 px-3 py-2.5">
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                  <div className="rounded-lg border border-border/60 bg-background/35 px-3 py-2.5">
+                    <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                       Franja
                     </p>
                     <p className="mt-1 text-sm font-semibold text-foreground">
@@ -377,9 +377,9 @@ export function AssignmentForm({
                                 type="button"
                                 onClick={() => field.onChange(option.value)}
                                 className={cn(
-                                  "rounded-2xl border px-4 py-2.5 text-left transition-colors",
+                                  "rounded-lg border px-3 py-2.5 text-left transition-colors",
                                   isActive
-                                    ? "border-primary bg-primary/15 text-foreground shadow-[0_8px_24px_rgba(102,145,255,0.18)]"
+                                    ? "border-primary bg-primary/15 text-foreground"
                                     : "border-border/70 bg-background/35 text-muted-foreground hover:border-primary/40 hover:text-foreground"
                                 )}
                               >
@@ -427,8 +427,8 @@ export function AssignmentForm({
                       </FormItem>
                     )}
                   />
-                  <div className="rounded-2xl border border-border/70 bg-background/35 px-4 py-3">
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                  <div className="rounded-lg border border-border/70 bg-background/35 px-3 py-3">
+                    <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
                       Día
                     </p>
                     <p className="mt-1 font-semibold text-foreground">

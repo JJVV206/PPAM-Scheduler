@@ -16,7 +16,10 @@ export function TimeSlotBlock({
   assignments
 }: TimeSlotBlockProps) {
   return (
-    <div className="space-y-2.5">
+    <div
+      aria-label={`Horario ${TIME_SLOT_DEFINITIONS[timeSlot].label}`}
+      className="space-y-2"
+    >
       <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
         <div className="h-2 w-2 rounded-full bg-primary" />
         <span>{TIME_SLOT_DEFINITIONS[timeSlot].label}</span>

@@ -1,5 +1,4 @@
-import { format, isSameMonth, isSameYear, startOfWeek } from "date-fns";
-import { es } from "date-fns/locale";
+import { format, startOfWeek } from "date-fns";
 
 import { EmptyState } from "@/components/forms/empty-state";
 import { AssignmentForm } from "@/components/assignments/assignment-form";
@@ -11,6 +10,7 @@ import { getWeeklySchedule } from "@/services/assignment.service";
 import { getPreachingPoints } from "@/services/point.service";
 import { getVolunteers } from "@/services/volunteer.service";
 import { db } from "@/lib/db/prisma";
+import { formatDateRange } from "@/lib/utils";
 
 type AdminSchedulePageProps = {
   searchParams?: Promise<{
@@ -28,26 +28,6 @@ const scheduleStateLegend = [
   { label: "Requiere atención", variant: "warning" as const }
 ];
 
-function formatSchedulePeriod(startDate: Date, endDate: Date) {
-  if (isSameMonth(startDate, endDate) && isSameYear(startDate, endDate)) {
-    return `Del ${format(startDate, "d", { locale: es })} al ${format(
-      endDate,
-      "d 'de' MMMM 'de' yyyy",
-      { locale: es }
-    )}`;
-  }
-
-  if (isSameYear(startDate, endDate)) {
-    return `Del ${format(startDate, "d 'de' MMMM", {
-      locale: es
-    })} al ${format(endDate, "d 'de' MMMM 'de' yyyy", { locale: es })}`;
-  }
-
-  return `Del ${format(startDate, "d 'de' MMMM 'de' yyyy", {
-    locale: es
-  })} al ${format(endDate, "d 'de' MMMM 'de' yyyy", { locale: es })}`;
-}
-
 export default async function AdminSchedulePage({
   searchParams
 }: AdminSchedulePageProps) {
@@ -62,7 +42,7 @@ export default async function AdminSchedulePage({
     startOfWeek(new Date(), { weekStartsOn: 1 }),
     "yyyy-MM-dd"
   );
-  const schedulePeriodLabel = formatSchedulePeriod(
+  const schedulePeriodLabel = formatDateRange(
     schedule.startDate,
     schedule.endDate
   );
@@ -96,16 +76,16 @@ export default async function AdminSchedulePage({
   }));
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
-      <section className="surface-panel shrink-0 overflow-hidden px-4 py-4 sm:px-5 sm:py-5">
-        <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(24rem,1fr)_auto] xl:items-start xl:gap-6">
+      <section className="surface-panel shrink-0 overflow-hidden px-4 py-3">
+        <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(24rem,1fr)_auto] xl:items-start xl:gap-5">
           <div className="min-w-0">
-            <h1 className="font-heading text-3xl font-semibold leading-tight sm:text-4xl lg:whitespace-nowrap">
+            <h1 className="font-heading text-2xl font-semibold leading-tight sm:text-3xl lg:whitespace-nowrap">
               Horario semanal
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {schedulePeriodLabel}
             </p>
-            <div className="mt-3 flex max-w-full flex-wrap gap-2">
+            <div className="mt-3 flex max-w-full flex-wrap gap-1.5">
               {scheduleStateLegend.map((item) => (
                 <Badge key={item.label} variant={item.variant}>
                   {item.label}
@@ -114,7 +94,7 @@ export default async function AdminSchedulePage({
             </div>
           </div>
 
-          <div className="flex min-w-0 flex-col gap-2.5 xl:items-end">
+          <div className="flex min-w-0 flex-col gap-2 xl:items-end">
             <ScheduleWeekToolbar
               selectedWeekStart={schedule.startDate.toISOString().slice(0, 10)}
               currentWeekStart={currentWeekStart}
@@ -143,7 +123,7 @@ export default async function AdminSchedulePage({
       </section>
 
       <Card className="surface-panel min-h-0 flex-1 overflow-hidden">
-        <CardContent className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 xl:p-5">
+        <CardContent className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-2.5 sm:p-3">
           {schedule.days.some((day) =>
             Object.values(day.items).some((items) => items.length > 0)
           ) ? (

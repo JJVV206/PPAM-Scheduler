@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => {
       createMany: vi.fn(),
       delete: vi.fn(),
       deleteMany: vi.fn(),
+      findUnique: vi.fn(),
       update: vi.fn()
     },
     appNotification: {
@@ -102,13 +103,17 @@ vi.mock("@/services/assignment-invitation.service", () => ({
   ),
   createPendingPrimaryInvitationsForAssignment:
     mocks.createPendingPrimaryInvitationsForAssignment,
-  getAssignmentInvitationAvailability: mocks.getAssignmentInvitationAvailability,
+  getAssignmentInvitationAvailability:
+    mocks.getAssignmentInvitationAvailability,
   sendPendingPrimaryInvitationsForAssignment:
     mocks.sendPendingPrimaryInvitationsForAssignment
 }));
 
 import {
+  assignReplacementVolunteer,
+  confirmAssignment,
   createWeeklyAssignment,
+  declineAssignment,
   duplicateScheduleWeek,
   respondToAssignmentInvitation,
   updateAssignment
@@ -149,9 +154,7 @@ function volunteer(id: string, name = id) {
   };
 }
 
-function assignmentDetail(
-  overrides: Record<string, unknown> = {}
-) {
+function assignmentDetail(overrides: Record<string, unknown> = {}) {
   return {
     id: "assignment-1",
     scheduleWeekId: "week-1",
@@ -196,9 +199,7 @@ function response(
   };
 }
 
-function invitation(
-  overrides: Record<string, unknown> = {}
-) {
+function invitation(overrides: Record<string, unknown> = {}) {
   return {
     id: "invitation-1",
     assignmentId: "assignment-1",
@@ -223,7 +224,9 @@ function setupAssignmentDefaults() {
   mocks.getAppSettings.mockResolvedValue({ confirmationLeadDays: 7 });
   mocks.db.preachingPoint.findUniqueOrThrow.mockResolvedValue(fixedPoint);
   mocks.db.assignmentVolunteer.findMany.mockResolvedValue([]);
-  mocks.tx.assignment.aggregate.mockResolvedValue({ _max: { pairNumber: null } });
+  mocks.tx.assignment.aggregate.mockResolvedValue({
+    _max: { pairNumber: null }
+  });
   mocks.tx.assignment.create.mockImplementation(async ({ data }) => {
     createdCount += 1;
     return {
@@ -232,6 +235,20 @@ function setupAssignmentDefaults() {
     };
   });
   mocks.tx.assignmentResponse.findMany.mockResolvedValue([]);
+  mocks.tx.assignmentVolunteer.findUnique.mockImplementation(
+    async ({
+      where
+    }: {
+      where: {
+        assignmentId_volunteerId: {
+          assignmentId: string;
+          volunteerId: string;
+        };
+      };
+    }) => ({
+      id: `slot-${where.assignmentId_volunteerId.volunteerId}`
+    })
+  );
   mocks.tx.assignment.findUniqueOrThrow.mockResolvedValue(
     assignmentDetail({
       volunteers: [
@@ -275,7 +292,9 @@ beforeEach(() => {
   mocks.tx.assignment.updateMany.mockResolvedValue({ count: 1 });
   mocks.tx.assignmentActivity.findFirst.mockResolvedValue(null);
   mocks.tx.appNotification.findFirst.mockResolvedValue(null);
-  mocks.tx.appNotification.create.mockResolvedValue({ id: "app-notification-1" });
+  mocks.tx.appNotification.create.mockResolvedValue({
+    id: "app-notification-1"
+  });
   mocks.tx.appNotification.updateMany.mockResolvedValue({ count: 1 });
   mocks.tx.volunteerProfile.findUnique.mockImplementation(
     async ({ where }: { where: { id: string } }) => ({
@@ -324,7 +343,9 @@ describe("assignment automation orchestration", () => {
       actorUserId: "admin-1"
     });
 
-    expect(mocks.createPendingPrimaryInvitationsForAssignment).toHaveBeenCalledWith(
+    expect(
+      mocks.createPendingPrimaryInvitationsForAssignment
+    ).toHaveBeenCalledWith(
       expect.objectContaining({
         assignmentId: "assignment-1",
         volunteerIds: ["volunteer-1", "volunteer-2"],
@@ -332,7 +353,9 @@ describe("assignment automation orchestration", () => {
         source: "assignment_created"
       })
     );
-    expect(mocks.sendPendingPrimaryInvitationsForAssignment).toHaveBeenCalledWith({
+    expect(
+      mocks.sendPendingPrimaryInvitationsForAssignment
+    ).toHaveBeenCalledWith({
       assignmentId: "assignment-1",
       actorUserId: "admin-1"
     });
@@ -344,7 +367,7 @@ describe("assignment automation orchestration", () => {
       id: "target-week",
       startDate: new Date(2026, 6, 20),
       endDate: new Date(2026, 6, 26),
-      label: "Semana del 20/7/2026",
+      label: "Del 20 al 26 de julio de 2026",
       createdById: "admin-1"
     });
     mocks.db.scheduleWeek.findUniqueOrThrow.mockResolvedValue({
@@ -386,13 +409,19 @@ describe("assignment automation orchestration", () => {
       actorUserId: "admin-1"
     });
 
-    expect(mocks.createPendingPrimaryInvitationsForAssignment).toHaveBeenCalledTimes(2);
-    expect(mocks.sendPendingPrimaryInvitationsForAssignment).toHaveBeenCalledTimes(2);
+    expect(
+      mocks.createPendingPrimaryInvitationsForAssignment
+    ).toHaveBeenCalledTimes(2);
+    expect(
+      mocks.sendPendingPrimaryInvitationsForAssignment
+    ).toHaveBeenCalledTimes(2);
     expect(mocks.prepareScheduleWeekAutomation).toHaveBeenCalledWith({
       scheduleWeekId: "target-week",
       actorUserId: "admin-1"
     });
-    expect(mocks.createPendingPrimaryInvitationsForAssignment).toHaveBeenNthCalledWith(
+    expect(
+      mocks.createPendingPrimaryInvitationsForAssignment
+    ).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         assignmentId: "assignment-2",
@@ -465,7 +494,9 @@ describe("assignment automation orchestration", () => {
         })
       })
     );
-    expect(mocks.createPendingPrimaryInvitationsForAssignment).toHaveBeenCalledWith(
+    expect(
+      mocks.createPendingPrimaryInvitationsForAssignment
+    ).toHaveBeenCalledWith(
       expect.objectContaining({
         assignmentId: "assignment-1",
         volunteerIds: ["volunteer-3", "volunteer-2"],
@@ -476,7 +507,9 @@ describe("assignment automation orchestration", () => {
         }
       })
     );
-    expect(mocks.sendPendingPrimaryInvitationsForAssignment).toHaveBeenCalledWith({
+    expect(
+      mocks.sendPendingPrimaryInvitationsForAssignment
+    ).toHaveBeenCalledWith({
       assignmentId: "assignment-1",
       actorUserId: "admin-1"
     });
@@ -484,7 +517,9 @@ describe("assignment automation orchestration", () => {
 
   it("confirms a titular invitation and records a confirmed assignment response", async () => {
     const primaryInvitation = invitation();
-    mocks.db.assignmentInvitation.findUnique.mockResolvedValue(primaryInvitation);
+    mocks.db.assignmentInvitation.findUnique.mockResolvedValue(
+      primaryInvitation
+    );
     mocks.tx.assignmentInvitation.findUniqueOrThrow.mockResolvedValue(
       primaryInvitation
     );
@@ -524,7 +559,9 @@ describe("assignment automation orchestration", () => {
 
   it("declines a titular invitation and triggers automatic replacement search", async () => {
     const primaryInvitation = invitation();
-    mocks.db.assignmentInvitation.findUnique.mockResolvedValue(primaryInvitation);
+    mocks.db.assignmentInvitation.findUnique.mockResolvedValue(
+      primaryInvitation
+    );
     mocks.tx.assignmentInvitation.findUniqueOrThrow.mockResolvedValue(
       primaryInvitation
     );
@@ -551,9 +588,108 @@ describe("assignment automation orchestration", () => {
       where: { id: "assignment-1" },
       data: { status: "NEEDS_REPLACEMENT" }
     });
-    expect(mocks.inviteNextAvailableReplacementForAssignment).toHaveBeenCalledWith({
+    expect(
+      mocks.inviteNextAvailableReplacementForAssignment
+    ).toHaveBeenCalledWith({
       assignmentId: "assignment-1"
     });
+  });
+
+  it("blocks direct confirmation when the volunteer is not assigned", async () => {
+    mocks.tx.assignmentVolunteer.findUnique.mockResolvedValue(null);
+
+    await expect(
+      confirmAssignment({
+        assignmentId: "assignment-1",
+        volunteerProfileId: "volunteer-3"
+      })
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    expect(mocks.tx.assignmentResponse.upsert).not.toHaveBeenCalled();
+    expect(mocks.tx.volunteerProfile.update).not.toHaveBeenCalled();
+  });
+
+  it("blocks direct decline when the volunteer is not assigned", async () => {
+    mocks.tx.assignmentVolunteer.findUnique.mockResolvedValue(null);
+
+    await expect(
+      declineAssignment({
+        assignmentId: "assignment-1",
+        volunteerProfileId: "volunteer-3",
+        note: "No puedo apoyar"
+      })
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    expect(mocks.tx.assignmentResponse.upsert).not.toHaveBeenCalled();
+    expect(mocks.tx.assignment.update).not.toHaveBeenCalledWith({
+      where: { id: "assignment-1" },
+      data: { status: "NEEDS_REPLACEMENT" }
+    });
+    expect(
+      mocks.inviteNextAvailableReplacementForAssignment
+    ).not.toHaveBeenCalled();
+  });
+
+  it("assigns a manual replacement to the declined volunteer position", async () => {
+    mocks.db.assignment.findUniqueOrThrow.mockResolvedValueOnce(
+      assignmentDetail({
+        status: "NEEDS_REPLACEMENT",
+        volunteers: [
+          assignmentSlot("volunteer-1", "FIRST"),
+          assignmentSlot("volunteer-2", "SECOND")
+        ],
+        responses: [
+          response("volunteer-1", "DECLINED"),
+          response("volunteer-2", "CONFIRMED")
+        ]
+      })
+    );
+
+    await assignReplacementVolunteer({
+      assignmentId: "assignment-1",
+      volunteerId: "replacement-1",
+      actorUserId: "admin-1"
+    });
+
+    expect(mocks.tx.assignmentVolunteer.delete).toHaveBeenCalledWith({
+      where: { id: "slot-volunteer-1" }
+    });
+    expect(mocks.tx.assignmentVolunteer.create).toHaveBeenCalledWith({
+      data: {
+        assignmentId: "assignment-1",
+        volunteerId: "replacement-1",
+        position: "FIRST",
+        isReplacement: true
+      }
+    });
+  });
+
+  it("blocks self-service replacement when the assignment has no open slot", async () => {
+    mocks.db.assignment.findUniqueOrThrow.mockResolvedValueOnce(
+      assignmentDetail({
+        status: "SCHEDULED",
+        volunteers: [
+          assignmentSlot("volunteer-1", "FIRST"),
+          assignmentSlot("volunteer-2", "SECOND")
+        ],
+        responses: [
+          response("volunteer-1", "PENDING"),
+          response("volunteer-2", "PENDING")
+        ]
+      })
+    );
+
+    await expect(
+      assignReplacementVolunteer({
+        assignmentId: "assignment-1",
+        volunteerId: "replacement-1",
+        actorUserId: "volunteer-user",
+        requireOpenSlot: true
+      })
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(mocks.tx.assignmentVolunteer.create).not.toHaveBeenCalled();
+    expect(mocks.tx.assignmentVolunteer.delete).not.toHaveBeenCalled();
   });
 
   it("accepts a replacement invitation and assigns the volunteer as confirmed replacement", async () => {
@@ -573,8 +709,16 @@ describe("assignment automation orchestration", () => {
         id: "assignment-1",
         status: "NEEDS_REPLACEMENT",
         volunteers: [
-          { id: "slot-volunteer-1", volunteerId: "volunteer-1", position: "FIRST" },
-          { id: "slot-volunteer-2", volunteerId: "volunteer-2", position: "SECOND" }
+          {
+            id: "slot-volunteer-1",
+            volunteerId: "volunteer-1",
+            position: "FIRST"
+          },
+          {
+            id: "slot-volunteer-2",
+            volunteerId: "volunteer-2",
+            position: "SECOND"
+          }
         ],
         responses: [
           response("volunteer-1", "DECLINED"),
@@ -658,7 +802,9 @@ describe("assignment automation orchestration", () => {
         data: expect.objectContaining({ status: "DECLINED" })
       })
     );
-    expect(mocks.inviteNextAvailableReplacementForAssignment).toHaveBeenCalledWith({
+    expect(
+      mocks.inviteNextAvailableReplacementForAssignment
+    ).toHaveBeenCalledWith({
       assignmentId: "assignment-1"
     });
   });
@@ -691,7 +837,9 @@ describe("assignment automation orchestration", () => {
         data: { status: "NEEDS_REPLACEMENT" }
       })
     );
-    expect(mocks.inviteNextAvailableReplacementForAssignment).toHaveBeenCalledWith({
+    expect(
+      mocks.inviteNextAvailableReplacementForAssignment
+    ).toHaveBeenCalledWith({
       assignmentId: "assignment-1"
     });
   });

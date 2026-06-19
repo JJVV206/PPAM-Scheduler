@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canVolunteerRespondToAssignment,
   getVolunteerAssignmentRoleLabel,
   isVolunteerAssignmentConfirmed,
   isVolunteerAssignmentPendingResponse
@@ -12,12 +13,14 @@ function assignmentForVolunteer(input: {
   responseStatus: "PENDING" | "CONFIRMED" | "DECLINED";
   isReplacement?: boolean;
   invitationType?: "PRIMARY" | "REPLACEMENT";
+  responseId?: string | null;
 }) {
   return {
     volunteers: [
       {
         volunteerId: input.volunteerId,
         responseStatus: input.responseStatus,
+        responseId: input.responseId,
         isReplacement: input.isReplacement ?? false
       }
     ],
@@ -56,6 +59,41 @@ describe("volunteer dashboard assignment helpers", () => {
     expect(isVolunteerAssignmentConfirmed(assignment, "volunteer-1")).toBe(
       true
     );
+  });
+
+  it("only enables response actions for pending volunteer responses", () => {
+    expect(
+      canVolunteerRespondToAssignment(
+        assignmentForVolunteer({
+          volunteerId: "volunteer-1",
+          responseStatus: "PENDING",
+          responseId: "response-1"
+        }),
+        "volunteer-1"
+      )
+    ).toBe(true);
+
+    expect(
+      canVolunteerRespondToAssignment(
+        assignmentForVolunteer({
+          volunteerId: "volunteer-1",
+          responseStatus: "PENDING",
+          responseId: null
+        }),
+        "volunteer-1"
+      )
+    ).toBe(false);
+
+    expect(
+      canVolunteerRespondToAssignment(
+        assignmentForVolunteer({
+          volunteerId: "volunteer-1",
+          responseStatus: "CONFIRMED",
+          responseId: "response-1"
+        }),
+        "volunteer-1"
+      )
+    ).toBe(false);
   });
 
   it("shows replacement role when slot or invitation marks the volunteer as replacement", () => {

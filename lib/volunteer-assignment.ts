@@ -29,6 +29,15 @@ export function isVolunteerAssignmentConfirmed(
   );
 }
 
+export function canVolunteerRespondToAssignment(
+  assignment: AssignmentDetailDto,
+  volunteerProfileId: string
+) {
+  const slot = getVolunteerAssignmentSlot(assignment, volunteerProfileId);
+
+  return slot?.responseStatus === "PENDING" && Boolean(slot.responseId);
+}
+
 export function getVolunteerAssignmentRoleLabel(
   assignment: AssignmentDetailDto,
   volunteerProfileId: string
