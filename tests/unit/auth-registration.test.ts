@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => {
   const tx = {
     user: {
-      count: vi.fn(),
       create: vi.fn()
     }
   };
@@ -45,7 +44,7 @@ describe("auth registration", () => {
     const result = registerSchema.safeParse({
       name: "Julia Rivera",
       email: "julia@example.org",
-      phone: "",
+      phone: "5551234567",
       password: "Password1",
       confirmPassword: "Password2"
     });
@@ -58,83 +57,66 @@ describe("auth registration", () => {
     }
   });
 
-  it("creates the first account as admin for local bootstrap", async () => {
-    mocks.tx.user.count.mockResolvedValue(0);
-    mocks.tx.user.create.mockResolvedValue({
-      id: "user-1",
-      name: "Admin Local",
-      email: "admin@example.org",
-      role: "ADMIN",
-      volunteerProfile: null
-    });
-
-    const account = await registerAccount({
-      name: " Admin Local ",
-      email: "ADMIN@EXAMPLE.ORG",
-      password: "Password1"
-    });
-
-    expect(account).toEqual({
-      id: "user-1",
-      name: "Admin Local",
-      email: "admin@example.org",
-      role: "ADMIN",
-      volunteerProfileId: null
-    });
-    expect(mocks.tx.user.count).toHaveBeenCalledWith({
-      where: {
-        active: true
-      }
-    });
-    expect(mocks.tx.user.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          name: "Admin Local",
-          email: "admin@example.org",
-          role: "ADMIN",
-          volunteerProfile: undefined
-        })
-      })
-    );
-  });
-
-  it("creates later accounts as volunteer profiles", async () => {
-    mocks.tx.user.count.mockResolvedValue(1);
-    mocks.tx.user.create.mockResolvedValue({
-      id: "user-2",
+  it("requires a phone number for registration", () => {
+    const result = registerSchema.safeParse({
       name: "Julia Rivera",
       email: "julia@example.org",
+      phone: "",
+      password: "Password1",
+      confirmPassword: "Password1"
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.phone).toContain(
+        "Ingresa un celular válido."
+      );
+    }
+  });
+
+  it("creates public registrations as pending volunteer accounts", async () => {
+    mocks.tx.user.create.mockResolvedValue({
+      id: "user-1",
+      name: "Julia Rivera",
+      email: "julia@example.org",
+      phone: "5551234567",
       role: "VOLUNTEER",
+      active: false,
+      accessStatus: "PENDING_APPROVAL",
       volunteerProfile: {
         id: "volunteer-1"
       }
     });
 
     const account = await registerAccount({
-      name: "Julia Rivera",
-      email: "julia@example.org",
-      phone: "5551234567",
+      name: " Julia Rivera ",
+      email: "JULIA@EXAMPLE.ORG",
+      phone: " 5551234567 ",
       password: "Password1"
     });
 
-    expect(account).toMatchObject({
-      id: "user-2",
+    expect(account).toEqual({
+      id: "user-1",
+      name: "Julia Rivera",
+      email: "julia@example.org",
+      phone: "5551234567",
       role: "VOLUNTEER",
+      active: false,
+      accessStatus: "PENDING_APPROVAL",
       volunteerProfileId: "volunteer-1"
-    });
-    expect(mocks.tx.user.count).toHaveBeenCalledWith({
-      where: {
-        active: true
-      }
     });
     expect(mocks.tx.user.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
+          active: false,
+          accessStatus: "PENDING_APPROVAL",
           phone: "5551234567",
           role: "VOLUNTEER",
           volunteerProfile: {
             create: {
-              active: true,
+              active: false,
+              canServeAsReplacement: false,
+              temporaryUnavailable: true,
               preferredAreas: []
             }
           }
@@ -150,6 +132,7 @@ describe("auth registration", () => {
       registerAccount({
         name: "Julia Rivera",
         email: "julia@example.org",
+        phone: "5551234567",
         password: "Password1"
       })
     ).rejects.toMatchObject({

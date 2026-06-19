@@ -51,6 +51,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  if (token.accessStatus && token.accessStatus !== "APPROVED") {
+    const response = NextResponse.redirect(new URL("/login", request.url));
+    clearAuthCookies(response, request);
+    return response;
+  }
+
   if (isHomeRoute || isAuthRoute) {
     return NextResponse.next();
   }

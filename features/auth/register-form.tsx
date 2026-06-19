@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -39,8 +37,8 @@ export function RegisterForm({
   authReady = true,
   environmentMessage
 }: RegisterFormProps) {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -61,6 +59,7 @@ export function RegisterForm({
     }
 
     setError(null);
+    setSuccessMessage(null);
     const response = await fetch("/api/auth/register", {
       method: "POST",
       headers: {
@@ -75,22 +74,11 @@ export function RegisterForm({
       return;
     }
 
-    const signInResult = await signIn("credentials", {
-      email: values.email,
-      password: values.password,
-      redirect: false,
-      callbackUrl: "/"
-    });
-
-    if (signInResult?.error) {
-      setError(
-        "La cuenta fue creada, pero no fue posible iniciar sesión automáticamente."
-      );
-      return;
-    }
-
-    router.push(signInResult?.url ?? "/");
-    router.refresh();
+    form.reset();
+    setSuccessMessage(
+      result.message ??
+        "Tu solicitud fue recibida. Un administrador debe aprobar tu cuenta antes de que puedas iniciar sesión."
+    );
   }
 
   return (
@@ -145,11 +133,11 @@ export function RegisterForm({
               name="phone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Teléfono</FormLabel>
+                  <FormLabel>Celular</FormLabel>
                   <FormControl>
                     <Input
                       type="tel"
-                      placeholder="Opcional"
+                      placeholder="+52 777 123 4567"
                       autoComplete="tel"
                       {...field}
                     />
@@ -197,13 +185,18 @@ export function RegisterForm({
                 </FormItem>
               )}
             />
+            {successMessage ? (
+              <div className="rounded-lg border border-success/25 bg-success/10 px-4 py-3 text-sm text-success">
+                {successMessage}
+              </div>
+            ) : null}
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             <Button
               className="w-full"
               type="submit"
               disabled={!authReady || form.formState.isSubmitting}
             >
-              Crear cuenta
+              Enviar solicitud
             </Button>
           </form>
         </Form>

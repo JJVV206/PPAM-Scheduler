@@ -1,6 +1,12 @@
 import type { TimeSlot } from "@/types/domain";
 
 export const USER_ROLES = ["ADMIN", "VOLUNTEER"] as const;
+export const USER_ACCESS_STATUSES = [
+  "PENDING_APPROVAL",
+  "APPROVED",
+  "REJECTED",
+  "SUSPENDED"
+] as const;
 export const DAYS_OF_WEEK = [
   "MONDAY",
   "TUESDAY",
@@ -130,6 +136,13 @@ export const DAY_LABELS = {
 export const ROLE_LABELS = {
   ADMIN: "Administrador",
   VOLUNTEER: "Voluntario"
+} as const;
+
+export const USER_ACCESS_STATUS_LABELS = {
+  PENDING_APPROVAL: "Pendiente de admisión",
+  APPROVED: "Aprobada",
+  REJECTED: "Rechazada",
+  SUSPENDED: "Suspendida"
 } as const;
 
 export const VOLUNTEER_POSITION_LABELS = {

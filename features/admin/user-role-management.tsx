@@ -20,7 +20,10 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
-import { ROLE_LABELS } from "@/lib/constants/domain";
+import {
+  ROLE_LABELS,
+  USER_ACCESS_STATUS_LABELS
+} from "@/lib/constants/domain";
 import type { UserAccountDto } from "@/services/user.service";
 import type { UserRole } from "@/types/domain";
 
@@ -29,6 +32,14 @@ type UserRoleManagementProps = {
 };
 
 function getProfileStatus(account: UserAccountDto) {
+  if (account.accessStatus === "PENDING_APPROVAL") {
+    return "Admisión pendiente";
+  }
+
+  if (account.accessStatus === "REJECTED") {
+    return "Solicitud rechazada";
+  }
+
   if (!account.volunteerProfile) {
     return account.role === "ADMIN"
       ? "Sin perfil voluntario"
@@ -52,6 +63,13 @@ function getRoleBadgeVariant(role: UserRole) {
   return role === "ADMIN" ? "default" : "success";
 }
 
+function getAccessBadgeVariant(accessStatus: UserAccountDto["accessStatus"]) {
+  if (accessStatus === "APPROVED") return "success";
+  if (accessStatus === "PENDING_APPROVAL") return "warning";
+  if (accessStatus === "REJECTED") return "danger";
+  return "outline";
+}
+
 export function UserRoleManagement({ accounts }: UserRoleManagementProps) {
   const router = useRouter();
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
@@ -63,7 +81,10 @@ export function UserRoleManagement({ accounts }: UserRoleManagementProps) {
   const activeAdminCount = useMemo(
     () =>
       accounts.filter(
-        (account) => account.role === "ADMIN" && account.active
+        (account) =>
+          account.role === "ADMIN" &&
+          account.active &&
+          account.accessStatus === "APPROVED"
       ).length,
     [accounts]
   );
@@ -109,6 +130,7 @@ export function UserRoleManagement({ accounts }: UserRoleManagementProps) {
         <TableHeader>
           <TableRow>
             <TableHead>Cuenta</TableHead>
+            <TableHead>Acceso</TableHead>
             <TableHead>Rol actual</TableHead>
             <TableHead>Perfil</TableHead>
             <TableHead>Delegar como</TableHead>
@@ -120,8 +142,13 @@ export function UserRoleManagement({ accounts }: UserRoleManagementProps) {
               const isOnlyActiveAdmin =
                 account.role === "ADMIN" &&
                 account.active &&
+                account.accessStatus === "APPROVED" &&
                 activeAdminCount === 1;
               const isPending = pendingUserId === account.id;
+              const roleChangeDisabled =
+                isPending ||
+                !account.active ||
+                account.accessStatus !== "APPROVED";
 
               return (
                 <TableRow key={account.id}>
@@ -131,8 +158,16 @@ export function UserRoleManagement({ accounts }: UserRoleManagementProps) {
                       {account.email}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
+                      {account.phone}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {account.active ? "Cuenta activa" : "Cuenta inactiva"}
                     </p>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={getAccessBadgeVariant(account.accessStatus)}>
+                      {USER_ACCESS_STATUS_LABELS[account.accessStatus]}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant={getRoleBadgeVariant(account.role)}>
@@ -153,7 +188,7 @@ export function UserRoleManagement({ accounts }: UserRoleManagementProps) {
                       onValueChange={(role) =>
                         void handleRoleChange(account, role)
                       }
-                      disabled={isPending}
+                      disabled={roleChangeDisabled}
                     >
                       <SelectTrigger className="w-full md:w-48">
                         <SelectValue placeholder="Selecciona rol" />
@@ -177,7 +212,7 @@ export function UserRoleManagement({ accounts }: UserRoleManagementProps) {
           ) : (
             <TableRow>
               <TableCell
-                colSpan={4}
+                colSpan={5}
                 className="h-32 text-center text-muted-foreground"
               >
                 No hay cuentas registradas.

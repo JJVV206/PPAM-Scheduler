@@ -40,8 +40,9 @@ function mapVolunteer(record: {
     id: string;
     name: string;
     email: string;
-    phone: string | null;
+    phone: string;
     active: boolean;
+    accessStatus: string;
   };
 }): VolunteerSummary {
   return {
@@ -50,7 +51,10 @@ function mapVolunteer(record: {
     name: record.user.name,
     email: record.user.email,
     phone: record.user.phone,
-    active: record.active && record.user.active,
+    active:
+      record.active &&
+      record.user.active &&
+      record.user.accessStatus === "APPROVED",
     transportationNotes: record.transportationNotes,
     preferredAreas: record.preferredAreas,
     reliabilityScore: record.reliabilityScore,
@@ -68,10 +72,17 @@ export async function getVolunteers(input?: { activeOnly?: boolean }) {
       ? {
           active: true,
           user: {
-            active: true
+            active: true,
+            accessStatus: "APPROVED"
           }
         }
-      : undefined,
+      : {
+          user: {
+            accessStatus: {
+              notIn: ["PENDING_APPROVAL", "REJECTED"]
+            }
+          }
+        },
     include: { user: true, availability: true },
     orderBy: { user: { name: "asc" } }
   });
@@ -106,7 +117,7 @@ export async function getVolunteer(volunteerId: string) {
 export async function createVolunteer(input: {
   name: string;
   email: string;
-  phone?: string;
+  phone: string;
   role: "VOLUNTEER" | "ADMIN";
   notes?: string;
   transportationNotes?: string;
@@ -115,6 +126,7 @@ export async function createVolunteer(input: {
   passwordHash: string;
 }) {
   const normalizedEmail = input.email.toLowerCase();
+  const normalizedPhone = input.phone.trim();
   const existingUser = await db.user.findUnique({
     where: { email: normalizedEmail },
     include: { volunteerProfile: true }
@@ -133,9 +145,10 @@ export async function createVolunteer(input: {
     data: {
       name: input.name,
       email: normalizedEmail,
-      phone: input.phone,
+      phone: normalizedPhone,
       role: input.role,
       active: input.active,
+      accessStatus: input.active ? "APPROVED" : "SUSPENDED",
       passwordHash: input.passwordHash,
       volunteerProfile:
         input.role === "VOLUNTEER"
@@ -195,7 +208,13 @@ export async function updateVolunteer(
         name: input.name,
         email: input.email?.toLowerCase(),
         phone: input.phone,
-        active: input.active
+        active: input.active,
+        accessStatus:
+          input.active === undefined
+            ? undefined
+            : input.active
+              ? "APPROVED"
+              : "SUSPENDED"
       }
     });
 
@@ -231,7 +250,10 @@ export async function deactivateVolunteer(
     });
     await tx.user.update({
       where: { id: volunteer.userId },
-      data: { active: false }
+      data: {
+        active: false,
+        accessStatus: "SUSPENDED"
+      }
     });
 
     const activeInvitations = await tx.assignmentInvitation.findMany({

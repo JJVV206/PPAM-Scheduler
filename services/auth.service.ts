@@ -18,10 +18,11 @@ function isUniqueConstraintError(error: unknown) {
 export async function registerAccount(input: {
   name: string;
   email: string;
-  phone?: string;
+  phone: string;
   password: string;
 }) {
   const normalizedEmail = input.email.trim().toLowerCase();
+  const normalizedPhone = input.phone.trim();
   const existingUser = await db.user.findUnique({
     where: {
       email: normalizedEmail
@@ -39,29 +40,23 @@ export async function registerAccount(input: {
 
   try {
     return await db.$transaction(async (tx) => {
-      const activeUserCount = await tx.user.count({
-        where: {
-          active: true
-        }
-      });
-      const role = activeUserCount === 0 ? "ADMIN" : "VOLUNTEER";
       const user = await tx.user.create({
         data: {
           name: input.name.trim(),
           email: normalizedEmail,
-          phone: input.phone?.trim() || undefined,
+          phone: normalizedPhone,
           passwordHash,
-          role,
-          active: true,
-          volunteerProfile:
-            role === "VOLUNTEER"
-              ? {
-                  create: {
-                    preferredAreas: [],
-                    active: true
-                  }
-                }
-              : undefined
+          role: "VOLUNTEER",
+          active: false,
+          accessStatus: "PENDING_APPROVAL",
+          volunteerProfile: {
+            create: {
+              preferredAreas: [],
+              active: false,
+              temporaryUnavailable: true,
+              canServeAsReplacement: false
+            }
+          }
         },
         include: {
           volunteerProfile: true
@@ -72,7 +67,10 @@ export async function registerAccount(input: {
         id: user.id,
         name: user.name,
         email: user.email,
+        phone: user.phone,
         role: user.role,
+        active: user.active,
+        accessStatus: user.accessStatus,
         volunteerProfileId: user.volunteerProfile?.id ?? null
       };
     });

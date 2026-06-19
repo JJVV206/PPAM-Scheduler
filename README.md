@@ -92,6 +92,7 @@ Recommended release flow:
 Notes:
 
 - Production no longer relies on `prisma db push`; use migrations instead.
+- `npm run prod:create-admin` requires `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `ADMIN_PHONE`.
 - `/api/health` reports core app/database health. Use `?scope=readiness` when email must be part of the release gate.
 - Resend API is the recommended production email provider. SMTP remains available as a fallback for providers that do not expose an API.
 - If Resend/SMTP is missing or invalid in production, password reset and assignment emails will fail explicitly instead of being marked as sent.

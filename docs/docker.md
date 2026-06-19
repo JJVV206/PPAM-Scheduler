@@ -124,5 +124,6 @@ Create the first production admin from the same tools image:
 docker run --rm --env-file .env.production \
   -e ADMIN_EMAIL="admin@example.com" \
   -e ADMIN_PASSWORD="replace-with-a-strong-password" \
+  -e ADMIN_PHONE="+52 777 000 0000" \
   ppam-scheduler-tools npm run prod:create-admin
 ```

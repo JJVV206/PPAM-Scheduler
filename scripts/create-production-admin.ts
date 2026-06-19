@@ -17,7 +17,7 @@ async function main() {
   const email = requireEnv("ADMIN_EMAIL").toLowerCase();
   const password = requireEnv("ADMIN_PASSWORD");
   const name = process.env.ADMIN_NAME?.trim() || "PPAM Admin";
-  const phone = process.env.ADMIN_PHONE?.trim() || null;
+  const phone = requireEnv("ADMIN_PHONE");
 
   if (password.length < 12) {
     throw new Error("ADMIN_PASSWORD must be at least 12 characters long.");
@@ -41,6 +41,7 @@ async function main() {
           where: { email },
           data: {
             active: true,
+            accessStatus: "APPROVED",
             name,
             passwordHash,
             phone
@@ -49,6 +50,7 @@ async function main() {
       : await prisma.user.create({
           data: {
             active: true,
+            accessStatus: "APPROVED",
             email,
             name,
             passwordHash,

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/prisma";
 import { AppError } from "@/services/errors";
-import type { UserRole } from "@/types/domain";
+import type { UserAccessStatus, UserRole } from "@/types/domain";
 
 type VolunteerProfileRoleState = {
   id: string;
@@ -13,10 +13,18 @@ type UserAccountRecord = {
   id: string;
   name: string;
   email: string;
-  phone: string | null;
+  phone: string;
   role: UserRole;
   active: boolean;
+  accessStatus: UserAccessStatus;
+  accessReviewedAt: Date | null;
+  accessReviewNote: string | null;
   createdAt: Date;
+  accessReviewedBy: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
   volunteerProfile: VolunteerProfileRoleState | null;
 };
 
@@ -36,7 +44,17 @@ const USER_ACCOUNT_SELECT = {
   phone: true,
   role: true,
   active: true,
+  accessStatus: true,
+  accessReviewedAt: true,
+  accessReviewNote: true,
   createdAt: true,
+  accessReviewedBy: {
+    select: {
+      id: true,
+      name: true,
+      email: true
+    }
+  },
   volunteerProfile: {
     select: VOLUNTEER_PROFILE_ROLE_SELECT
   }
@@ -50,7 +68,11 @@ function mapUserAccount(record: UserAccountRecord): UserAccountDto {
     phone: record.phone,
     role: record.role,
     active: record.active,
+    accessStatus: record.accessStatus,
+    accessReviewedAt: record.accessReviewedAt,
+    accessReviewNote: record.accessReviewNote,
     createdAt: record.createdAt,
+    accessReviewedBy: record.accessReviewedBy,
     volunteerProfile: record.volunteerProfile
   };
 }
@@ -58,7 +80,7 @@ function mapUserAccount(record: UserAccountRecord): UserAccountDto {
 export async function getUserAccounts(): Promise<UserAccountDto[]> {
   const users = await db.user.findMany({
     select: USER_ACCOUNT_SELECT,
-    orderBy: [{ role: "asc" }, { name: "asc" }]
+    orderBy: [{ accessStatus: "asc" }, { role: "asc" }, { name: "asc" }]
   });
 
   return users.map(mapUserAccount);
@@ -74,12 +96,20 @@ export async function updateUserRole(input: {
       include: { volunteerProfile: true }
     });
 
+    if (!user.active || user.accessStatus !== "APPROVED") {
+      throw new AppError(
+        "Solo puedes cambiar roles de cuentas activas y aprobadas.",
+        409
+      );
+    }
+
     if (user.role === "ADMIN" && input.role === "VOLUNTEER" && user.active) {
       const remainingActiveAdmins = await tx.user.count({
         where: {
           id: { not: user.id },
           role: "ADMIN",
-          active: true
+          active: true,
+          accessStatus: "APPROVED"
         }
       });
 
@@ -91,25 +121,14 @@ export async function updateUserRole(input: {
       }
     }
 
-    const updatedUser = await tx.user.update({
+    await tx.user.update({
       where: { id: user.id },
-      data: { role: input.role },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        role: true,
-        active: true,
-        createdAt: true
-      }
+      data: { role: input.role }
     });
 
-    let volunteerProfile: VolunteerProfileRoleState | null = null;
-
     if (input.role === "VOLUNTEER") {
-      volunteerProfile = user.volunteerProfile
-        ? await tx.volunteerProfile.update({
+      if (user.volunteerProfile) {
+        await tx.volunteerProfile.update({
             where: { id: user.volunteerProfile.id },
             data: {
               active: true,
@@ -117,8 +136,9 @@ export async function updateUserRole(input: {
               canServeAsReplacement: true
             },
             select: VOLUNTEER_PROFILE_ROLE_SELECT
-          })
-        : await tx.volunteerProfile.create({
+          });
+      } else {
+        await tx.volunteerProfile.create({
             data: {
               userId: user.id,
               preferredAreas: [],
@@ -128,8 +148,9 @@ export async function updateUserRole(input: {
             },
             select: VOLUNTEER_PROFILE_ROLE_SELECT
           });
+      }
     } else if (user.volunteerProfile) {
-      volunteerProfile = await tx.volunteerProfile.update({
+      await tx.volunteerProfile.update({
         where: { id: user.volunteerProfile.id },
         data: {
           active: false,
@@ -140,9 +161,115 @@ export async function updateUserRole(input: {
       });
     }
 
-    return mapUserAccount({
-      ...updatedUser,
-      volunteerProfile
+    const updatedUser = await tx.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: USER_ACCOUNT_SELECT
     });
+
+    return mapUserAccount(updatedUser);
+  });
+}
+
+export async function reviewUserAdmission(input: {
+  userId: string;
+  actorUserId: string;
+  decision: "APPROVE" | "REJECT";
+  note?: string;
+}): Promise<UserAccountDto> {
+  return db.$transaction(async (tx) => {
+    const user = await tx.user.findUniqueOrThrow({
+      where: { id: input.userId },
+      include: { volunteerProfile: true }
+    });
+
+    if (user.role !== "VOLUNTEER") {
+      throw new AppError(
+        "Solo se pueden revisar solicitudes de cuentas voluntarias.",
+        409
+      );
+    }
+
+    const now = new Date();
+    const reviewNote = input.note?.trim() || null;
+
+    if (input.decision === "APPROVE") {
+      if (user.accessStatus === "SUSPENDED") {
+        throw new AppError(
+          "Esta cuenta está suspendida. Reactívala desde la gestión del perfil.",
+          409
+        );
+      }
+
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          active: true,
+          accessStatus: "APPROVED",
+          accessReviewedAt: now,
+          accessReviewedById: input.actorUserId,
+          accessReviewNote: null
+        }
+      });
+
+      if (user.volunteerProfile) {
+        await tx.volunteerProfile.update({
+          where: { id: user.volunteerProfile.id },
+          data: {
+            active: true,
+            temporaryUnavailable: false,
+            canServeAsReplacement: true
+          }
+        });
+      } else {
+        await tx.volunteerProfile.create({
+          data: {
+            userId: user.id,
+            preferredAreas: [],
+            active: true,
+            temporaryUnavailable: false,
+            canServeAsReplacement: true
+          }
+        });
+      }
+    } else {
+      if (
+        user.accessStatus === "APPROVED" ||
+        user.accessStatus === "SUSPENDED"
+      ) {
+        throw new AppError(
+          "Solo se pueden rechazar solicitudes pendientes o previamente rechazadas.",
+          409
+        );
+      }
+
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          active: false,
+          accessStatus: "REJECTED",
+          accessReviewedAt: now,
+          accessReviewedById: input.actorUserId,
+          accessReviewNote: reviewNote
+        }
+      });
+
+      if (user.volunteerProfile) {
+        await tx.volunteerProfile.update({
+          where: { id: user.volunteerProfile.id },
+          data: {
+            active: false,
+            temporaryUnavailable: true,
+            canServeAsReplacement: false
+          }
+        });
+      }
+    }
+
+    const reviewedUser = await tx.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: USER_ACCOUNT_SELECT
+    });
+
+    return mapUserAccount(reviewedUser);
   });
 }

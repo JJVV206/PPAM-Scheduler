@@ -79,7 +79,7 @@ function candidate(input: {
       id: `user-${input.id}`,
       name: input.name,
       email: `${input.id}@example.org`,
-      phone: null,
+      phone: "5551234567",
       active: true
     },
     availability: [

@@ -97,7 +97,8 @@ describe("volunteer service", () => {
         where: {
           active: true,
           user: {
-            active: true
+            active: true,
+            accessStatus: "APPROVED"
           }
         }
       })
@@ -115,7 +116,10 @@ describe("volunteer service", () => {
     });
     expect(mocks.tx.user.update).toHaveBeenCalledWith({
       where: { id: "user-1" },
-      data: { active: false }
+      data: {
+        active: false,
+        accessStatus: "SUSPENDED"
+      }
     });
     expect(mocks.tx.assignmentInvitation.update).toHaveBeenCalledWith({
       where: { id: "invitation-1" },

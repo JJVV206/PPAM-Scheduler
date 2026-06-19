@@ -9,11 +9,13 @@ import type {
   NOTIFICATION_TYPES,
   RESPONSE_STATUSES,
   TIME_SLOTS,
+  USER_ACCESS_STATUSES,
   USER_ROLES,
   VOLUNTEER_POSITIONS
 } from "@/lib/constants/domain";
 
 export type UserRole = (typeof USER_ROLES)[number];
+export type UserAccessStatus = (typeof USER_ACCESS_STATUSES)[number];
 export type DayOfWeek = (typeof DAYS_OF_WEEK)[number];
 export type TimeSlot = (typeof TIME_SLOTS)[number];
 export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number];
@@ -32,9 +34,10 @@ export type BasicUser = {
   id: string;
   name: string;
   email: string;
-  phone?: string | null;
+  phone: string;
   role: UserRole;
   active: boolean;
+  accessStatus: UserAccessStatus;
 };
 
 export type VolunteerSummary = {
@@ -42,7 +45,7 @@ export type VolunteerSummary = {
   userId: string;
   name: string;
   email: string;
-  phone?: string | null;
+  phone: string;
   active: boolean;
   transportationNotes?: string | null;
   preferredAreas: string[];

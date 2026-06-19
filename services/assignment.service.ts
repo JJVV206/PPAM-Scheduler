@@ -120,8 +120,9 @@ function mapVolunteerSummary(record: {
     id: string;
     name: string;
     email: string;
-    phone: string | null;
+    phone: string;
     active: boolean;
+    accessStatus: string;
   };
 }): VolunteerSummary {
   return {
@@ -130,7 +131,10 @@ function mapVolunteerSummary(record: {
     name: record.user.name,
     email: record.user.email,
     phone: record.user.phone,
-    active: record.user.active && record.active,
+    active:
+      record.user.active &&
+      record.user.accessStatus === "APPROVED" &&
+      record.active,
     transportationNotes: record.transportationNotes,
     preferredAreas: record.preferredAreas,
     reliabilityScore: record.reliabilityScore,

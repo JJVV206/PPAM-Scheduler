@@ -133,7 +133,7 @@ function user(id: string, name = id) {
     id: `user-${id}`,
     name,
     email: `${id}@example.org`,
-    phone: null,
+    phone: "5551234567",
     active: true
   };
 }
