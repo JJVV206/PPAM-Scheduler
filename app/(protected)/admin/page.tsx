@@ -55,17 +55,17 @@ function CoverageMetric({
 }) {
   return (
     <div
-      className={`${toneClasses[tone].card} flex min-h-[7.5rem] flex-col justify-between rounded-lg border p-4`}
+      className={`${toneClasses[tone].card} flex min-h-[5.75rem] flex-col justify-between rounded-lg border p-3`}
     >
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm leading-5 text-muted-foreground">{label}</p>
         <div
-          className={`${toneClasses[tone].icon} flex h-8 w-8 shrink-0 items-center justify-center rounded-lg`}
+          className={`${toneClasses[tone].icon} flex h-7 w-7 shrink-0 items-center justify-center rounded-lg`}
         >
           <Icon className="h-4 w-4" />
         </div>
       </div>
-      <p className="font-heading text-3xl font-semibold leading-none sm:text-4xl">
+      <p className="font-heading text-2xl font-semibold leading-none sm:text-3xl">
         {value}
       </p>
     </div>
@@ -82,15 +82,15 @@ function AlertMetric({
   value: number;
 }) {
   return (
-    <div className="grid min-h-[8.75rem] grid-cols-[auto_minmax(0,1fr)] items-center gap-4 rounded-lg border border-border/70 bg-background/35 p-4">
-      <span className="bg-warning/12 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-warning">
+    <div className="grid min-h-[5.75rem] grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-lg border border-border/70 bg-background/35 p-3">
+      <span className="bg-warning/12 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-warning">
         <Icon className="h-5 w-5" />
       </span>
       <div className="min-w-0">
-        <p className="font-heading text-3xl font-semibold leading-none">
+        <p className="font-heading text-2xl font-semibold leading-none">
           {value}
         </p>
-        <p className="mt-2 min-w-0 text-sm leading-5 text-muted-foreground">
+        <p className="mt-1 min-w-0 text-sm leading-5 text-muted-foreground">
           {label}
         </p>
       </div>
@@ -100,9 +100,9 @@ function AlertMetric({
 
 function CensusMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex min-h-[6.25rem] flex-col justify-between rounded-lg border border-border/70 bg-background/35 p-4">
+    <div className="flex min-h-[4.75rem] flex-col justify-between rounded-lg border border-border/70 bg-background/35 p-3">
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="font-heading text-3xl font-semibold leading-none">
+      <p className="font-heading text-2xl font-semibold leading-none">
         {value}
       </p>
     </div>
@@ -123,7 +123,7 @@ function DashboardPanelHeader({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
-        <h2 className="font-heading text-2xl font-semibold leading-tight">
+        <h2 className="font-heading text-xl font-semibold leading-tight">
           {title}
         </h2>
         <p className="text-sm text-muted-foreground">{description}</p>
@@ -143,7 +143,7 @@ function CoveragePanel({
   dashboard: Awaited<ReturnType<typeof getAdminDashboardStats>>;
 }) {
   return (
-    <section className="surface-panel flex min-h-[16rem] flex-col gap-4 p-4 lg:p-5">
+    <section className="surface-panel flex flex-col gap-3 p-3 lg:p-4">
       <DashboardPanelHeader
         title="Cobertura semanal"
         description={dashboard.weekLabel}
@@ -157,7 +157,7 @@ function CoveragePanel({
         }
       />
 
-      <div className="grid flex-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+      <div className="grid flex-1 gap-2.5 sm:grid-cols-2 2xl:grid-cols-4">
         <CoverageMetric
           icon={CheckCircle2}
           label="Confirmadas"
@@ -195,7 +195,7 @@ function AlertsPanel({
   totalAlerts: number;
 }) {
   return (
-    <section className="surface-panel flex min-h-[26rem] flex-col gap-4 p-4 lg:p-5">
+    <section className="surface-panel flex flex-col gap-3 p-3 lg:p-4">
       <DashboardPanelHeader
         title="Alertas"
         description="Incidencias que requieren revisión operativa."
@@ -208,7 +208,7 @@ function AlertsPanel({
           </Button>
         }
       />
-      <div className="grid flex-1 gap-3 sm:grid-cols-2">
+      <div className="grid flex-1 gap-2.5 sm:grid-cols-2">
         <AlertMetric
           icon={MailWarning}
           label="Emails fallidos"
@@ -243,7 +243,7 @@ function ReplacementCensusPanel({
   dashboard: Awaited<ReturnType<typeof getAdminDashboardStats>>;
 }) {
   return (
-    <section className="surface-panel flex min-h-[24rem] flex-col gap-4 p-4 lg:p-5 xl:row-span-2">
+    <section className="surface-panel flex flex-col gap-3 p-3 lg:p-4 xl:row-span-2">
       <DashboardPanelHeader
         title="Censo de suplentes"
         description={
@@ -263,7 +263,7 @@ function ReplacementCensusPanel({
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+      <div className="grid gap-2.5 sm:grid-cols-3 xl:grid-cols-3">
         <CensusMetric
           label="Invitados"
           value={dashboard.census.totalResponses}
@@ -278,7 +278,7 @@ function ReplacementCensusPanel({
         />
       </div>
 
-      <div className="flex flex-1 flex-col justify-center rounded-lg border border-border/70 bg-background/35 p-5">
+      <div className="flex flex-1 flex-col justify-center rounded-lg border border-border/70 bg-background/35 p-4">
         <div className="flex items-end justify-between gap-3">
           <div>
             <p className="text-sm text-muted-foreground">Respuesta del censo</p>
@@ -287,11 +287,11 @@ function ReplacementCensusPanel({
               {dashboard.census.totalResponses} respondieron
             </p>
           </div>
-          <p className="font-heading text-5xl font-semibold leading-none">
+          <p className="font-heading text-4xl font-semibold leading-none">
             {dashboard.census.responseRate}%
           </p>
         </div>
-        <div className="mt-6 h-2.5 overflow-hidden rounded-full bg-secondary">
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-secondary">
           <div
             className="h-full rounded-full bg-primary"
             style={{ width: `${dashboard.census.responseRate}%` }}
@@ -299,7 +299,7 @@ function ReplacementCensusPanel({
         </div>
         <Badge
           variant={dashboard.census.pendingResponses ? "warning" : "success"}
-          className="mt-5 w-fit"
+          className="mt-3 w-fit"
         >
           {dashboard.census.pendingResponses
             ? "Seguimiento pendiente"
