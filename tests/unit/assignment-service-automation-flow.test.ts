@@ -62,6 +62,10 @@ const mocks = vi.hoisted(() => {
       create: vi.fn(),
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn()
+    },
+    volunteerProfile: {
+      findMany: vi.fn(),
+      findUnique: vi.fn()
     }
   };
 
@@ -121,7 +125,7 @@ import {
 
 const fixedPoint = {
   id: "point-1",
-  name: "Hospital Dr Jose G. Parres",
+  name: "Hospital Dr José G. Parres",
   area: "North",
   notes: null,
   active: true,
@@ -133,7 +137,7 @@ function user(id: string, name = id) {
     id: `user-${id}`,
     name,
     email: `${id}@example.org`,
-    phone: null,
+    phone: "5551234567",
     active: true
   };
 }
@@ -224,6 +228,26 @@ function setupAssignmentDefaults() {
   mocks.getAppSettings.mockResolvedValue({ confirmationLeadDays: 7 });
   mocks.db.preachingPoint.findUniqueOrThrow.mockResolvedValue(fixedPoint);
   mocks.db.assignmentVolunteer.findMany.mockResolvedValue([]);
+  mocks.db.volunteerProfile.findMany.mockImplementation(
+    async ({ where }: { where: { id?: { in?: string[] } } }) =>
+      (where.id?.in ?? []).map((id) => ({
+        id,
+        canServeAsPrimary: true,
+        user: {
+          name: `Voluntario ${id}`
+        }
+      }))
+  );
+  mocks.db.volunteerProfile.findUnique.mockResolvedValue({
+    active: true,
+    temporaryUnavailable: false,
+    canServeAsReplacement: true,
+    user: {
+      name: "Replacement Candidate",
+      active: true,
+      accessStatus: "APPROVED"
+    }
+  });
   mocks.tx.assignment.aggregate.mockResolvedValue({
     _max: { pairNumber: null }
   });
@@ -359,6 +383,69 @@ describe("assignment automation orchestration", () => {
       assignmentId: "assignment-1",
       actorUserId: "admin-1"
     });
+  });
+
+  it("rejects primary assignments for volunteers without primary capacity", async () => {
+    mocks.db.volunteerProfile.findMany.mockResolvedValueOnce([
+      {
+        id: "replacement-only",
+        canServeAsPrimary: false,
+        user: {
+          name: "Solo Suplente"
+        }
+      }
+    ]);
+
+    await expect(
+      createWeeklyAssignment({
+        scheduleWeekId: "week-1",
+        date: new Date(2026, 6, 20),
+        dayOfWeek: "MONDAY",
+        timeSlot: "SLOT_11_13",
+        preachingPointId: fixedPoint.id,
+        volunteers: [{ volunteerId: "replacement-only", position: "FIRST" }],
+        actorUserId: "admin-1"
+      })
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(mocks.tx.assignment.create).not.toHaveBeenCalled();
+  });
+
+  it("allows assignments on any slot for the fixed preaching point even if legacy active slots exist", async () => {
+    mocks.getSingletonPreachingPoint.mockResolvedValueOnce({
+      ...fixedPoint,
+      activeSlots: [
+        {
+          id: "slot-legacy",
+          preachingPointId: fixedPoint.id,
+          dayOfWeek: "TUESDAY",
+          timeSlot: "SLOT_09_11"
+        }
+      ]
+    });
+
+    await createWeeklyAssignment({
+      scheduleWeekId: "week-1",
+      date: new Date(2026, 5, 22),
+      dayOfWeek: "MONDAY",
+      timeSlot: "SLOT_07_09",
+      preachingPointId: fixedPoint.id,
+      volunteers: [
+        { volunteerId: "volunteer-1", position: "FIRST" },
+        { volunteerId: "volunteer-2", position: "SECOND" }
+      ],
+      actorUserId: "admin-1"
+    });
+
+    expect(mocks.tx.assignment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          dayOfWeek: "MONDAY",
+          timeSlot: "SLOT_07_09"
+        })
+      })
+    );
+    expect(mocks.db.preachingPoint.findUniqueOrThrow).not.toHaveBeenCalled();
   });
 
   it("duplicates a week and generates titular invitations for every copied assignment", async () => {
@@ -662,6 +749,42 @@ describe("assignment automation orchestration", () => {
         isReplacement: true
       }
     });
+  });
+
+  it("rejects manual replacement for volunteers without replacement capacity", async () => {
+    mocks.db.assignment.findUniqueOrThrow.mockResolvedValueOnce(
+      assignmentDetail({
+        status: "NEEDS_REPLACEMENT",
+        volunteers: [
+          assignmentSlot("volunteer-1", "FIRST"),
+          assignmentSlot("volunteer-2", "SECOND")
+        ],
+        responses: [
+          response("volunteer-1", "DECLINED"),
+          response("volunteer-2", "CONFIRMED")
+        ]
+      })
+    );
+    mocks.db.volunteerProfile.findUnique.mockResolvedValueOnce({
+      active: true,
+      temporaryUnavailable: false,
+      canServeAsReplacement: false,
+      user: {
+        name: "Solo Titular",
+        active: true,
+        accessStatus: "APPROVED"
+      }
+    });
+
+    await expect(
+      assignReplacementVolunteer({
+        assignmentId: "assignment-1",
+        volunteerId: "primary-only",
+        actorUserId: "admin-1"
+      })
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(mocks.tx.assignmentVolunteer.create).not.toHaveBeenCalled();
   });
 
   it("blocks self-service replacement when the assignment has no open slot", async () => {

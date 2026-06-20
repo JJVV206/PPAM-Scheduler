@@ -52,7 +52,7 @@ export function LoginForm({
     if (result?.error) {
       setError(
         result.error === "CredentialsSignin"
-          ? "Credenciales inválidas."
+          ? "Credenciales inválidas o cuenta pendiente de aprobación."
           : "No fue posible iniciar sesión. Revisa la configuración del servidor y la conexión a la base de datos."
       );
       return;

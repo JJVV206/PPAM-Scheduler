@@ -54,6 +54,7 @@ async function seed() {
   const user = await db.user.create({
     data: {
       active: true,
+      accessStatus: "APPROVED",
       email,
       name: `QA Volunteer ${runId}`,
       passwordHash,
@@ -97,8 +98,8 @@ async function seed() {
     JSON.stringify(
       {
         email,
-        password,
         runId,
+        passwordGenerated: true,
         status: "created",
         userId: user.id,
         volunteerProfileId: user.volunteerProfile?.id

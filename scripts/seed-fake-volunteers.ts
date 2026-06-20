@@ -99,14 +99,16 @@ async function main() {
         passwordHash,
         role: UserRole.VOLUNTEER,
         phone: volunteer.phone,
-        active: true
+        active: true,
+        accessStatus: "APPROVED"
       },
       update: {
         name: volunteer.name,
         passwordHash,
         role: UserRole.VOLUNTEER,
         phone: volunteer.phone,
-        active: true
+        active: true,
+        accessStatus: "APPROVED"
       }
     });
 
@@ -172,7 +174,6 @@ async function main() {
   console.log(
     `Seeded ${COUNT} fake volunteers. Matching fake volunteer users in this database: ${createdUsers}.`
   );
-  console.log(`Default fake volunteer password: ${DEFAULT_PASSWORD}`);
 }
 
 main()

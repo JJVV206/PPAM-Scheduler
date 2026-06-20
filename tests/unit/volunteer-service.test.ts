@@ -97,7 +97,8 @@ describe("volunteer service", () => {
         where: {
           active: true,
           user: {
-            active: true
+            active: true,
+            accessStatus: "APPROVED"
           }
         }
       })
@@ -111,11 +112,19 @@ describe("volunteer service", () => {
 
     expect(mocks.tx.volunteerProfile.update).toHaveBeenCalledWith({
       where: { id: "volunteer-1" },
-      data: { active: false }
+      data: {
+        active: false,
+        temporaryUnavailable: true,
+        canServeAsPrimary: false,
+        canServeAsReplacement: false
+      }
     });
     expect(mocks.tx.user.update).toHaveBeenCalledWith({
       where: { id: "user-1" },
-      data: { active: false }
+      data: {
+        active: false,
+        accessStatus: "SUSPENDED"
+      }
     });
     expect(mocks.tx.assignmentInvitation.update).toHaveBeenCalledWith({
       where: { id: "invitation-1" },

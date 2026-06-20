@@ -35,7 +35,9 @@ export const authOptions: NextAuthOptions = {
           include: { volunteerProfile: true }
         });
 
-        if (!user || !user.active) return null;
+        if (!user || !user.active || user.accessStatus !== "APPROVED") {
+          return null;
+        }
 
         const validPassword = await verifyPassword(
           parsed.data.password,
@@ -49,6 +51,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           role: user.role,
+          accessStatus: user.accessStatus,
           volunteerProfileId: user.volunteerProfile?.id ?? null
         };
       }
@@ -58,6 +61,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.role = user.role;
+        token.accessStatus = user.accessStatus;
         token.volunteerProfileId = user.volunteerProfileId ?? null;
       }
 
@@ -67,6 +71,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.sub ?? "";
         session.user.role = token.role ?? "VOLUNTEER";
+        session.user.accessStatus = token.accessStatus ?? "PENDING_APPROVAL";
         session.user.volunteerProfileId = token.volunteerProfileId ?? null;
       }
 
@@ -95,7 +100,11 @@ export function getServerAuthSession() {
           })
         : null);
 
-    if (!currentUser || !currentUser.active) {
+    if (
+      !currentUser ||
+      !currentUser.active ||
+      currentUser.accessStatus !== "APPROVED"
+    ) {
       return null;
     }
 
@@ -103,6 +112,7 @@ export function getServerAuthSession() {
     session.user.name = currentUser.name;
     session.user.email = currentUser.email;
     session.user.role = currentUser.role;
+    session.user.accessStatus = currentUser.accessStatus;
     session.user.volunteerProfileId = currentUser.volunteerProfile?.id ?? null;
 
     return session;

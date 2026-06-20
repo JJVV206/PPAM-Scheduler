@@ -12,9 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DAYS_OF_WEEK,
   DAY_LABELS,
-  TIME_SLOT_DEFINITIONS
+  TIME_SLOT_DEFINITIONS,
+  VOLUNTEER_SERVICE_TYPE_LABELS
 } from "@/lib/constants/domain";
-import type { DayOfWeek, TimeSlot } from "@/types/domain";
+import type { DayOfWeek, TimeSlot, VolunteerServiceType } from "@/types/domain";
 
 type VolunteerProfileCardProps = {
   volunteer: {
@@ -23,7 +24,9 @@ type VolunteerProfileCardProps = {
     phone?: string | null;
     active: boolean;
     temporaryUnavailable: boolean;
+    canServeAsPrimary: boolean;
     canServeAsReplacement: boolean;
+    serviceType: VolunteerServiceType;
     confirmationCount: number;
     declineCount: number;
     noResponseCount: number;
@@ -66,10 +69,8 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
             {volunteer.temporaryUnavailable ? (
               <Badge variant="warning">No disponible</Badge>
             ) : null}
-            <Badge
-              variant={volunteer.canServeAsReplacement ? "success" : "outline"}
-            >
-              {volunteer.canServeAsReplacement ? "Suplente" : "No suplente"}
+            <Badge variant="secondary">
+              {VOLUNTEER_SERVICE_TYPE_LABELS[volunteer.serviceType]}
             </Badge>
           </div>
         </div>
@@ -102,6 +103,20 @@ export function VolunteerProfileCard({ volunteer }: VolunteerProfileCardProps) {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border/60 bg-background/35 p-3 md:col-span-2">
+          <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+            Tipo operativo
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {volunteer.canServeAsPrimary ? (
+              <Badge variant="outline">Puede servir como titular</Badge>
+            ) : null}
+            {volunteer.canServeAsReplacement ? (
+              <Badge variant="success">Puede servir como suplente</Badge>
+            ) : null}
           </div>
         </div>
 

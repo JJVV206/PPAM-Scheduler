@@ -13,6 +13,13 @@ enum UserRole {
   VOLUNTEER
 }
 
+enum UserAccessStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
 enum DayOfWeek {
   MONDAY
   TUESDAY
@@ -145,24 +152,33 @@ enum AssignmentActivityType {
 }
 
 model User {
-  id               String               @id @default(cuid())
-  name             String
-  email            String               @unique
-  passwordHash     String
-  role             UserRole
-  phone            String?
-  active           Boolean              @default(true)
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-  volunteerProfile VolunteerProfile?
-  accounts         Account[]
-  sessions         Session[]
-  notifications    NotificationLog[]
-  appNotifications AppNotification[]
-  activities       AssignmentActivity[]
-  createdWeeks     ScheduleWeek[]
-  createdCensuses  ReplacementCensus[]
-  passwordResets   PasswordResetToken[]
+  id                 String           @id @default(cuid())
+  name               String
+  email              String           @unique
+  passwordHash       String
+  role               UserRole
+  phone              String
+  active             Boolean          @default(true)
+  accessStatus       UserAccessStatus @default(APPROVED)
+  accessReviewedAt   DateTime?
+  accessReviewedById String?
+  accessReviewNote   String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  volunteerProfile   VolunteerProfile?
+  accounts           Account[]
+  sessions           Session[]
+  notifications      NotificationLog[]
+  appNotifications   AppNotification[]
+  activities         AssignmentActivity[]
+  createdWeeks       ScheduleWeek[]
+  createdCensuses    ReplacementCensus[]
+  passwordResets     PasswordResetToken[]
+  accessReviewedBy   User?            @relation("UserAccessReviews", fields: [accessReviewedById], references: [id], onDelete: SetNull)
+  accessReviews      User[]           @relation("UserAccessReviews")
+
+  @@index([accessStatus, role, createdAt])
+  @@index([accessReviewedById])
 }
 
 model VolunteerProfile {
@@ -177,7 +193,8 @@ model VolunteerProfile {
   noResponseCount       Int                             @default(0)
   active                Boolean                         @default(true)
   temporaryUnavailable  Boolean                         @default(false)
-  canServeAsReplacement Boolean                         @default(true)
+  canServeAsPrimary     Boolean                         @default(true)
+  canServeAsReplacement Boolean                         @default(false)
   user                  User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignments           AssignmentVolunteer[]
   responses             AssignmentResponse[]

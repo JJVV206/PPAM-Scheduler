@@ -215,7 +215,8 @@ export async function createAdminAppNotifications(input: {
     (await client.user.findMany({
       where: {
         role: "ADMIN",
-        active: true
+        active: true,
+        accessStatus: "APPROVED"
       },
       select: {
         id: true

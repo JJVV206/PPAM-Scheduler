@@ -227,8 +227,10 @@ async function seed() {
     where: { email: adminEmail },
     update: {
       active: true,
+      accessStatus: "APPROVED",
       name: "E2E Admin",
       passwordHash: adminPasswordHash,
+      phone: "000-000-0000",
       role: "ADMIN"
     },
     create: {
@@ -245,8 +247,10 @@ async function seed() {
     where: { email: volunteerEmail },
     update: {
       active: true,
+      accessStatus: "APPROVED",
       name: "E2E Volunteer",
       passwordHash: volunteerPasswordHash,
+      phone: "000-000-0001",
       role: "VOLUNTEER"
     },
     create: {

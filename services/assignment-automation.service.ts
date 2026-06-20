@@ -677,7 +677,8 @@ async function alertAdminsForAssignment(input: {
     db.user.findMany({
       where: {
         role: "ADMIN",
-        active: true
+        active: true,
+        accessStatus: "APPROVED"
       }
     })
   ]);
@@ -2047,7 +2048,8 @@ async function getAutomationActorUserId(actorUserId?: string) {
   const admin = await db.user.findFirst({
     where: {
       role: "ADMIN",
-      active: true
+      active: true,
+      accessStatus: "APPROVED"
     },
     select: {
       id: true

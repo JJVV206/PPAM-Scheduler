@@ -14,6 +14,15 @@ export default async function VolunteerOpenSlotsPage() {
     session.user.volunteerProfileId
   );
 
+  if (!dashboard.volunteer.canServeAsReplacement) {
+    return (
+      <EmptyState
+        title="Sin suplencias activas"
+        description="Tu perfil no está habilitado como suplente. Puedes mantener tu disponibilidad general al día desde Mi disponibilidad."
+      />
+    );
+  }
+
   return dashboard.openSlots.length ? (
     <div className="space-y-6">
       <section className="surface-panel p-4 sm:p-5">

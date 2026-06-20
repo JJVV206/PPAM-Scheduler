@@ -135,6 +135,7 @@ DIRECT_URL="PASTE_NEON_DIRECT_URL" \
 ADMIN_EMAIL="admin@example.com" \
 ADMIN_PASSWORD="use-a-long-random-password" \
 ADMIN_NAME="PPAM Admin" \
+ADMIN_PHONE="+52 777 000 0000" \
 npm run prod:create-admin
 ```
 

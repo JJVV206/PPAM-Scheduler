@@ -88,7 +88,9 @@ export function AssignmentAdminActions({
     const options = new Map<string, VolunteerSummary>();
 
     for (const volunteer of volunteers) {
-      options.set(volunteer.id, volunteer);
+      if (volunteer.canServeAsPrimary) {
+        options.set(volunteer.id, volunteer);
+      }
     }
 
     for (const slot of assignment.volunteers) {

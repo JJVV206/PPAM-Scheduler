@@ -16,9 +16,9 @@ export const registerSchema = z
     phone: z
       .string()
       .trim()
+      .min(7, "Ingresa un celular válido.")
       .max(30, "El teléfono no puede superar 30 caracteres.")
-      .optional()
-      .or(z.literal("")),
+      .regex(/^[+()\d\s-]+$/, "El celular solo puede incluir números, espacios, guiones, paréntesis y +."),
     password: z
       .string()
       .min(8, "La contraseña debe tener al menos 8 caracteres.")
