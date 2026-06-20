@@ -278,7 +278,12 @@ async function assertPointSupportsSlot(input: {
   preachingPointId: string;
   dayOfWeek: DayOfWeek;
   timeSlot: TimeSlot;
+  allowAllSlots?: boolean;
 }) {
+  if (input.allowAllSlots) {
+    return;
+  }
+
   const point = await db.preachingPoint.findUniqueOrThrow({
     where: { id: input.preachingPointId },
     include: {
@@ -480,7 +485,8 @@ export async function createWeeklyAssignment(input: {
   await assertPointSupportsSlot({
     preachingPointId: fixedPoint.id,
     dayOfWeek: input.dayOfWeek,
-    timeSlot: input.timeSlot
+    timeSlot: input.timeSlot,
+    allowAllSlots: fixedPoint.name === FIXED_PREACHING_POINT_NAME
   });
 
   const uniqueVolunteerIds = [
@@ -619,7 +625,8 @@ export async function updateAssignment(
   await assertPointSupportsSlot({
     preachingPointId: nextPreachingPointId,
     dayOfWeek: nextDayOfWeek,
-    timeSlot: nextTimeSlot
+    timeSlot: nextTimeSlot,
+    allowAllSlots: fixedPoint.name === FIXED_PREACHING_POINT_NAME
   });
 
   await assertNoVolunteerConflicts({

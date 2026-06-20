@@ -2,11 +2,20 @@ import { db } from "@/lib/db/prisma";
 import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import { AppError } from "@/services/errors";
 
-function withFixedPointName<T extends { name: string }>(point: T): T {
-  return {
+function withFixedPointDefaults<T extends { name: string }>(point: T): T {
+  const fixedPoint = {
     ...point,
     name: FIXED_PREACHING_POINT_NAME
   };
+
+  if ("activeSlots" in fixedPoint && Array.isArray(fixedPoint.activeSlots)) {
+    return {
+      ...fixedPoint,
+      activeSlots: []
+    } as T;
+  }
+
+  return fixedPoint;
 }
 
 export async function getSingletonPreachingPoint() {
@@ -28,7 +37,7 @@ export async function getSingletonPreachingPoint() {
     throw new AppError("No hay un punto de predicación configurado.", 500);
   }
 
-  return withFixedPointName(point);
+  return withFixedPointDefaults(point);
 }
 
 export async function getPreachingPoints() {
@@ -47,7 +56,7 @@ export async function getPreachingPoint(pointId: string) {
     }
   });
 
-  return withFixedPointName(point);
+  return withFixedPointDefaults(point);
 }
 
 export async function createPreachingPoint(input: {

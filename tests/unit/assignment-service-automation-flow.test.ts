@@ -121,7 +121,7 @@ import {
 
 const fixedPoint = {
   id: "point-1",
-  name: "Hospital Dr Jose G. Parres",
+  name: "Hospital Dr José G. Parres",
   area: "North",
   notes: null,
   active: true,
@@ -359,6 +359,43 @@ describe("assignment automation orchestration", () => {
       assignmentId: "assignment-1",
       actorUserId: "admin-1"
     });
+  });
+
+  it("allows assignments on any slot for the fixed preaching point even if legacy active slots exist", async () => {
+    mocks.getSingletonPreachingPoint.mockResolvedValueOnce({
+      ...fixedPoint,
+      activeSlots: [
+        {
+          id: "slot-legacy",
+          preachingPointId: fixedPoint.id,
+          dayOfWeek: "TUESDAY",
+          timeSlot: "SLOT_09_11"
+        }
+      ]
+    });
+
+    await createWeeklyAssignment({
+      scheduleWeekId: "week-1",
+      date: new Date(2026, 5, 22),
+      dayOfWeek: "MONDAY",
+      timeSlot: "SLOT_07_09",
+      preachingPointId: fixedPoint.id,
+      volunteers: [
+        { volunteerId: "volunteer-1", position: "FIRST" },
+        { volunteerId: "volunteer-2", position: "SECOND" }
+      ],
+      actorUserId: "admin-1"
+    });
+
+    expect(mocks.tx.assignment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          dayOfWeek: "MONDAY",
+          timeSlot: "SLOT_07_09"
+        })
+      })
+    );
+    expect(mocks.db.preachingPoint.findUniqueOrThrow).not.toHaveBeenCalled();
   });
 
   it("duplicates a week and generates titular invitations for every copied assignment", async () => {
