@@ -77,7 +77,8 @@ export default async function VolunteerDashboardPage() {
                 </Link>
               </Button>
             ) : null}
-            {dashboard.openSlots.length ? (
+            {dashboard.volunteer.canServeAsReplacement &&
+            dashboard.openSlots.length ? (
               <Button
                 variant={focusAssignment ? "secondary" : "default"}
                 className="w-full sm:w-auto"
@@ -152,10 +153,18 @@ export default async function VolunteerDashboardPage() {
           hint="Próximos turnos"
         />
         <DashboardStatCard
-          label="Vacantes para ti"
+          label={
+            dashboard.volunteer.canServeAsReplacement
+              ? "Vacantes para ti"
+              : "Disponibilidad"
+          }
           value={dashboard.openSlots.length}
           icon={Sparkles}
-          hint="Puedes cubrir"
+          hint={
+            dashboard.volunteer.canServeAsReplacement
+              ? "Puedes cubrir"
+              : "Sin suplencias activas"
+          }
         />
         <DashboardStatCard
           label="Historial"

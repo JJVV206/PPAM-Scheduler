@@ -112,7 +112,12 @@ describe("volunteer service", () => {
 
     expect(mocks.tx.volunteerProfile.update).toHaveBeenCalledWith({
       where: { id: "volunteer-1" },
-      data: { active: false }
+      data: {
+        active: false,
+        temporaryUnavailable: true,
+        canServeAsPrimary: false,
+        canServeAsReplacement: false
+      }
     });
     expect(mocks.tx.user.update).toHaveBeenCalledWith({
       where: { id: "user-1" },

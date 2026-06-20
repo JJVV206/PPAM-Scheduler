@@ -7,9 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DAYS_OF_WEEK,
   DAY_LABELS,
-  TIME_SLOT_DEFINITIONS
+  TIME_SLOT_DEFINITIONS,
+  VOLUNTEER_SERVICE_TYPE_LABELS
 } from "@/lib/constants/domain";
-import type { DayOfWeek, TimeSlot } from "@/types/domain";
+import type { DayOfWeek, TimeSlot, VolunteerServiceType } from "@/types/domain";
 
 type VolunteerSelfProfileCardProps = {
   volunteer: {
@@ -18,7 +19,9 @@ type VolunteerSelfProfileCardProps = {
     phone?: string | null;
     active: boolean;
     temporaryUnavailable: boolean;
+    canServeAsPrimary: boolean;
     canServeAsReplacement: boolean;
+    serviceType: VolunteerServiceType;
     preferredAreas: string[];
     availability?: Array<{
       dayOfWeek: DayOfWeek;
@@ -68,14 +71,8 @@ export function VolunteerSelfProfileCard({
               {volunteer.temporaryUnavailable ? (
                 <Badge variant="warning">No disponible</Badge>
               ) : null}
-              <Badge
-                variant={
-                  volunteer.canServeAsReplacement ? "success" : "secondary"
-                }
-              >
-                {volunteer.canServeAsReplacement
-                  ? "Puede servir como suplente"
-                  : "Sin suplencias"}
+              <Badge variant="secondary">
+                {VOLUNTEER_SERVICE_TYPE_LABELS[volunteer.serviceType]}
               </Badge>
             </div>
           </div>
@@ -110,6 +107,20 @@ export function VolunteerSelfProfileCard({
                 </p>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-border/70 bg-white/[0.03] p-4">
+          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+            Tipo operativo
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {volunteer.canServeAsPrimary ? (
+              <Badge variant="outline">Puede servir como titular</Badge>
+            ) : null}
+            {volunteer.canServeAsReplacement ? (
+              <Badge variant="success">Puede servir como suplente</Badge>
+            ) : null}
           </div>
         </section>
 

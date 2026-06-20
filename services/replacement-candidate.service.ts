@@ -4,6 +4,7 @@ import type { TimeSlot } from "@prisma/client";
 
 import { db } from "@/lib/db/prisma";
 import type { VolunteerSummary } from "@/types/domain";
+import { deriveVolunteerServiceType } from "@/lib/volunteer-service-type";
 
 const TERMINAL_ASSIGNMENT_STATUSES = ["CANCELLED", "COMPLETED"] as const;
 
@@ -186,7 +187,9 @@ function mapCandidate(
     declineCount: volunteer.declineCount,
     noResponseCount: volunteer.noResponseCount,
     temporaryUnavailable: volunteer.temporaryUnavailable,
+    canServeAsPrimary: volunteer.canServeAsPrimary,
     canServeAsReplacement: volunteer.canServeAsReplacement,
+    serviceType: deriveVolunteerServiceType(volunteer),
     replacementPriority: {
       availabilitySource: availabilityMatch.source,
       availabilityRank: availabilityMatch.rank,
@@ -394,6 +397,8 @@ export function toVolunteerSummary(
     declineCount: candidate.declineCount,
     noResponseCount: candidate.noResponseCount,
     temporaryUnavailable: candidate.temporaryUnavailable,
-    canServeAsReplacement: candidate.canServeAsReplacement
+    canServeAsPrimary: candidate.canServeAsPrimary,
+    canServeAsReplacement: candidate.canServeAsReplacement,
+    serviceType: candidate.serviceType
   };
 }

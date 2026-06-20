@@ -115,6 +115,7 @@ describe("auth registration", () => {
           volunteerProfile: {
             create: {
               active: false,
+              canServeAsPrimary: true,
               canServeAsReplacement: false,
               temporaryUnavailable: true,
               preferredAreas: []

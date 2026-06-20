@@ -11,7 +11,8 @@ import type {
   TIME_SLOTS,
   USER_ACCESS_STATUSES,
   USER_ROLES,
-  VOLUNTEER_POSITIONS
+  VOLUNTEER_POSITIONS,
+  VOLUNTEER_SERVICE_TYPES
 } from "@/lib/constants/domain";
 
 export type UserRole = (typeof USER_ROLES)[number];
@@ -21,6 +22,7 @@ export type TimeSlot = (typeof TIME_SLOTS)[number];
 export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number];
 export type ResponseStatus = (typeof RESPONSE_STATUSES)[number];
 export type VolunteerPosition = (typeof VOLUNTEER_POSITIONS)[number];
+export type VolunteerServiceType = (typeof VOLUNTEER_SERVICE_TYPES)[number];
 export type AssignmentInvitationType =
   (typeof ASSIGNMENT_INVITATION_TYPES)[number];
 export type AssignmentInvitationStatus =
@@ -54,7 +56,9 @@ export type VolunteerSummary = {
   declineCount: number;
   noResponseCount: number;
   temporaryUnavailable: boolean;
+  canServeAsPrimary: boolean;
   canServeAsReplacement: boolean;
+  serviceType: VolunteerServiceType;
 };
 
 export type PreachingPointSummary = {

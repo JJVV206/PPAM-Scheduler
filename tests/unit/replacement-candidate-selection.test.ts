@@ -74,6 +74,7 @@ function candidate(input: {
     noResponseCount: 0,
     active: true,
     temporaryUnavailable: false,
+    canServeAsPrimary: true,
     canServeAsReplacement: true,
     user: {
       id: `user-${input.id}`,
@@ -161,6 +162,7 @@ describe("replacement candidate selection QA", () => {
     expect(mocks.db.volunteerProfile.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
+          canServeAsReplacement: true,
           id: {
             notIn: ["primary-1", "declined-1", "attempted-1"]
           }

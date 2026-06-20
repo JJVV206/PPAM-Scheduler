@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -43,7 +44,9 @@ export function CreateVolunteerForm() {
       notes: "",
       transportationNotes: "",
       preferredAreas: [],
-      active: true
+      active: true,
+      canServeAsPrimary: true,
+      canServeAsReplacement: false
     }
   });
 
@@ -185,6 +188,53 @@ export function CreateVolunteerForm() {
                 </FormItem>
               )}
             />
+            <div className="rounded-lg border border-border/70 bg-background/35 p-3">
+              <p className="text-sm font-medium text-foreground">
+                Tipo operativo
+              </p>
+              <div className="mt-3 grid gap-3">
+                <FormField
+                  control={form.control}
+                  name="canServeAsPrimary"
+                  render={({ field }) => (
+                    <FormItem>
+                      <label className="flex items-start gap-3 rounded-lg border border-border/60 bg-background/35 px-3 py-2.5">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={(checked) =>
+                              field.onChange(checked === true)
+                            }
+                          />
+                        </FormControl>
+                        <span className="text-sm">Puede servir como titular</span>
+                      </label>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="canServeAsReplacement"
+                  render={({ field }) => (
+                    <FormItem>
+                      <label className="flex items-start gap-3 rounded-lg border border-border/60 bg-background/35 px-3 py-2.5">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={(checked) =>
+                              field.onChange(checked === true)
+                            }
+                          />
+                        </FormControl>
+                        <span className="text-sm">Puede servir como suplente</span>
+                      </label>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
             <FeedbackMessage
               message={feedback?.text}
               tone={feedback?.tone}

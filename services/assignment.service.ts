@@ -64,6 +64,7 @@ import {
   markAssignmentPendingAppNotificationsRead
 } from "@/services/app-notification.service";
 import { recordAutomationAuditLog } from "@/services/automation-audit-log.service";
+import { deriveVolunteerServiceType } from "@/lib/volunteer-service-type";
 
 const assignmentInclude = {
   scheduleWeek: true,
@@ -115,6 +116,7 @@ function mapVolunteerSummary(record: {
   noResponseCount: number;
   active: boolean;
   temporaryUnavailable: boolean;
+  canServeAsPrimary: boolean;
   canServeAsReplacement: boolean;
   user: {
     id: string;
@@ -142,7 +144,9 @@ function mapVolunteerSummary(record: {
     declineCount: record.declineCount,
     noResponseCount: record.noResponseCount,
     temporaryUnavailable: record.temporaryUnavailable,
-    canServeAsReplacement: record.canServeAsReplacement
+    canServeAsPrimary: record.canServeAsPrimary,
+    canServeAsReplacement: record.canServeAsReplacement,
+    serviceType: deriveVolunteerServiceType(record)
   };
 }
 
@@ -340,6 +344,77 @@ async function assertNoVolunteerConflicts(input: {
   }
 }
 
+async function assertVolunteersCanServeAsPrimary(volunteerIds: string[]) {
+  const uniqueVolunteerIds = [...new Set(volunteerIds)];
+  if (!uniqueVolunteerIds.length) return;
+
+  const volunteers = await db.volunteerProfile.findMany({
+    where: {
+      id: { in: uniqueVolunteerIds }
+    },
+    select: {
+      id: true,
+      canServeAsPrimary: true,
+      user: {
+        select: {
+          name: true
+        }
+      }
+    }
+  });
+  const foundVolunteerIds = new Set(volunteers.map((volunteer) => volunteer.id));
+  const invalidVolunteerNames = volunteers
+    .filter((volunteer) => !volunteer.canServeAsPrimary)
+    .map((volunteer) => volunteer.user.name);
+  const missingVolunteerIds = uniqueVolunteerIds.filter(
+    (volunteerId) => !foundVolunteerIds.has(volunteerId)
+  );
+
+  if (invalidVolunteerNames.length || missingVolunteerIds.length) {
+    throw new AppError(
+      invalidVolunteerNames.length
+        ? `No puedes asignar como titular a: ${invalidVolunteerNames.join(", ")}.`
+        : "Uno de los voluntarios seleccionados no existe.",
+      409
+    );
+  }
+}
+
+async function assertVolunteerCanServeAsReplacement(volunteerId: string) {
+  const volunteer = await db.volunteerProfile.findUnique({
+    where: { id: volunteerId },
+    select: {
+      active: true,
+      temporaryUnavailable: true,
+      canServeAsReplacement: true,
+      user: {
+        select: {
+          name: true,
+          active: true,
+          accessStatus: true
+        }
+      }
+    }
+  });
+
+  if (!volunteer) {
+    throw new AppError("No se encontró el voluntario seleccionado.", 404);
+  }
+
+  if (
+    !volunteer.active ||
+    volunteer.temporaryUnavailable ||
+    !volunteer.user.active ||
+    volunteer.user.accessStatus !== "APPROVED" ||
+    !volunteer.canServeAsReplacement
+  ) {
+    throw new AppError(
+      `${volunteer.user.name} no está habilitado como suplente activo.`,
+      409
+    );
+  }
+}
+
 async function syncResponses(input: {
   tx: Prisma.TransactionClient;
   assignmentId: string;
@@ -492,6 +567,7 @@ export async function createWeeklyAssignment(input: {
   const uniqueVolunteerIds = [
     ...new Set(input.volunteers.map((volunteer) => volunteer.volunteerId))
   ];
+  await assertVolunteersCanServeAsPrimary(uniqueVolunteerIds);
   await assertNoVolunteerConflicts({
     date: input.date,
     timeSlot: input.timeSlot,
@@ -635,6 +711,10 @@ export async function updateAssignment(
     timeSlot: nextTimeSlot,
     volunteerIds
   });
+
+  if (input.volunteers) {
+    await assertVolunteersCanServeAsPrimary(nextVolunteerIds);
+  }
 
   const assignment = await db.$transaction(async (tx) => {
     const pairNumber = movedToNewSlot
@@ -1836,8 +1916,9 @@ export async function getAvailableVolunteersForSlot(input: {
   const volunteers = await db.volunteerProfile.findMany({
     where: {
       active: true,
+      canServeAsPrimary: true,
       temporaryUnavailable: false,
-      user: { active: true },
+      user: { active: true, accessStatus: "APPROVED" },
       id: {
         notIn: input.excludeVolunteerIds ?? []
       },
@@ -2007,6 +2088,8 @@ export async function assignReplacementVolunteer(input: {
   ) {
     throw new AppError("La posición seleccionada no está vacante.", 409);
   }
+
+  await assertVolunteerCanServeAsReplacement(input.volunteerId);
 
   await assertNoVolunteerConflicts({
     assignmentId: input.assignmentId,

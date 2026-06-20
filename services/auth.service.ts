@@ -54,6 +54,7 @@ export async function registerAccount(input: {
               preferredAreas: [],
               active: false,
               temporaryUnavailable: true,
+              canServeAsPrimary: true,
               canServeAsReplacement: false
             }
           }

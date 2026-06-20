@@ -6,6 +6,7 @@ type VolunteerProfileRoleState = {
   id: string;
   active: boolean;
   temporaryUnavailable: boolean;
+  canServeAsPrimary: boolean;
   canServeAsReplacement: boolean;
 };
 
@@ -34,6 +35,7 @@ const VOLUNTEER_PROFILE_ROLE_SELECT = {
   id: true,
   active: true,
   temporaryUnavailable: true,
+  canServeAsPrimary: true,
   canServeAsReplacement: true
 } as const;
 
@@ -133,7 +135,8 @@ export async function updateUserRole(input: {
             data: {
               active: true,
               temporaryUnavailable: false,
-              canServeAsReplacement: true
+              canServeAsPrimary: true,
+              canServeAsReplacement: false
             },
             select: VOLUNTEER_PROFILE_ROLE_SELECT
           });
@@ -144,7 +147,8 @@ export async function updateUserRole(input: {
               preferredAreas: [],
               active: true,
               temporaryUnavailable: false,
-              canServeAsReplacement: true
+              canServeAsPrimary: true,
+              canServeAsReplacement: false
             },
             select: VOLUNTEER_PROFILE_ROLE_SELECT
           });
@@ -155,6 +159,7 @@ export async function updateUserRole(input: {
         data: {
           active: false,
           temporaryUnavailable: true,
+          canServeAsPrimary: false,
           canServeAsReplacement: false
         },
         select: VOLUNTEER_PROFILE_ROLE_SELECT
@@ -217,7 +222,8 @@ export async function reviewUserAdmission(input: {
           data: {
             active: true,
             temporaryUnavailable: false,
-            canServeAsReplacement: true
+            canServeAsPrimary: true,
+            canServeAsReplacement: false
           }
         });
       } else {
@@ -227,7 +233,8 @@ export async function reviewUserAdmission(input: {
             preferredAreas: [],
             active: true,
             temporaryUnavailable: false,
-            canServeAsReplacement: true
+            canServeAsPrimary: true,
+            canServeAsReplacement: false
           }
         });
       }
@@ -259,6 +266,7 @@ export async function reviewUserAdmission(input: {
           data: {
             active: false,
             temporaryUnavailable: true,
+            canServeAsPrimary: false,
             canServeAsReplacement: false
           }
         });

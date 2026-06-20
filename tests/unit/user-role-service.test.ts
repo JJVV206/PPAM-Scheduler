@@ -45,6 +45,7 @@ const activeVolunteerProfile = {
   id: "volunteer-1",
   active: true,
   temporaryUnavailable: false,
+  canServeAsPrimary: true,
   canServeAsReplacement: true
 };
 
@@ -80,6 +81,7 @@ describe("user role service", () => {
             id: "volunteer-1",
             active: false,
             temporaryUnavailable: true,
+            canServeAsPrimary: false,
             canServeAsReplacement: false
           }
         })
@@ -99,12 +101,14 @@ describe("user role service", () => {
       data: {
         active: false,
         temporaryUnavailable: true,
+        canServeAsPrimary: false,
         canServeAsReplacement: false
       },
       select: expect.objectContaining({
         id: true,
         active: true,
         temporaryUnavailable: true,
+        canServeAsPrimary: true,
         canServeAsReplacement: true
       })
     });
@@ -114,6 +118,7 @@ describe("user role service", () => {
       volunteerProfile: {
         active: false,
         temporaryUnavailable: true,
+        canServeAsPrimary: false,
         canServeAsReplacement: false
       }
     });
@@ -126,7 +131,17 @@ describe("user role service", () => {
         role: "ADMIN",
         volunteerProfile: null
       })
-      .mockResolvedValueOnce(accountResult());
+      .mockResolvedValueOnce(
+        accountResult({
+          volunteerProfile: {
+            id: "volunteer-1",
+            active: true,
+            temporaryUnavailable: false,
+            canServeAsPrimary: true,
+            canServeAsReplacement: false
+          }
+        })
+      );
 
     const result = await updateUserRole({
       userId: "user-1",
@@ -147,12 +162,14 @@ describe("user role service", () => {
         preferredAreas: [],
         active: true,
         temporaryUnavailable: false,
-        canServeAsReplacement: true
+        canServeAsPrimary: true,
+        canServeAsReplacement: false
       },
       select: expect.objectContaining({
         id: true,
         active: true,
         temporaryUnavailable: true,
+        canServeAsPrimary: true,
         canServeAsReplacement: true
       })
     });
@@ -161,7 +178,8 @@ describe("user role service", () => {
       volunteerProfile: {
         active: true,
         temporaryUnavailable: false,
-        canServeAsReplacement: true
+        canServeAsPrimary: true,
+        canServeAsReplacement: false
       }
     });
   });
@@ -241,7 +259,8 @@ describe("user admission service", () => {
       data: {
         active: true,
         temporaryUnavailable: false,
-        canServeAsReplacement: true
+        canServeAsPrimary: true,
+        canServeAsReplacement: false
       }
     });
     expect(result).toMatchObject({
@@ -268,6 +287,7 @@ describe("user admission service", () => {
             id: "volunteer-1",
             active: false,
             temporaryUnavailable: true,
+            canServeAsPrimary: false,
             canServeAsReplacement: false
           }
         })
@@ -294,6 +314,7 @@ describe("user admission service", () => {
       data: {
         active: false,
         temporaryUnavailable: true,
+        canServeAsPrimary: false,
         canServeAsReplacement: false
       }
     });

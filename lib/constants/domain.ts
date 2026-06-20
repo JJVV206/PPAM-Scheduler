@@ -35,6 +35,11 @@ export const ASSIGNMENT_STATUSES = [
 ] as const;
 export const RESPONSE_STATUSES = ["PENDING", "CONFIRMED", "DECLINED"] as const;
 export const VOLUNTEER_POSITIONS = ["FIRST", "SECOND"] as const;
+export const VOLUNTEER_SERVICE_TYPES = [
+  "PRIMARY",
+  "REPLACEMENT",
+  "PRIMARY_AND_REPLACEMENT"
+] as const;
 export const ASSIGNMENT_INVITATION_TYPES = ["PRIMARY", "REPLACEMENT"] as const;
 export const ASSIGNMENT_INVITATION_STATUSES = [
   "PENDING",
@@ -148,6 +153,12 @@ export const USER_ACCESS_STATUS_LABELS = {
 export const VOLUNTEER_POSITION_LABELS = {
   FIRST: "Puesto 1",
   SECOND: "Puesto 2"
+} as const;
+
+export const VOLUNTEER_SERVICE_TYPE_LABELS = {
+  PRIMARY: "Titular",
+  REPLACEMENT: "Suplente",
+  PRIMARY_AND_REPLACEMENT: "Titular/Suplente"
 } as const;
 
 export const ASSIGNMENT_INVITATION_TYPE_LABELS = {

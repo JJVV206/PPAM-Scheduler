@@ -193,7 +193,8 @@ model VolunteerProfile {
   noResponseCount       Int                             @default(0)
   active                Boolean                         @default(true)
   temporaryUnavailable  Boolean                         @default(false)
-  canServeAsReplacement Boolean                         @default(true)
+  canServeAsPrimary     Boolean                         @default(true)
+  canServeAsReplacement Boolean                         @default(false)
   user                  User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignments           AssignmentVolunteer[]
   responses             AssignmentResponse[]

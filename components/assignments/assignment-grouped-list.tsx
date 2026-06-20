@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { addDays, startOfMonth, startOfWeek } from "date-fns";
+import { addDays } from "date-fns";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { AutomationStateBadge } from "@/components/assignments/automation-state-badge";
@@ -59,16 +59,52 @@ type AssignmentMonthGroup = {
   weeks: AssignmentWeekGroup[];
 };
 
+function padDatePart(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function getUtcDateParts(value: Date | string) {
+  const date = new Date(value);
+
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth(),
+    day: date.getUTCDate()
+  };
+}
+
+function getDisplayDate(value: Date | string) {
+  const { year, month, day } = getUtcDateParts(value);
+
+  return new Date(Date.UTC(year, month, day, 12));
+}
+
 function getDateKey(value: Date | string) {
-  return formatDisplayDate(value, "yyyy-MM-dd");
+  const { year, month, day } = getUtcDateParts(value);
+
+  return `${year}-${padDatePart(month + 1)}-${padDatePart(day)}`;
 }
 
 function getMonthKey(value: Date | string) {
-  return formatDisplayDate(startOfMonth(new Date(value)), "yyyy-MM");
+  const { year, month } = getUtcDateParts(value);
+
+  return `${year}-${padDatePart(month + 1)}`;
+}
+
+function getMonthStart(value: Date | string) {
+  const { year, month } = getUtcDateParts(value);
+
+  return new Date(Date.UTC(year, month, 1, 12));
 }
 
 function getWeekStart(value: Date | string) {
-  return startOfWeek(new Date(value), { weekStartsOn: 1 });
+  const { year, month, day } = getUtcDateParts(value);
+  const date = new Date(Date.UTC(year, month, day, 12));
+  const dayOffset = (date.getUTCDay() + 6) % 7;
+
+  date.setUTCDate(date.getUTCDate() - dayOffset);
+
+  return date;
 }
 
 function groupAssignmentsByWeek(assignments: AssignmentDetailDto[]) {
@@ -95,7 +131,7 @@ function groupAssignmentsByWeek(assignments: AssignmentDetailDto[]) {
     if (!dayGroup) {
       dayGroup = {
         key: dayKey,
-        date: new Date(assignment.date),
+        date: getDisplayDate(assignment.date),
         assignments: []
       };
       weekGroup.days.push(dayGroup);
@@ -111,7 +147,7 @@ function groupWeeksByMonth(weekGroups: AssignmentWeekGroup[]) {
   const monthGroups = new Map<string, AssignmentMonthGroup>();
 
   for (const weekGroup of weekGroups) {
-    const monthStart = startOfMonth(weekGroup.startDate);
+    const monthStart = getMonthStart(weekGroup.startDate);
     const monthKey = getMonthKey(monthStart);
     let monthGroup = monthGroups.get(monthKey);
 
@@ -249,7 +285,7 @@ export function AssignmentGroupedList({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {monthGroups.map((monthGroup) => {
         const monthAssignments = monthGroup.weeks.flatMap((weekGroup) =>
           weekGroup.days.flatMap((dayGroup) => dayGroup.assignments)
@@ -262,8 +298,11 @@ export function AssignmentGroupedList({
         const isMonthCollapsed = collapsedMonths.has(monthGroup.key);
 
         return (
-          <section key={monthGroup.key} className="space-y-3">
-            <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-surface-elevated/35 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
+          <section
+            key={monthGroup.key}
+            className="overflow-hidden rounded-xl border border-primary/25 bg-primary/[0.035]"
+          >
+            <div className="flex flex-col gap-3 border-b border-primary/20 bg-primary/[0.06] px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   Mes
@@ -306,7 +345,10 @@ export function AssignmentGroupedList({
 
             <div
               id={`assignment-month-${monthGroup.key}`}
-              className={cn("space-y-3", isMonthCollapsed && "hidden")}
+              className={cn(
+                "space-y-3 border-l border-primary/25 px-3 pb-4 pl-4 pt-3 sm:ml-4 sm:pl-5",
+                isMonthCollapsed && "hidden"
+              )}
             >
               {monthGroup.weeks.map((weekGroup) => {
                 const weekAssignments = weekGroup.days.flatMap(
@@ -318,9 +360,9 @@ export function AssignmentGroupedList({
                 return (
                   <section
                     key={weekGroup.key}
-                    className="overflow-hidden rounded-lg border border-border/70 bg-background/20"
+                    className="overflow-hidden rounded-lg border border-l-4 border-border/70 border-l-primary/45 bg-background/45"
                   >
-                    <div className="flex flex-col gap-3 border-b border-border/65 bg-surface-elevated/40 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-col gap-3 border-b border-border/65 bg-surface-elevated/45 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
                       <div className="min-w-0">
                         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                           Semana
@@ -368,7 +410,7 @@ export function AssignmentGroupedList({
                     <div
                       id={`assignment-week-${weekGroup.key}`}
                       className={cn(
-                        "space-y-4 p-3 sm:p-4",
+                        "space-y-3 border-l border-border/70 p-3 pl-4 sm:ml-4 sm:p-4 sm:pl-5",
                         isWeekCollapsed && "hidden"
                       )}
                     >
@@ -381,9 +423,9 @@ export function AssignmentGroupedList({
                         return (
                           <section
                             key={dayGroup.key}
-                            className="overflow-hidden rounded-lg border border-border/60 bg-background/25"
+                            className="overflow-hidden rounded-lg border border-l-4 border-border/60 border-l-muted-foreground/25 bg-surface-elevated/20"
                           >
-                            <div className="flex flex-col gap-3 border-b border-border/60 bg-surface-elevated/30 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex flex-col gap-3 border-b border-border/60 bg-background/35 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                               <div className="min-w-0">
                                 <h4 className="font-heading text-base font-semibold capitalize text-foreground">
                                   {formatDisplayDate(

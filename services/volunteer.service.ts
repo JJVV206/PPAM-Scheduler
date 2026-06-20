@@ -17,6 +17,10 @@ import {
 } from "@/lib/volunteer-assignment";
 import { mergeJsonMetadata } from "@/lib/utils/safe-metadata";
 import { recordAssignmentAuditActivity } from "@/services/assignment-audit.service";
+import {
+  deriveVolunteerServiceType,
+  hasVolunteerServiceCapacity
+} from "@/lib/volunteer-service-type";
 
 const ACTIVE_INVITATION_STATUSES = ["PENDING", "SENT"] as const;
 const TERMINAL_ASSIGNMENT_STATUSES = ["CANCELLED", "COMPLETED"] as const;
@@ -35,6 +39,7 @@ function mapVolunteer(record: {
   noResponseCount: number;
   active: boolean;
   temporaryUnavailable: boolean;
+  canServeAsPrimary: boolean;
   canServeAsReplacement: boolean;
   user: {
     id: string;
@@ -62,8 +67,24 @@ function mapVolunteer(record: {
     declineCount: record.declineCount,
     noResponseCount: record.noResponseCount,
     temporaryUnavailable: record.temporaryUnavailable,
-    canServeAsReplacement: record.canServeAsReplacement
+    canServeAsPrimary: record.canServeAsPrimary,
+    canServeAsReplacement: record.canServeAsReplacement,
+    serviceType: deriveVolunteerServiceType(record)
   };
+}
+
+function assertActiveVolunteerHasCapacity(input: {
+  active: boolean;
+  canServeAsPrimary: boolean;
+  canServeAsReplacement: boolean;
+}) {
+  if (!input.active) return;
+  if (hasVolunteerServiceCapacity(input)) return;
+
+  throw new AppError(
+    "Un perfil voluntario activo debe tener al menos una capacidad operativa.",
+    400
+  );
 }
 
 export async function getVolunteers(input?: { activeOnly?: boolean }) {
@@ -123,6 +144,8 @@ export async function createVolunteer(input: {
   transportationNotes?: string;
   preferredAreas: string[];
   active: boolean;
+  canServeAsPrimary: boolean;
+  canServeAsReplacement: boolean;
   passwordHash: string;
 }) {
   const normalizedEmail = input.email.toLowerCase();
@@ -141,6 +164,14 @@ export async function createVolunteer(input: {
     );
   }
 
+  if (input.role === "VOLUNTEER") {
+    assertActiveVolunteerHasCapacity({
+      active: input.active,
+      canServeAsPrimary: input.canServeAsPrimary,
+      canServeAsReplacement: input.canServeAsReplacement
+    });
+  }
+
   const user = await db.user.create({
     data: {
       name: input.name,
@@ -157,7 +188,9 @@ export async function createVolunteer(input: {
                 notes: input.notes,
                 transportationNotes: input.transportationNotes,
                 preferredAreas: input.preferredAreas,
-                active: input.active
+                active: input.active,
+                canServeAsPrimary: input.canServeAsPrimary,
+                canServeAsReplacement: input.canServeAsReplacement
               }
             }
           : undefined
@@ -181,10 +214,19 @@ export async function updateVolunteer(
     preferredAreas?: string[];
     active?: boolean;
     temporaryUnavailable?: boolean;
+    canServeAsPrimary?: boolean;
+    canServeAsReplacement?: boolean;
   }
 ) {
   const volunteer = await db.volunteerProfile.findUniqueOrThrow({
-    where: { id: volunteerId }
+    where: { id: volunteerId },
+    select: {
+      id: true,
+      userId: true,
+      active: true,
+      canServeAsPrimary: true,
+      canServeAsReplacement: true
+    }
   });
 
   if (input.email) {
@@ -200,6 +242,18 @@ export async function updateVolunteer(
       );
     }
   }
+
+  const nextActive = input.active ?? volunteer.active;
+  const nextCanServeAsPrimary =
+    input.canServeAsPrimary ?? volunteer.canServeAsPrimary;
+  const nextCanServeAsReplacement =
+    input.canServeAsReplacement ?? volunteer.canServeAsReplacement;
+
+  assertActiveVolunteerHasCapacity({
+    active: nextActive,
+    canServeAsPrimary: nextCanServeAsPrimary,
+    canServeAsReplacement: nextCanServeAsReplacement
+  });
 
   return db.$transaction(async (tx) => {
     await tx.user.update({
@@ -225,7 +279,9 @@ export async function updateVolunteer(
         transportationNotes: input.transportationNotes,
         preferredAreas: input.preferredAreas,
         active: input.active,
-        temporaryUnavailable: input.temporaryUnavailable
+        temporaryUnavailable: input.temporaryUnavailable,
+        canServeAsPrimary: input.canServeAsPrimary,
+        canServeAsReplacement: input.canServeAsReplacement
       },
       include: { user: true }
     });
@@ -246,7 +302,12 @@ export async function deactivateVolunteer(
   return db.$transaction(async (tx) => {
     await tx.volunteerProfile.update({
       where: { id: volunteerId },
-      data: { active: false }
+      data: {
+        active: false,
+        temporaryUnavailable: true,
+        canServeAsPrimary: false,
+        canServeAsReplacement: false
+      }
     });
     await tx.user.update({
       where: { id: volunteer.userId },
@@ -393,11 +454,13 @@ export async function getVolunteerDashboardData(
       (assignment) => assignment.date < now
     ),
     remindersByAssignmentId,
-    openSlots: openSlots.filter((slot) =>
-      slot.suggestedVolunteers.some(
-        (candidate) => candidate.id === volunteerProfileId
-      )
-    ),
+    openSlots: volunteer.canServeAsReplacement
+      ? openSlots.filter((slot) =>
+          slot.suggestedVolunteers.some(
+            (candidate) => candidate.id === volunteerProfileId
+          )
+        )
+      : [],
     weeklyAvailabilitySummary: volunteer.availability.reduce<
       VolunteerDashboardData["weeklyAvailabilitySummary"]
     >((accumulator, item) => {

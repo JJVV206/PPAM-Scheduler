@@ -25,9 +25,10 @@ import {
 import {
   DAYS_OF_WEEK,
   DAY_LABELS,
-  TIME_SLOT_DEFINITIONS
+  TIME_SLOT_DEFINITIONS,
+  VOLUNTEER_SERVICE_TYPE_LABELS
 } from "@/lib/constants/domain";
-import type { DayOfWeek, TimeSlot } from "@/types/domain";
+import type { DayOfWeek, TimeSlot, VolunteerServiceType } from "@/types/domain";
 
 type VolunteerTableProps = {
   volunteers: Array<{
@@ -37,7 +38,9 @@ type VolunteerTableProps = {
     phone?: string | null;
     active: boolean;
     preferredAreas: string[];
+    canServeAsPrimary: boolean;
     canServeAsReplacement: boolean;
+    serviceType: VolunteerServiceType;
     temporaryUnavailable: boolean;
     confirmationCount: number;
     declineCount: number;
@@ -113,6 +116,8 @@ export function VolunteerTable({ volunteers }: VolunteerTableProps) {
           volunteer.email,
           volunteer.phone ?? "",
           volunteer.preferredAreas.join(" "),
+          VOLUNTEER_SERVICE_TYPE_LABELS[volunteer.serviceType],
+          volunteer.canServeAsPrimary ? "titular" : "",
           volunteer.canServeAsReplacement ? "suplente reemplazo" : "",
           getAvailabilityLines(volunteer.availabilitySummary).join(" ")
         ].join(" ")
@@ -194,7 +199,7 @@ export function VolunteerTable({ volunteers }: VolunteerTableProps) {
             <TableHead>Nombre</TableHead>
             <TableHead>Contacto</TableHead>
             <TableHead>Estado</TableHead>
-            <TableHead>Suplente</TableHead>
+            <TableHead>Tipo</TableHead>
             <TableHead>Disponibilidad</TableHead>
             <TableHead>Historial</TableHead>
             <TableHead />
@@ -238,12 +243,8 @@ export function VolunteerTable({ volunteers }: VolunteerTableProps) {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={
-                        volunteer.canServeAsReplacement ? "success" : "outline"
-                      }
-                    >
-                      {volunteer.canServeAsReplacement ? "Sí" : "No"}
+                    <Badge variant="secondary">
+                      {VOLUNTEER_SERVICE_TYPE_LABELS[volunteer.serviceType]}
                     </Badge>
                   </TableCell>
                   <TableCell className="min-w-[220px]">

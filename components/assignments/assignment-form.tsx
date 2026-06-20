@@ -195,6 +195,11 @@ export function AssignmentForm({
     return () => clearCloseTimeout();
   }, []);
 
+  const primaryVolunteerOptions = useMemo(
+    () => volunteers.filter((volunteer) => volunteer.canServeAsPrimary),
+    [volunteers]
+  );
+
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
       clearCloseTimeout();
@@ -457,7 +462,7 @@ export function AssignmentForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {volunteers.map((volunteer) => (
+                        {primaryVolunteerOptions.map((volunteer) => (
                           <SelectItem key={volunteer.id} value={volunteer.id}>
                             {volunteer.name}
                           </SelectItem>
@@ -481,7 +486,7 @@ export function AssignmentForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {volunteers.map((volunteer) => (
+                        {primaryVolunteerOptions.map((volunteer) => (
                           <SelectItem key={volunteer.id} value={volunteer.id}>
                             {volunteer.name}
                           </SelectItem>

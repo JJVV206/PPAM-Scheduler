@@ -207,6 +207,7 @@ function replacementVolunteer(input: {
     noResponseCount: 0,
     active: true,
     temporaryUnavailable: false,
+    canServeAsPrimary: true,
     canServeAsReplacement: true,
     user: {
       id: `user-${input.id}`,
