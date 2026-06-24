@@ -3,72 +3,50 @@ import { differenceInCalendarDays } from "date-fns";
 
 import { DataTable } from "@/components/forms/data-table";
 import { EmptyState } from "@/components/forms/empty-state";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "@/components/ui/table";
+  AdminAttentionTable,
+  type AdminAttentionCase
+} from "@/features/admin/admin-attention-table";
 import { getServerAuthSession } from "@/lib/auth/auth";
 import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
-import { formatDisplayDate } from "@/lib/utils";
 import { getAdminDashboardStats } from "@/services/dashboard.service";
 import { getUnreadAdminAttentionNotificationsForUser } from "@/services/app-notification.service";
 import type { AssignmentDetailDto } from "@/types/domain";
-
-type AttentionPriority = "URGENT" | "HIGH" | "NORMAL";
-
-type AttentionCase = {
-  id: string;
-  priority: AttentionPriority;
-  date: Date;
-  timeLabel: string;
-  pointName: string;
-  problem: string;
-  href: string;
-  actionLabel: string;
-};
 
 type AttentionNotification = Awaited<
   ReturnType<typeof getUnreadAdminAttentionNotificationsForUser>
 >[number];
 
-const priorityLabels: Record<AttentionPriority, string> = {
-  URGENT: "Urgente",
-  HIGH: "Alta",
-  NORMAL: "Normal"
-};
-
-const priorityRank: Record<AttentionPriority, number> = {
-  URGENT: 0,
-  HIGH: 1,
-  NORMAL: 2
-};
-
-function getPriorityVariant(priority: AttentionPriority) {
-  if (priority === "URGENT") return "danger" as const;
-  if (priority === "HIGH") return "warning" as const;
-  return "secondary" as const;
-}
-
 function notificationToAttentionCase(
   notification: AttentionNotification
-): AttentionCase {
+): AdminAttentionCase {
+  const baseCase = {
+    id: `notification:${notification.id}`,
+    createdAt: notification.createdAt,
+    problem: `${notification.title}: ${notification.body}`,
+    notificationId: notification.id,
+    dismissible: true,
+    priority:
+      notification.priority === "URGENT" || notification.priority === "HIGH"
+        ? notification.priority
+        : "NORMAL"
+  } satisfies Pick<
+    AdminAttentionCase,
+    | "id"
+    | "createdAt"
+    | "problem"
+    | "notificationId"
+    | "dismissible"
+    | "priority"
+  >;
+
   if (notification.assignment) {
     return {
-      id: `notification:${notification.id}`,
-      priority:
-        notification.priority === "URGENT" || notification.priority === "HIGH"
-          ? notification.priority
-          : "NORMAL",
+      ...baseCase,
       date: notification.assignment.date,
       timeLabel: TIME_SLOT_DEFINITIONS[notification.assignment.timeSlot].label,
       pointName: notification.assignment.preachingPoint.name,
-      problem: `${notification.title}: ${notification.body}`,
       href: `/admin/assignments/${notification.assignment.id}`,
       actionLabel: "Abrir detalle"
     };
@@ -76,36 +54,36 @@ function notificationToAttentionCase(
 
   if (notification.census) {
     return {
-      id: `notification:${notification.id}`,
-      priority:
-        notification.priority === "URGENT" || notification.priority === "HIGH"
-          ? notification.priority
-          : "NORMAL",
+      ...baseCase,
       date: notification.census.closesAt,
       timeLabel: "Censo semanal",
       pointName: "Suplentes",
-      problem: `${notification.title}: ${notification.body}`,
       href: "/admin/replacements",
       actionLabel: "Ver suplentes"
     };
   }
 
   return {
-    id: `notification:${notification.id}`,
-    priority:
-      notification.priority === "URGENT" || notification.priority === "HIGH"
-        ? notification.priority
-        : "NORMAL",
+    ...baseCase,
     date: notification.createdAt,
     timeLabel: "Operación",
     pointName: "PPAM",
-    problem: `${notification.title}: ${notification.body}`,
     href: "/admin/settings",
     actionLabel: "Revisar"
   };
 }
 
-function assignmentToAttentionCase(assignment: AssignmentDetailDto): AttentionCase {
+function getLatestAssignmentActivityDate(assignment: AssignmentDetailDto) {
+  return assignment.timeline.reduce(
+    (latestDate, item) =>
+      item.createdAt > latestDate ? item.createdAt : latestDate,
+    assignment.date
+  );
+}
+
+function assignmentToAttentionCase(
+  assignment: AssignmentDetailDto
+): AdminAttentionCase {
   const daysUntilAssignment = differenceInCalendarDays(
     assignment.date,
     new Date()
@@ -118,25 +96,20 @@ function assignmentToAttentionCase(assignment: AssignmentDetailDto): AttentionCa
   return {
     id: `assignment:${assignment.id}`,
     priority,
+    createdAt: getLatestAssignmentActivityDate(assignment),
     date: assignment.date,
     timeLabel: TIME_SLOT_DEFINITIONS[assignment.timeSlot].label,
     pointName: assignment.preachingPoint.name,
     problem,
     href: `/admin/assignments/${assignment.id}`,
-    actionLabel: "Abrir detalle"
+    actionLabel: "Abrir detalle",
+    dismissible: false
   };
 }
 
-function sortAttentionCases(cases: AttentionCase[]) {
+function sortAttentionCases(cases: AdminAttentionCase[]) {
   return [...cases].sort((left, right) => {
-    const priorityDifference =
-      priorityRank[left.priority] - priorityRank[right.priority];
-
-    if (priorityDifference !== 0) {
-      return priorityDifference;
-    }
-
-    return left.date.getTime() - right.date.getTime();
+    return right.createdAt.getTime() - left.createdAt.getTime();
   });
 }
 
@@ -176,44 +149,7 @@ export default async function AdminAttentionPage() {
       }
     >
       {cases.length ? (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Prioridad</TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Horario</TableHead>
-                <TableHead>Punto</TableHead>
-                <TableHead>Problema</TableHead>
-                <TableHead>Acción</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {cases.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>
-                    <Badge variant={getPriorityVariant(item.priority)}>
-                      {priorityLabels[item.priority]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {formatDisplayDate(item.date, "d 'de' MMMM")}
-                  </TableCell>
-                  <TableCell>{item.timeLabel}</TableCell>
-                  <TableCell>{item.pointName}</TableCell>
-                  <TableCell className="max-w-xl text-sm text-muted-foreground">
-                    {item.problem}
-                  </TableCell>
-                  <TableCell>
-                    <Button asChild size="sm">
-                      <Link href={item.href}>{item.actionLabel}</Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <AdminAttentionTable cases={cases} />
       ) : (
         <EmptyState
           title="Sin excepciones activas"
