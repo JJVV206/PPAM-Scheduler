@@ -47,6 +47,13 @@ export const updateAssignmentSchema = z.object({
   volunteers: z.array(assignmentVolunteerInputSchema).max(2, "Solo se permiten dos voluntarios.").optional()
 });
 
+export const assignmentPreflightSchema = z.object({
+  assignmentId: z.string().optional(),
+  date: z.string().datetime(),
+  timeSlot: z.enum(TIME_SLOTS),
+  volunteerIds: z.array(z.string().min(1)).max(2, "Solo se permiten dos voluntarios.")
+});
+
 export const confirmAssignmentSchema = z.object({
   note: z.string().max(500, "No excedas 500 caracteres.").optional()
 });
