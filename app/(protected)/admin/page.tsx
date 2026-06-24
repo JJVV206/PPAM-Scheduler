@@ -1,6 +1,5 @@
 import {
   AlertTriangle,
-  ArrowUpRight,
   CheckCircle2,
   ClipboardCheck,
   MailWarning,
@@ -11,7 +10,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { getAdminDashboardStats } from "@/services/dashboard.service";
 import { formatDisplayDate } from "@/lib/utils";
 
@@ -112,12 +110,10 @@ function CensusMetric({ label, value }: { label: string; value: number }) {
 function DashboardPanelHeader({
   title,
   description,
-  action,
   badge
 }: {
   title: string;
   description: string;
-  action?: ReactNode;
   badge?: ReactNode;
 }) {
   return (
@@ -128,10 +124,8 @@ function DashboardPanelHeader({
         </h2>
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
-      {(action ?? badge) ? (
-        <div className="flex shrink-0 items-center gap-2">
-          {action ?? badge}
-        </div>
+      {badge ? (
+        <div className="flex shrink-0 items-center gap-2">{badge}</div>
       ) : null}
     </div>
   );
@@ -143,18 +137,14 @@ function CoveragePanel({
   dashboard: Awaited<ReturnType<typeof getAdminDashboardStats>>;
 }) {
   return (
-    <section className="surface-panel flex flex-col gap-3 p-3 lg:p-4">
+    <Link
+      href="/admin/schedule"
+      className="surface-panel group flex flex-col gap-3 p-3 transition hover:border-primary/35 hover:bg-surface-elevated/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background lg:p-4"
+      aria-label="Ir a horario semanal"
+    >
       <DashboardPanelHeader
         title="Cobertura semanal"
         description={dashboard.weekLabel}
-        action={
-          <Button asChild variant="secondary" size="sm">
-            <Link href="/admin/schedule">
-              Horario semanal
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        }
       />
 
       <div className="grid flex-1 gap-2.5 sm:grid-cols-2 2xl:grid-cols-4">
@@ -183,30 +173,24 @@ function CoveragePanel({
           tone="danger"
         />
       </div>
-    </section>
+    </Link>
   );
 }
 
 function AlertsPanel({
-  dashboard,
-  totalAlerts
+  dashboard
 }: {
   dashboard: Awaited<ReturnType<typeof getAdminDashboardStats>>;
-  totalAlerts: number;
 }) {
   return (
-    <section className="surface-panel flex flex-col gap-3 p-3 lg:p-4">
+    <Link
+      href="/admin/attention"
+      className="surface-panel group flex flex-col gap-3 p-3 transition hover:border-primary/35 hover:bg-surface-elevated/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background lg:p-4"
+      aria-label="Ir a atención requerida"
+    >
       <DashboardPanelHeader
         title="Alertas"
         description="Incidencias que requieren revisión operativa."
-        action={
-          <Button asChild variant="secondary" size="sm">
-            <Link href="/admin/attention">
-              Atención requerida
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        }
       />
       <div className="grid flex-1 gap-2.5 sm:grid-cols-2">
         <AlertMetric
@@ -230,10 +214,7 @@ function AlertsPanel({
           value={dashboard.alerts.uncoveredAssignments}
         />
       </div>
-      <Badge variant={totalAlerts ? "warning" : "outline"} className="w-fit">
-        {totalAlerts ? `${totalAlerts} activas` : "Sin alertas"}
-      </Badge>
-    </section>
+    </Link>
   );
 }
 
@@ -243,7 +224,11 @@ function ReplacementCensusPanel({
   dashboard: Awaited<ReturnType<typeof getAdminDashboardStats>>;
 }) {
   return (
-    <section className="surface-panel flex flex-col gap-3 p-3 lg:p-4 xl:row-span-2">
+    <Link
+      href="/admin/replacements"
+      className="surface-panel group flex flex-col gap-3 p-3 transition hover:border-primary/35 hover:bg-surface-elevated/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background lg:p-4 xl:row-span-2"
+      aria-label="Ir a suplentes"
+    >
       <DashboardPanelHeader
         title="Censo de suplentes"
         description={
@@ -306,28 +291,19 @@ function ReplacementCensusPanel({
             : "Censo al día"}
         </Badge>
       </div>
-
-      <Button asChild variant="secondary" className="mt-auto w-full">
-        <Link href="/admin/replacements">Abrir censo de suplentes</Link>
-      </Button>
-    </section>
+    </Link>
   );
 }
 
 export default async function AdminDashboardPage() {
   const dashboard = await getAdminDashboardStats();
-  const totalAlerts =
-    dashboard.alerts.failedEmails +
-    dashboard.alerts.expiredPrimaryInvitations +
-    dashboard.alerts.expiredReplacementInvitations +
-    dashboard.alerts.uncoveredAssignments;
 
   return (
     <div className="grid min-h-full gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.95fr)] xl:grid-rows-[auto_minmax(0,1fr)]">
       <h1 className="sr-only">Panel administrativo</h1>
       <CoveragePanel dashboard={dashboard} />
       <ReplacementCensusPanel dashboard={dashboard} />
-      <AlertsPanel dashboard={dashboard} totalAlerts={totalAlerts} />
+      <AlertsPanel dashboard={dashboard} />
     </div>
   );
 }
