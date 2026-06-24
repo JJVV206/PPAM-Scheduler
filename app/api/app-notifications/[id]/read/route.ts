@@ -22,11 +22,14 @@ export async function POST(
       notificationId: id
     });
 
-    revalidatePath(
-      auth.session.user.role === "ADMIN"
-        ? "/admin/notifications"
-        : "/volunteer/notifications"
-    );
+    if (auth.session.user.role === "ADMIN") {
+      revalidatePath("/admin/notifications");
+      revalidatePath("/admin/attention");
+      revalidatePath("/admin", "layout");
+    } else {
+      revalidatePath("/volunteer/notifications");
+      revalidatePath("/volunteer", "layout");
+    }
 
     return ok({
       updatedCount: result.count
