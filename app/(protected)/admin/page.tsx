@@ -1,6 +1,5 @@
 import {
   AlertTriangle,
-  ArrowUpRight,
   CheckCircle2,
   ClipboardCheck,
   MailWarning,
@@ -11,7 +10,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { getAdminDashboardStats } from "@/services/dashboard.service";
 import { formatDisplayDate } from "@/lib/utils";
 
@@ -55,17 +53,17 @@ function CoverageMetric({
 }) {
   return (
     <div
-      className={`${toneClasses[tone].card} flex min-h-[7.5rem] flex-col justify-between rounded-lg border p-4`}
+      className={`${toneClasses[tone].card} flex min-h-[5.75rem] flex-col justify-between rounded-lg border p-3`}
     >
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm leading-5 text-muted-foreground">{label}</p>
         <div
-          className={`${toneClasses[tone].icon} flex h-8 w-8 shrink-0 items-center justify-center rounded-lg`}
+          className={`${toneClasses[tone].icon} flex h-7 w-7 shrink-0 items-center justify-center rounded-lg`}
         >
           <Icon className="h-4 w-4" />
         </div>
       </div>
-      <p className="font-heading text-3xl font-semibold leading-none sm:text-4xl">
+      <p className="font-heading text-2xl font-semibold leading-none sm:text-3xl">
         {value}
       </p>
     </div>
@@ -82,15 +80,15 @@ function AlertMetric({
   value: number;
 }) {
   return (
-    <div className="grid min-h-[8.75rem] grid-cols-[auto_minmax(0,1fr)] items-center gap-4 rounded-lg border border-border/70 bg-background/35 p-4">
-      <span className="bg-warning/12 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-warning">
+    <div className="grid min-h-[5.75rem] grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-lg border border-border/70 bg-background/35 p-3">
+      <span className="bg-warning/12 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-warning">
         <Icon className="h-5 w-5" />
       </span>
       <div className="min-w-0">
-        <p className="font-heading text-3xl font-semibold leading-none">
+        <p className="font-heading text-2xl font-semibold leading-none">
           {value}
         </p>
-        <p className="mt-2 min-w-0 text-sm leading-5 text-muted-foreground">
+        <p className="mt-1 min-w-0 text-sm leading-5 text-muted-foreground">
           {label}
         </p>
       </div>
@@ -100,9 +98,9 @@ function AlertMetric({
 
 function CensusMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex min-h-[6.25rem] flex-col justify-between rounded-lg border border-border/70 bg-background/35 p-4">
+    <div className="flex min-h-[4.75rem] flex-col justify-between rounded-lg border border-border/70 bg-background/35 p-3">
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="font-heading text-3xl font-semibold leading-none">
+      <p className="font-heading text-2xl font-semibold leading-none">
         {value}
       </p>
     </div>
@@ -112,26 +110,22 @@ function CensusMetric({ label, value }: { label: string; value: number }) {
 function DashboardPanelHeader({
   title,
   description,
-  action,
   badge
 }: {
   title: string;
   description: string;
-  action?: ReactNode;
   badge?: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
-        <h2 className="font-heading text-2xl font-semibold leading-tight">
+        <h2 className="font-heading text-xl font-semibold leading-tight">
           {title}
         </h2>
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
-      {(action ?? badge) ? (
-        <div className="flex shrink-0 items-center gap-2">
-          {action ?? badge}
-        </div>
+      {badge ? (
+        <div className="flex shrink-0 items-center gap-2">{badge}</div>
       ) : null}
     </div>
   );
@@ -143,21 +137,17 @@ function CoveragePanel({
   dashboard: Awaited<ReturnType<typeof getAdminDashboardStats>>;
 }) {
   return (
-    <section className="surface-panel flex min-h-[16rem] flex-col gap-4 p-4 lg:p-5">
+    <Link
+      href="/admin/schedule"
+      className="surface-panel group flex flex-col gap-3 p-3 transition hover:border-primary/35 hover:bg-surface-elevated/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background lg:p-4"
+      aria-label="Ir a horario semanal"
+    >
       <DashboardPanelHeader
         title="Cobertura semanal"
         description={dashboard.weekLabel}
-        action={
-          <Button asChild variant="secondary" size="sm">
-            <Link href="/admin/schedule">
-              Horario semanal
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        }
       />
 
-      <div className="grid flex-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+      <div className="grid flex-1 gap-2.5 sm:grid-cols-2 2xl:grid-cols-4">
         <CoverageMetric
           icon={CheckCircle2}
           label="Confirmadas"
@@ -183,32 +173,26 @@ function CoveragePanel({
           tone="danger"
         />
       </div>
-    </section>
+    </Link>
   );
 }
 
 function AlertsPanel({
-  dashboard,
-  totalAlerts
+  dashboard
 }: {
   dashboard: Awaited<ReturnType<typeof getAdminDashboardStats>>;
-  totalAlerts: number;
 }) {
   return (
-    <section className="surface-panel flex min-h-[26rem] flex-col gap-4 p-4 lg:p-5">
+    <Link
+      href="/admin/attention"
+      className="surface-panel group flex flex-col gap-3 p-3 transition hover:border-primary/35 hover:bg-surface-elevated/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background lg:p-4"
+      aria-label="Ir a atención requerida"
+    >
       <DashboardPanelHeader
         title="Alertas"
         description="Incidencias que requieren revisión operativa."
-        action={
-          <Button asChild variant="secondary" size="sm">
-            <Link href="/admin/attention">
-              Atención requerida
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        }
       />
-      <div className="grid flex-1 gap-3 sm:grid-cols-2">
+      <div className="grid flex-1 gap-2.5 sm:grid-cols-2">
         <AlertMetric
           icon={MailWarning}
           label="Emails fallidos"
@@ -230,10 +214,7 @@ function AlertsPanel({
           value={dashboard.alerts.uncoveredAssignments}
         />
       </div>
-      <Badge variant={totalAlerts ? "warning" : "outline"} className="w-fit">
-        {totalAlerts ? `${totalAlerts} activas` : "Sin alertas"}
-      </Badge>
-    </section>
+    </Link>
   );
 }
 
@@ -243,7 +224,11 @@ function ReplacementCensusPanel({
   dashboard: Awaited<ReturnType<typeof getAdminDashboardStats>>;
 }) {
   return (
-    <section className="surface-panel flex min-h-[24rem] flex-col gap-4 p-4 lg:p-5 xl:row-span-2">
+    <Link
+      href="/admin/replacements"
+      className="surface-panel group flex flex-col gap-3 p-3 transition hover:border-primary/35 hover:bg-surface-elevated/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background lg:p-4 xl:row-span-2"
+      aria-label="Ir a suplentes"
+    >
       <DashboardPanelHeader
         title="Censo de suplentes"
         description={
@@ -263,7 +248,7 @@ function ReplacementCensusPanel({
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+      <div className="grid gap-2.5 sm:grid-cols-3 xl:grid-cols-3">
         <CensusMetric
           label="Invitados"
           value={dashboard.census.totalResponses}
@@ -278,7 +263,7 @@ function ReplacementCensusPanel({
         />
       </div>
 
-      <div className="flex flex-1 flex-col justify-center rounded-lg border border-border/70 bg-background/35 p-5">
+      <div className="flex flex-1 flex-col justify-center rounded-lg border border-border/70 bg-background/35 p-4">
         <div className="flex items-end justify-between gap-3">
           <div>
             <p className="text-sm text-muted-foreground">Respuesta del censo</p>
@@ -287,11 +272,11 @@ function ReplacementCensusPanel({
               {dashboard.census.totalResponses} respondieron
             </p>
           </div>
-          <p className="font-heading text-5xl font-semibold leading-none">
+          <p className="font-heading text-4xl font-semibold leading-none">
             {dashboard.census.responseRate}%
           </p>
         </div>
-        <div className="mt-6 h-2.5 overflow-hidden rounded-full bg-secondary">
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-secondary">
           <div
             className="h-full rounded-full bg-primary"
             style={{ width: `${dashboard.census.responseRate}%` }}
@@ -299,35 +284,26 @@ function ReplacementCensusPanel({
         </div>
         <Badge
           variant={dashboard.census.pendingResponses ? "warning" : "success"}
-          className="mt-5 w-fit"
+          className="mt-3 w-fit"
         >
           {dashboard.census.pendingResponses
             ? "Seguimiento pendiente"
             : "Censo al día"}
         </Badge>
       </div>
-
-      <Button asChild variant="secondary" className="mt-auto w-full">
-        <Link href="/admin/replacements">Abrir censo de suplentes</Link>
-      </Button>
-    </section>
+    </Link>
   );
 }
 
 export default async function AdminDashboardPage() {
   const dashboard = await getAdminDashboardStats();
-  const totalAlerts =
-    dashboard.alerts.failedEmails +
-    dashboard.alerts.expiredPrimaryInvitations +
-    dashboard.alerts.expiredReplacementInvitations +
-    dashboard.alerts.uncoveredAssignments;
 
   return (
     <div className="grid min-h-full gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.95fr)] xl:grid-rows-[auto_minmax(0,1fr)]">
       <h1 className="sr-only">Panel administrativo</h1>
       <CoveragePanel dashboard={dashboard} />
       <ReplacementCensusPanel dashboard={dashboard} />
-      <AlertsPanel dashboard={dashboard} totalAlerts={totalAlerts} />
+      <AlertsPanel dashboard={dashboard} />
     </div>
   );
 }
