@@ -144,6 +144,19 @@ export type AssignmentDetailDto = {
   requiresAttention: boolean;
 };
 
+export type AssignmentSameDayRepeatWarningVolunteer = {
+  volunteerId: string;
+  volunteerName: string;
+  timeSlots: TimeSlot[];
+  assignmentIds: string[];
+};
+
+export type AssignmentPreflightWarningsDto = {
+  warnings: string[];
+  repeatedVolunteerIds: string[];
+  repeatedVolunteers: AssignmentSameDayRepeatWarningVolunteer[];
+};
+
 export type WeeklySchedulePair = {
   id: string;
   pairNumber: number;

@@ -42,6 +42,7 @@ import {
 } from "@/lib/constants/domain";
 import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 import { TimeSlotOptionButton } from "@/components/assignments/time-slot-option-button";
+import { useAssignmentPreflightWarnings } from "@/components/assignments/use-assignment-preflight-warnings";
 import { cn } from "@/lib/utils";
 import type {
   DayOfWeek,
@@ -211,8 +212,14 @@ export function AssignmentForm({
 
   const selectedDate = form.watch("assignmentDate");
   const selectedTimeSlot = form.watch("timeSlot");
+  const selectedVolunteerOneId = form.watch("volunteerOneId");
+  const selectedVolunteerTwoId = form.watch("volunteerTwoId");
   const selectedDayOfWeek = useMemo(
     () => getDayOfWeekFromDate(selectedDate),
+    [selectedDate]
+  );
+  const selectedAssignmentIsoDate = useMemo(
+    () => (selectedDate ? toAssignmentIsoDate(selectedDate) : ""),
     [selectedDate]
   );
   const selectedDateLabel = useMemo(
@@ -248,6 +255,13 @@ export function AssignmentForm({
       });
     }
   }, [compatiblePoints, form]);
+
+  const preflightWarnings = useAssignmentPreflightWarnings({
+    date: selectedAssignmentIsoDate,
+    enabled: open,
+    timeSlot: selectedTimeSlot,
+    volunteerIds: [selectedVolunteerOneId ?? "", selectedVolunteerTwoId ?? ""]
+  });
 
   async function onSubmit(values: AssignmentFormValues) {
     setSubmitting(true);
@@ -518,6 +532,10 @@ export function AssignmentForm({
               )}
             />
 
+            <FeedbackMessage
+              message={preflightWarnings.warningMessage}
+              tone="warning"
+            />
             <FeedbackMessage message={feedback?.text} tone={feedback?.tone} />
 
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">

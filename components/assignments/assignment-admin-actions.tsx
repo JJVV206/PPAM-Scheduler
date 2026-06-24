@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { TimeSlotOptionButton } from "@/components/assignments/time-slot-option-button";
+import { useAssignmentPreflightWarnings } from "@/components/assignments/use-assignment-preflight-warnings";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -123,6 +124,16 @@ export function AssignmentAdminActions({
   const selectablePoints = compatiblePoints.length
     ? compatiblePoints
     : preachingPoints;
+  const assignmentIsoDate = useMemo(
+    () => (assignmentDate ? toAssignmentIsoDate(assignmentDate) : ""),
+    [assignmentDate]
+  );
+  const preflightWarnings = useAssignmentPreflightWarnings({
+    assignmentId: assignment.id,
+    date: assignmentIsoDate,
+    timeSlot,
+    volunteerIds: [volunteerOneId, volunteerTwoId]
+  });
 
   useEffect(() => {
     if (
@@ -322,6 +333,12 @@ export function AssignmentAdminActions({
           placeholder="Indicaciones operativas"
         />
       </div>
+
+      <FeedbackMessage
+        className={compact ? "text-xs" : undefined}
+        message={preflightWarnings.warningMessage}
+        tone="warning"
+      />
 
       <FeedbackMessage
         className={compact ? "text-xs" : undefined}

@@ -28,6 +28,7 @@ import type {
   AdminDashboardStats,
   AssignmentDetailDto,
   AssignmentInvitationDto,
+  AssignmentPreflightWarningsDto,
   AssignmentVolunteerDto,
   OpenSlotDto,
   VolunteerSummary,
@@ -105,6 +106,18 @@ const assignmentInclude = {
   }
 } satisfies Prisma.AssignmentInclude;
 
+const SAME_DAY_REPEAT_WARNING = "Integrante repetido este día";
+
+type SameDayRepeatAssignment = {
+  id: string;
+  date: Date;
+  timeSlot: TimeSlot;
+  status: AssignmentStatus;
+  volunteers: Array<{
+    volunteerId: string;
+  }>;
+};
+
 function mapVolunteerSummary(record: {
   id: string;
   userId: string;
@@ -150,22 +163,106 @@ function mapVolunteerSummary(record: {
   };
 }
 
+function getUniqueIds(values: string[]) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function getAssignmentDateKey(date: Date) {
+  return startOfDay(date).toISOString();
+}
+
+function sortTimeSlots(timeSlots: TimeSlot[]) {
+  return [...timeSlots].sort(
+    (left, right) => TIME_SLOTS.indexOf(left) - TIME_SLOTS.indexOf(right)
+  );
+}
+
+function getSameDayRepeatAssignmentIds(
+  assignments: SameDayRepeatAssignment[]
+) {
+  const assignmentsByVolunteerDay = new Map<string, SameDayRepeatAssignment[]>();
+
+  for (const assignment of assignments) {
+    if (assignment.status === "CANCELLED") continue;
+
+    for (const volunteerId of getUniqueIds(
+      assignment.volunteers.map((volunteer) => volunteer.volunteerId)
+    )) {
+      const key = `${getAssignmentDateKey(assignment.date)}:${volunteerId}`;
+      const existingAssignments = assignmentsByVolunteerDay.get(key) ?? [];
+      existingAssignments.push(assignment);
+      assignmentsByVolunteerDay.set(key, existingAssignments);
+    }
+  }
+
+  const repeatedAssignmentIds = new Set<string>();
+
+  for (const dayAssignments of assignmentsByVolunteerDay.values()) {
+    for (const assignment of dayAssignments) {
+      const hasOtherTimeSlot = dayAssignments.some(
+        (candidate) =>
+          candidate.id !== assignment.id &&
+          candidate.timeSlot !== assignment.timeSlot
+      );
+
+      if (hasOtherTimeSlot) {
+        repeatedAssignmentIds.add(assignment.id);
+      }
+    }
+  }
+
+  return repeatedAssignmentIds;
+}
+
+async function getSameDayRepeatAssignmentIdsForDate(date: Date) {
+  const assignments = await db.assignment.findMany({
+    where: {
+      date: {
+        gte: startOfDay(date),
+        lte: endOfDay(date)
+      },
+      status: {
+        notIn: ["CANCELLED"]
+      }
+    },
+    select: {
+      id: true,
+      date: true,
+      timeSlot: true,
+      status: true,
+      volunteers: {
+        select: {
+          volunteerId: true
+        }
+      }
+    }
+  });
+
+  return getSameDayRepeatAssignmentIds(assignments);
+}
+
 function calculateWarnings(input: {
   volunteerCount: number;
   hasDecline: boolean;
   duplicateBooking?: boolean;
+  sameDayRepeat?: boolean;
 }): string[] {
   const warnings: string[] = [];
 
   if (input.volunteerCount < 2) warnings.push("Pareja incompleta");
   if (input.hasDecline) warnings.push("Se requiere reemplazo");
   if (input.duplicateBooking) warnings.push("Posible asignación duplicada");
+  if (input.sameDayRepeat) warnings.push(SAME_DAY_REPEAT_WARNING);
 
   return warnings;
 }
 
 function mapAssignmentDetail(
-  assignment: Prisma.AssignmentGetPayload<{ include: typeof assignmentInclude }>
+  assignment: Prisma.AssignmentGetPayload<{ include: typeof assignmentInclude }>,
+  options: {
+    sameDayRepeat?: boolean;
+    sameDayRepeatAssignmentIds?: Set<string>;
+  } = {}
 ): AssignmentDetailDto {
   const volunteers: AssignmentVolunteerDto[] = assignment.volunteers.map(
     (slot) => {
@@ -249,10 +346,33 @@ function mapAssignmentDetail(
       volunteerCount: volunteers.length,
       hasDecline: volunteers.some(
         (volunteer) => volunteer.responseStatus === "DECLINED"
-      )
+      ),
+      sameDayRepeat:
+        options.sameDayRepeat ??
+        options.sameDayRepeatAssignmentIds?.has(assignment.id)
     }),
     requiresAttention
   };
+}
+
+function mapAssignmentDetails(
+  assignments: Prisma.AssignmentGetPayload<{ include: typeof assignmentInclude }>[]
+) {
+  const sameDayRepeatAssignmentIds =
+    getSameDayRepeatAssignmentIds(assignments);
+
+  return assignments.map((assignment) =>
+    mapAssignmentDetail(assignment, { sameDayRepeatAssignmentIds })
+  );
+}
+
+async function mapAssignmentDetailWithSameDayWarnings(
+  assignment: Prisma.AssignmentGetPayload<{ include: typeof assignmentInclude }>
+) {
+  const sameDayRepeatAssignmentIds =
+    await getSameDayRepeatAssignmentIdsForDate(assignment.date);
+
+  return mapAssignmentDetail(assignment, { sameDayRepeatAssignmentIds });
 }
 
 function normalizeWeekStart(date: Date) {
@@ -342,6 +462,104 @@ async function assertNoVolunteerConflicts(input: {
       .join(", ");
     throw new AppError(`Se detectó doble asignación para ${names}.`, 409);
   }
+}
+
+export async function getSameDayVolunteerRepeatWarnings(input: {
+  assignmentId?: string;
+  date: Date;
+  timeSlot: TimeSlot;
+  volunteerIds: string[];
+}): Promise<AssignmentPreflightWarningsDto> {
+  const volunteerIds = getUniqueIds(input.volunteerIds);
+
+  if (!volunteerIds.length) {
+    return {
+      warnings: [],
+      repeatedVolunteerIds: [],
+      repeatedVolunteers: []
+    };
+  }
+
+  const repeatedSlots = await db.assignmentVolunteer.findMany({
+    where: {
+      volunteerId: {
+        in: volunteerIds
+      },
+      assignment: {
+        date: {
+          gte: startOfDay(input.date),
+          lte: endOfDay(input.date)
+        },
+        id: input.assignmentId ? { not: input.assignmentId } : undefined,
+        timeSlot: {
+          not: input.timeSlot
+        },
+        status: {
+          notIn: ["CANCELLED"]
+        }
+      }
+    },
+    include: {
+      volunteer: {
+        include: {
+          user: true
+        }
+      },
+      assignment: {
+        select: {
+          id: true,
+          timeSlot: true
+        }
+      }
+    }
+  });
+
+  const repeatedByVolunteer = new Map<
+    string,
+    {
+      volunteerId: string;
+      volunteerName: string;
+      timeSlots: Set<TimeSlot>;
+      assignmentIds: Set<string>;
+    }
+  >();
+
+  for (const slot of repeatedSlots) {
+    const existing = repeatedByVolunteer.get(slot.volunteerId) ?? {
+      volunteerId: slot.volunteerId,
+      volunteerName: slot.volunteer.user.name,
+      timeSlots: new Set<TimeSlot>(),
+      assignmentIds: new Set<string>()
+    };
+
+    existing.timeSlots.add(slot.assignment.timeSlot);
+    existing.assignmentIds.add(slot.assignment.id);
+    repeatedByVolunteer.set(slot.volunteerId, existing);
+  }
+
+  const repeatedVolunteers = [...repeatedByVolunteer.values()]
+    .sort((left, right) =>
+      left.volunteerName.localeCompare(right.volunteerName, "es-MX")
+    )
+    .map((item) => ({
+      volunteerId: item.volunteerId,
+      volunteerName: item.volunteerName,
+      timeSlots: sortTimeSlots([...item.timeSlots]),
+      assignmentIds: [...item.assignmentIds]
+    }));
+  const warnings = repeatedVolunteers.map((item) => {
+    const timeSlotLabels = item.timeSlots
+      .map((timeSlot) => TIME_SLOT_DEFINITIONS[timeSlot].label)
+      .join(", ");
+
+    return `${item.volunteerName} ya tiene asignación este día en ${timeSlotLabels}. Revisa si debe cubrir ambos horarios.`;
+  });
+
+  return {
+    warnings,
+    repeatedVolunteerIds: repeatedVolunteers.map((item) => item.volunteerId),
+    repeatedVolunteers
+  };
 }
 
 async function assertVolunteersCanServeAsPrimary(volunteerIds: string[]) {
@@ -650,7 +868,7 @@ export async function createWeeklyAssignment(input: {
     include: assignmentInclude
   });
 
-  return mapAssignmentDetail(refreshedAssignment);
+  return mapAssignmentDetailWithSameDayWarnings(refreshedAssignment);
 }
 
 export async function updateAssignment(
@@ -875,7 +1093,7 @@ export async function updateAssignment(
     });
   }
 
-  return mapAssignmentDetail(assignment);
+  return mapAssignmentDetailWithSameDayWarnings(assignment);
 }
 
 export async function deleteAssignment(assignmentId: string) {
@@ -888,7 +1106,7 @@ export async function getAssignmentDetail(assignmentId: string) {
     include: assignmentInclude
   });
 
-  return mapAssignmentDetail(assignment);
+  return mapAssignmentDetailWithSameDayWarnings(assignment);
 }
 
 export async function getAssignmentsForScheduleSlot(input: {
@@ -907,7 +1125,12 @@ export async function getAssignmentsForScheduleSlot(input: {
     orderBy: [{ preachingPoint: { name: "asc" } }, { pairNumber: "asc" }]
   });
 
-  return assignments.map(mapAssignmentDetail);
+  const sameDayRepeatAssignmentIds =
+    await getSameDayRepeatAssignmentIdsForDate(input.date);
+
+  return assignments.map((assignment) =>
+    mapAssignmentDetail(assignment, { sameDayRepeatAssignmentIds })
+  );
 }
 
 export async function getWeeklySchedule(input?: {
@@ -952,6 +1175,8 @@ export async function getWeeklySchedule(input?: {
       { pairNumber: "asc" }
     ]
   });
+  const sameDayRepeatAssignmentIds =
+    getSameDayRepeatAssignmentIds(assignments);
 
   const days = Array.from({ length: 7 }).map((_, index) => {
     const date = addDays(weekStart, index);
@@ -991,7 +1216,8 @@ export async function getWeeklySchedule(input?: {
         volunteerCount: assignment.volunteers.length,
         hasDecline: assignment.responses.some(
           (response) => response.responseStatus === "DECLINED"
-        )
+        ),
+        sameDayRepeat: sameDayRepeatAssignmentIds.has(assignment.id)
       }),
       notes: assignment.notes
     };
@@ -1229,7 +1455,7 @@ export async function confirmAssignment(input: {
     return updatedAssignment;
   });
 
-  return mapAssignmentDetail(assignment);
+  return mapAssignmentDetailWithSameDayWarnings(assignment);
 }
 
 export async function declineAssignment(input: {
@@ -1308,7 +1534,7 @@ export async function declineAssignment(input: {
     assignmentId: assignment.id
   });
 
-  return mapAssignmentDetail(assignment);
+  return mapAssignmentDetailWithSameDayWarnings(assignment);
 }
 
 export type AssignmentInvitationConfirmationContext =
@@ -1849,7 +2075,7 @@ export async function respondToAssignmentInvitation(input: {
     });
   }
 
-  return mapAssignmentDetail(assignment);
+  return mapAssignmentDetailWithSameDayWarnings(assignment);
 }
 
 async function getAssignmentResponseContext(responseId: string) {
@@ -2176,7 +2402,7 @@ export async function assignReplacementVolunteer(input: {
     });
   });
 
-  return mapAssignmentDetail(result);
+  return mapAssignmentDetailWithSameDayWarnings(result);
 }
 
 export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
@@ -2250,7 +2476,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
     })
   ]);
 
-  const details = assignments.map(mapAssignmentDetail);
+  const details = mapAssignmentDetails(assignments);
   const requiresAttention = details.filter(
     (assignment) => assignment.requiresAttention
   );
@@ -2334,7 +2560,7 @@ export async function getVolunteerHistory(volunteerProfileId: string) {
     orderBy: [{ date: "desc" }, { pairNumber: "asc" }]
   });
 
-  return assignments.map(mapAssignmentDetail);
+  return mapAssignmentDetails(assignments);
 }
 
 export async function sendAssignmentConfirmationRequests(input: {
@@ -2520,5 +2746,5 @@ export async function getAssignments(input?: {
     orderBy: [{ date: "asc" }, { timeSlot: "asc" }, { pairNumber: "asc" }]
   });
 
-  return assignments.map(mapAssignmentDetail);
+  return mapAssignmentDetails(assignments);
 }

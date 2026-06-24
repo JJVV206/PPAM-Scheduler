@@ -47,6 +47,7 @@ const mocks = vi.hoisted(() => {
       callback(tx)
     ),
     assignment: {
+      findMany: vi.fn(),
       findUniqueOrThrow: vi.fn()
     },
     assignmentInvitation: {
@@ -119,6 +120,8 @@ import {
   createWeeklyAssignment,
   declineAssignment,
   duplicateScheduleWeek,
+  getAssignmentDetail,
+  getSameDayVolunteerRepeatWarnings,
   respondToAssignmentInvitation,
   updateAssignment
 } from "@/services/assignment.service";
@@ -297,6 +300,7 @@ function setupAssignmentDefaults() {
       ]
     })
   );
+  mocks.db.assignment.findMany.mockResolvedValue([]);
   mocks.createPendingPrimaryInvitationsForAssignment.mockResolvedValue({
     createdCount: 2,
     skippedCount: 0
@@ -446,6 +450,140 @@ describe("assignment automation orchestration", () => {
       })
     );
     expect(mocks.db.preachingPoint.findUniqueOrThrow).not.toHaveBeenCalled();
+  });
+
+  it("returns no same-day warning when selected volunteers have no other assignments that day", async () => {
+    mocks.db.assignmentVolunteer.findMany.mockResolvedValueOnce([]);
+
+    const result = await getSameDayVolunteerRepeatWarnings({
+      date: new Date("2026-07-20T12:00:00.000Z"),
+      timeSlot: "SLOT_07_09",
+      volunteerIds: ["volunteer-1", "volunteer-2"]
+    });
+
+    expect(result).toEqual({
+      warnings: [],
+      repeatedVolunteerIds: [],
+      repeatedVolunteers: []
+    });
+  });
+
+  it("returns yellow-warning payload when a selected volunteer is assigned in another time slot that day", async () => {
+    mocks.db.assignmentVolunteer.findMany.mockResolvedValueOnce([
+      {
+        volunteerId: "volunteer-1",
+        volunteer: {
+          user: {
+            name: "Julia Westbrook"
+          }
+        },
+        assignment: {
+          id: "assignment-existing",
+          timeSlot: "SLOT_09_11"
+        }
+      }
+    ]);
+
+    const result = await getSameDayVolunteerRepeatWarnings({
+      date: new Date("2026-07-20T12:00:00.000Z"),
+      timeSlot: "SLOT_07_09",
+      volunteerIds: ["volunteer-1", "volunteer-2"]
+    });
+
+    expect(result).toEqual({
+      warnings: [
+        "Julia Westbrook ya tiene asignación este día en 09:00 - 11:00. Revisa si debe cubrir ambos horarios."
+      ],
+      repeatedVolunteerIds: ["volunteer-1"],
+      repeatedVolunteers: [
+        {
+          volunteerId: "volunteer-1",
+          volunteerName: "Julia Westbrook",
+          timeSlots: ["SLOT_09_11"],
+          assignmentIds: ["assignment-existing"]
+        }
+      ]
+    });
+  });
+
+  it("excludes cancelled assignments and the current assignment from same-day preflight", async () => {
+    mocks.db.assignmentVolunteer.findMany.mockResolvedValueOnce([]);
+
+    await getSameDayVolunteerRepeatWarnings({
+      assignmentId: "assignment-current",
+      date: new Date("2026-07-20T12:00:00.000Z"),
+      timeSlot: "SLOT_07_09",
+      volunteerIds: ["volunteer-1"]
+    });
+
+    expect(mocks.db.assignmentVolunteer.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          assignment: expect.objectContaining({
+            id: { not: "assignment-current" },
+            status: { notIn: ["CANCELLED"] },
+            timeSlot: { not: "SLOT_07_09" }
+          })
+        })
+      })
+    );
+  });
+
+  it("keeps exact same-day and same-time volunteer conflicts blocking", async () => {
+    mocks.db.assignmentVolunteer.findMany.mockResolvedValueOnce([
+      {
+        volunteer: {
+          user: {
+            name: "Julia Westbrook"
+          }
+        },
+        assignment: {
+          preachingPoint: fixedPoint
+        }
+      }
+    ]);
+
+    await expect(
+      createWeeklyAssignment({
+        scheduleWeekId: "week-1",
+        date: new Date(2026, 6, 20),
+        dayOfWeek: "MONDAY",
+        timeSlot: "SLOT_11_13",
+        preachingPointId: fixedPoint.id,
+        volunteers: [{ volunteerId: "volunteer-1", position: "FIRST" }],
+        actorUserId: "admin-1"
+      })
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(mocks.tx.assignment.create).not.toHaveBeenCalled();
+  });
+
+  it("persists same-day repeat warnings in assignment detail responses", async () => {
+    mocks.db.assignment.findUniqueOrThrow.mockResolvedValueOnce(
+      assignmentDetail({
+        volunteers: [assignmentSlot("volunteer-1", "FIRST")]
+      })
+    );
+    mocks.db.assignment.findMany.mockResolvedValueOnce([
+      {
+        id: "assignment-1",
+        date: new Date(2026, 6, 20),
+        timeSlot: "SLOT_11_13",
+        status: "SCHEDULED",
+        volunteers: [{ volunteerId: "volunteer-1" }]
+      },
+      {
+        id: "assignment-2",
+        date: new Date(2026, 6, 20),
+        timeSlot: "SLOT_13_15",
+        status: "SCHEDULED",
+        volunteers: [{ volunteerId: "volunteer-1" }]
+      }
+    ]);
+
+    const result = await getAssignmentDetail("assignment-1");
+
+    expect(result.warnings).toContain("Integrante repetido este día");
   });
 
   it("duplicates a week and generates titular invitations for every copied assignment", async () => {
