@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { addDays, format } from "date-fns";
 import { es } from "date-fns/locale";
+import { Plus, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -51,26 +52,13 @@ import type {
   VolunteerSummary
 } from "@/types/domain";
 
-const assignmentFormSchema = z
-  .object({
-    scheduleWeekId: z.string().min(1),
-    assignmentDate: z.string().min(1, "Selecciona una fecha."),
-    timeSlot: z.enum(TIME_SLOTS),
-    preachingPointId: z.string().min(1, "Selecciona un punto de predicación."),
-    volunteerOneId: z.string().optional(),
-    volunteerTwoId: z.string().optional(),
-    notes: z.string().max(1000, "No excedas 1000 caracteres.").optional()
-  })
-  .refine(
-    (values) =>
-      !values.volunteerOneId ||
-      !values.volunteerTwoId ||
-      values.volunteerOneId !== values.volunteerTwoId,
-    {
-      message: "Selecciona dos voluntarios distintos para la pareja.",
-      path: ["volunteerTwoId"]
-    }
-  );
+const assignmentFormSchema = z.object({
+  scheduleWeekId: z.string().min(1),
+  assignmentDate: z.string().min(1, "Selecciona una fecha."),
+  timeSlot: z.enum(TIME_SLOTS),
+  preachingPointId: z.string().min(1, "Selecciona un punto de predicación."),
+  notes: z.string().max(1000, "No excedas 1000 caracteres.").optional()
+});
 
 type AssignmentFormValues = z.infer<typeof assignmentFormSchema>;
 
@@ -100,6 +88,8 @@ const DAY_ORDER: DayOfWeek[] = [
   "SATURDAY"
 ];
 const SUCCESS_CLOSE_DELAY_MS = 900;
+const MIN_VISIBLE_MEMBER_FIELDS = 2;
+const UNASSIGNED_VOLUNTEER_VALUE = "__unassigned__";
 
 function getDatePart(value: string) {
   return value.slice(0, 10);
@@ -116,6 +106,15 @@ function getDayOfWeekFromDate(value: string): DayOfWeek {
 
 function toAssignmentIsoDate(value: string) {
   return parseLocalDateOnly(value).toISOString();
+}
+
+function normalizeSelectedVolunteerIds(volunteerIds: string[]) {
+  return volunteerIds.filter(Boolean);
+}
+
+function hasDuplicateVolunteerIds(volunteerIds: string[]) {
+  const selectedVolunteerIds = normalizeSelectedVolunteerIds(volunteerIds);
+  return new Set(selectedVolunteerIds).size !== selectedVolunteerIds.length;
 }
 
 export function AssignmentForm({
@@ -140,6 +139,9 @@ export function AssignmentForm({
     tone: "success" | "error";
     text: string;
   } | null>(null);
+  const [memberVolunteerIds, setMemberVolunteerIds] = useState<string[]>(
+    Array.from({ length: MIN_VISIBLE_MEMBER_FIELDS }, () => "")
+  );
   const closeTimeoutRef = useRef<number | null>(null);
 
   function clearCloseTimeout() {
@@ -170,9 +172,7 @@ export function AssignmentForm({
         format(new Date(), "yyyy-MM-dd"),
       timeSlot: presetTimeSlot ?? "SLOT_09_11",
       preachingPointId: preachingPoints[0]?.id ?? "",
-      notes: "",
-      volunteerOneId: "",
-      volunteerTwoId: ""
+      notes: ""
     }),
     [
       preachingPoints,
@@ -190,6 +190,9 @@ export function AssignmentForm({
 
   useEffect(() => {
     form.reset(defaultValues);
+    setMemberVolunteerIds(
+      Array.from({ length: MIN_VISIBLE_MEMBER_FIELDS }, () => "")
+    );
   }, [defaultValues, form]);
 
   useEffect(() => {
@@ -200,6 +203,12 @@ export function AssignmentForm({
     () => volunteers.filter((volunteer) => volunteer.canServeAsPrimary),
     [volunteers]
   );
+  const selectedMemberVolunteerIds = useMemo(
+    () => normalizeSelectedVolunteerIds(memberVolunteerIds),
+    [memberVolunteerIds]
+  );
+  const canAddMemberField =
+    memberVolunteerIds.length < primaryVolunteerOptions.length;
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
@@ -210,10 +219,50 @@ export function AssignmentForm({
     setOpen(nextOpen);
   }
 
+  function setMemberVolunteerId(index: number, volunteerId: string) {
+    setMemberVolunteerIds((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? volunteerId : item
+      )
+    );
+  }
+
+  function addMemberField() {
+    setMemberVolunteerIds((current) =>
+      current.length < primaryVolunteerOptions.length
+        ? [...current, ""]
+        : current
+    );
+  }
+
+  function removeMemberField(index: number) {
+    setMemberVolunteerIds((current) => {
+      const next = current.filter((_, itemIndex) => itemIndex !== index);
+      return next.length >= MIN_VISIBLE_MEMBER_FIELDS
+        ? next
+        : Array.from(
+            { length: MIN_VISIBLE_MEMBER_FIELDS },
+            (_, itemIndex) => next[itemIndex] ?? ""
+          );
+    });
+  }
+
+  function getSelectableVolunteers(index: number) {
+    const selectedIds = new Set(
+      memberVolunteerIds.filter((volunteerId, itemIndex) => {
+        return itemIndex !== index && volunteerId;
+      })
+    );
+
+    return primaryVolunteerOptions.filter(
+      (volunteer) =>
+        volunteer.id === memberVolunteerIds[index] ||
+        !selectedIds.has(volunteer.id)
+    );
+  }
+
   const selectedDate = form.watch("assignmentDate");
   const selectedTimeSlot = form.watch("timeSlot");
-  const selectedVolunteerOneId = form.watch("volunteerOneId");
-  const selectedVolunteerTwoId = form.watch("volunteerTwoId");
   const selectedDayOfWeek = useMemo(
     () => getDayOfWeekFromDate(selectedDate),
     [selectedDate]
@@ -260,12 +309,23 @@ export function AssignmentForm({
     date: selectedAssignmentIsoDate,
     enabled: open,
     timeSlot: selectedTimeSlot,
-    volunteerIds: [selectedVolunteerOneId ?? "", selectedVolunteerTwoId ?? ""]
+    volunteerIds: selectedMemberVolunteerIds
   });
 
   async function onSubmit(values: AssignmentFormValues) {
     setSubmitting(true);
     setFeedback(null);
+    const selectedVolunteerIds =
+      normalizeSelectedVolunteerIds(memberVolunteerIds);
+
+    if (hasDuplicateVolunteerIds(selectedVolunteerIds)) {
+      setFeedback({
+        tone: "error",
+        text: "No puedes seleccionar el mismo voluntario dos veces."
+      });
+      setSubmitting(false);
+      return;
+    }
 
     const payload = {
       scheduleWeekId: values.scheduleWeekId,
@@ -274,14 +334,10 @@ export function AssignmentForm({
       timeSlot: values.timeSlot,
       preachingPointId: values.preachingPointId,
       notes: values.notes,
-      volunteers: [
-        values.volunteerOneId
-          ? { volunteerId: values.volunteerOneId, position: "FIRST" as const }
-          : null,
-        values.volunteerTwoId
-          ? { volunteerId: values.volunteerTwoId, position: "SECOND" as const }
-          : null
-      ].filter(Boolean)
+      volunteers: selectedVolunteerIds.map((volunteerId, index) => ({
+        volunteerId,
+        slotNumber: index + 1
+      }))
     };
 
     const response = await fetch("/api/assignments", {
@@ -309,10 +365,11 @@ export function AssignmentForm({
     });
     form.reset({
       ...values,
-      volunteerOneId: "",
-      volunteerTwoId: "",
       notes: ""
     });
+    setMemberVolunteerIds(
+      Array.from({ length: MIN_VISIBLE_MEMBER_FIELDS }, () => "")
+    );
     router.refresh();
     if (closeOnSuccess) {
       clearCloseTimeout();
@@ -462,55 +519,78 @@ export function AssignmentForm({
               </>
             )}
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="volunteerOneId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Voluntario 1</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
+            <div className="space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <FormLabel>Integrantes</FormLabel>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="w-full gap-2 sm:w-auto"
+                  onClick={addMemberField}
+                  disabled={!canAddMemberField}
+                >
+                  <Plus className="h-4 w-4" />
+                  Agregar integrante
+                </Button>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {memberVolunteerIds.map((volunteerId, index) => {
+                  const slotNumber = index + 1;
+                  const selectableVolunteers = getSelectableVolunteers(index);
+
+                  return (
+                    <div
+                      key={slotNumber}
+                      className="grid gap-2 rounded-lg border border-border/60 bg-background/35 p-3"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="text-sm font-medium">
+                          Integrante {slotNumber}
+                        </label>
+                        {memberVolunteerIds.length >
+                        MIN_VISIBLE_MEMBER_FIELDS ? (
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-muted-foreground"
+                            onClick={() => removeMemberField(index)}
+                            aria-label={`Quitar integrante ${slotNumber}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        ) : null}
+                      </div>
+                      <Select
+                        value={volunteerId || UNASSIGNED_VOLUNTEER_VALUE}
+                        onValueChange={(nextValue) =>
+                          setMemberVolunteerId(
+                            index,
+                            nextValue === UNASSIGNED_VOLUNTEER_VALUE
+                              ? ""
+                              : nextValue
+                          )
+                        }
+                      >
                         <SelectTrigger className="h-10">
-                          <SelectValue placeholder="Asignar primer voluntario" />
+                          <SelectValue placeholder="Asignar voluntario" />
                         </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {primaryVolunteerOptions.map((volunteer) => (
-                          <SelectItem key={volunteer.id} value={volunteer.id}>
-                            {volunteer.name}
+                        <SelectContent>
+                          <SelectItem value={UNASSIGNED_VOLUNTEER_VALUE}>
+                            Sin asignar
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="volunteerTwoId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Voluntario 2</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="h-10">
-                          <SelectValue placeholder="Asignar segundo voluntario" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {primaryVolunteerOptions.map((volunteer) => (
-                          <SelectItem key={volunteer.id} value={volunteer.id}>
-                            {volunteer.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                          {selectableVolunteers.map((volunteer) => (
+                            <SelectItem key={volunteer.id} value={volunteer.id}>
+                              {volunteer.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             <FormField

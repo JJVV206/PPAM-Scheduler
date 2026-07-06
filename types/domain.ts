@@ -11,7 +11,6 @@ import type {
   TIME_SLOTS,
   USER_ACCESS_STATUSES,
   USER_ROLES,
-  VOLUNTEER_POSITIONS,
   VOLUNTEER_SERVICE_TYPES
 } from "@/lib/constants/domain";
 
@@ -21,7 +20,6 @@ export type DayOfWeek = (typeof DAYS_OF_WEEK)[number];
 export type TimeSlot = (typeof TIME_SLOTS)[number];
 export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number];
 export type ResponseStatus = (typeof RESPONSE_STATUSES)[number];
-export type VolunteerPosition = (typeof VOLUNTEER_POSITIONS)[number];
 export type VolunteerServiceType = (typeof VOLUNTEER_SERVICE_TYPES)[number];
 export type AssignmentInvitationType =
   (typeof ASSIGNMENT_INVITATION_TYPES)[number];
@@ -78,7 +76,7 @@ export type AssignmentVolunteerDto = {
   volunteerId: string;
   assignmentVolunteerId: string;
   responseId?: string | null;
-  position: VolunteerPosition;
+  slotNumber: number;
   isReplacement: boolean;
   responseStatus: ResponseStatus;
   respondedAt?: Date | null;
@@ -258,7 +256,7 @@ export type OpenSlotDto = {
   preachingPointName: string;
   area: string;
   status: AssignmentStatus;
-  missingPositions: VolunteerPosition[];
+  missingSlotNumbers: number[];
   urgencyLabel: string;
   suggestedVolunteers: VolunteerSummary[];
   notes?: string | null;

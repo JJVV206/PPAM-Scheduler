@@ -34,7 +34,6 @@ export const ASSIGNMENT_STATUSES = [
   "CANCELLED"
 ] as const;
 export const RESPONSE_STATUSES = ["PENDING", "CONFIRMED", "DECLINED"] as const;
-export const VOLUNTEER_POSITIONS = ["FIRST", "SECOND"] as const;
 export const VOLUNTEER_SERVICE_TYPES = [
   "PRIMARY",
   "REPLACEMENT",
@@ -150,10 +149,13 @@ export const USER_ACCESS_STATUS_LABELS = {
   SUSPENDED: "Suspendida"
 } as const;
 
-export const VOLUNTEER_POSITION_LABELS = {
-  FIRST: "Puesto 1",
-  SECOND: "Puesto 2"
-} as const;
+export function getVolunteerSlotLabel(slotNumber: number) {
+  return `Integrante ${slotNumber}`;
+}
+
+export function formatVolunteerSlotList(slotNumbers: number[]) {
+  return slotNumbers.map(getVolunteerSlotLabel).join(" y ");
+}
 
 export const VOLUNTEER_SERVICE_TYPE_LABELS = {
   PRIMARY: "Titular",

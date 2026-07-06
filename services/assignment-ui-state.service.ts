@@ -137,16 +137,7 @@ function hasAttentionActivity(timeline: AssignmentUiTimelineEntry[]) {
 }
 
 function isCovered(input: AssignmentAutomationStateInput) {
-  if (["CONFIRMED", "COMPLETED"].includes(input.status)) {
-    return true;
-  }
-
-  return (
-    input.status === "REASSIGNED" &&
-    !input.volunteers.some(
-      (volunteer) => volunteer.responseStatus === "DECLINED"
-    )
-  );
+  return ["CONFIRMED", "COMPLETED"].includes(input.status);
 }
 
 export function deriveAssignmentAutomationState(
@@ -174,7 +165,11 @@ export function deriveAssignmentAutomationState(
     return AUTOMATION_STATES.CONFIRMED;
   }
 
-  if (latestInvitation?.status === "ACCEPTED") {
+  if (
+    latestInvitation?.status === "ACCEPTED" &&
+    !hasPendingResponse &&
+    !hasDeclinedResponse
+  ) {
     return AUTOMATION_STATES.CONFIRMED;
   }
 

@@ -76,7 +76,8 @@ beforeEach(() => {
       status: "SCHEDULED",
       volunteers: [
         {
-          position: "FIRST"
+          volunteerId: "volunteer-1",
+          slotNumber: 1
         }
       ]
     }
@@ -166,7 +167,7 @@ describe("volunteer service", () => {
           metadata: expect.objectContaining({
             reason: "volunteer_deleted",
             volunteerProfileId: "volunteer-1",
-            position: "FIRST"
+            slotNumber: 1
           })
         })
       })

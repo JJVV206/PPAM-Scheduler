@@ -409,7 +409,7 @@ export async function deactivateVolunteer(
           reason: "volunteer_deleted",
           volunteerProfileId: volunteerId,
           volunteerUserId: volunteer.userId,
-          position: assignedSlot?.position,
+          slotNumber: assignedSlot?.slotNumber,
           previousStatus: assignment.status,
           markedAt: now
         }

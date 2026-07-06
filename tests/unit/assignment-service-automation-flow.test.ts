@@ -192,12 +192,12 @@ function assignmentDetail(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function assignmentSlot(volunteerId: string, position: "FIRST" | "SECOND") {
+function assignmentSlot(volunteerId: string, slotNumber: number) {
   return {
     id: `slot-${volunteerId}`,
     assignmentId: "assignment-1",
     volunteerId,
-    position,
+    slotNumber,
     isReplacement: false,
     volunteer: volunteer(volunteerId)
   };
@@ -290,8 +290,8 @@ function setupAssignmentDefaults() {
   mocks.tx.assignment.findUniqueOrThrow.mockResolvedValue(
     assignmentDetail({
       volunteers: [
-        assignmentSlot("volunteer-1", "FIRST"),
-        assignmentSlot("volunteer-2", "SECOND")
+        assignmentSlot("volunteer-1", 1),
+        assignmentSlot("volunteer-2", 2)
       ],
       responses: [
         response("volunteer-1", "PENDING"),
@@ -302,8 +302,8 @@ function setupAssignmentDefaults() {
   mocks.db.assignment.findUniqueOrThrow.mockResolvedValue(
     assignmentDetail({
       volunteers: [
-        assignmentSlot("volunteer-1", "FIRST"),
-        assignmentSlot("volunteer-2", "SECOND")
+        assignmentSlot("volunteer-1", 1),
+        assignmentSlot("volunteer-2", 2)
       ],
       responses: [
         response("volunteer-1", "PENDING"),
@@ -379,8 +379,9 @@ describe("assignment automation orchestration", () => {
       timeSlot: "SLOT_11_13",
       preachingPointId: fixedPoint.id,
       volunteers: [
-        { volunteerId: "volunteer-1", position: "FIRST" },
-        { volunteerId: "volunteer-2", position: "SECOND" }
+        { volunteerId: "volunteer-1", slotNumber: 1 },
+        { volunteerId: "volunteer-2", slotNumber: 2 },
+        { volunteerId: "volunteer-3", slotNumber: 3 }
       ],
       actorUserId: "admin-1"
     });
@@ -390,7 +391,7 @@ describe("assignment automation orchestration", () => {
     ).toHaveBeenCalledWith(
       expect.objectContaining({
         assignmentId: "assignment-1",
-        volunteerIds: ["volunteer-1", "volunteer-2"],
+        volunteerIds: ["volunteer-1", "volunteer-2", "volunteer-3"],
         actorUserId: "admin-1",
         source: "assignment_created"
       })
@@ -421,7 +422,7 @@ describe("assignment automation orchestration", () => {
         dayOfWeek: "MONDAY",
         timeSlot: "SLOT_11_13",
         preachingPointId: fixedPoint.id,
-        volunteers: [{ volunteerId: "replacement-only", position: "FIRST" }],
+        volunteers: [{ volunteerId: "replacement-only", slotNumber: 1 }],
         actorUserId: "admin-1"
       })
     ).rejects.toMatchObject({ statusCode: 409 });
@@ -449,8 +450,8 @@ describe("assignment automation orchestration", () => {
       timeSlot: "SLOT_07_09",
       preachingPointId: fixedPoint.id,
       volunteers: [
-        { volunteerId: "volunteer-1", position: "FIRST" },
-        { volunteerId: "volunteer-2", position: "SECOND" }
+        { volunteerId: "volunteer-1", slotNumber: 1 },
+        { volunteerId: "volunteer-2", slotNumber: 2 }
       ],
       actorUserId: "admin-1"
     });
@@ -564,7 +565,7 @@ describe("assignment automation orchestration", () => {
         dayOfWeek: "MONDAY",
         timeSlot: "SLOT_11_13",
         preachingPointId: fixedPoint.id,
-        volunteers: [{ volunteerId: "volunteer-1", position: "FIRST" }],
+        volunteers: [{ volunteerId: "volunteer-1", slotNumber: 1 }],
         actorUserId: "admin-1"
       })
     ).rejects.toMatchObject({ statusCode: 409 });
@@ -575,7 +576,7 @@ describe("assignment automation orchestration", () => {
   it("persists same-day repeat warnings in assignment detail responses", async () => {
     mocks.db.assignment.findUniqueOrThrow.mockResolvedValueOnce(
       assignmentDetail({
-        volunteers: [assignmentSlot("volunteer-1", "FIRST")]
+        volunteers: [assignmentSlot("volunteer-1", 1)]
       })
     );
     mocks.db.assignment.findMany.mockResolvedValueOnce([
@@ -717,8 +718,8 @@ describe("assignment automation orchestration", () => {
           pairNumber: 1,
           notes: null,
           volunteers: [
-            { volunteerId: "volunteer-1", position: "FIRST" },
-            { volunteerId: "volunteer-2", position: "SECOND" }
+            { volunteerId: "volunteer-1", slotNumber: 1 },
+            { volunteerId: "volunteer-2", slotNumber: 2 }
           ]
         },
         {
@@ -730,8 +731,8 @@ describe("assignment automation orchestration", () => {
           pairNumber: 1,
           notes: null,
           volunteers: [
-            { volunteerId: "volunteer-3", position: "FIRST" },
-            { volunteerId: "volunteer-4", position: "SECOND" }
+            { volunteerId: "volunteer-3", slotNumber: 1 },
+            { volunteerId: "volunteer-4", slotNumber: 2 }
           ]
         }
       ]
@@ -769,8 +770,8 @@ describe("assignment automation orchestration", () => {
     mocks.db.assignment.findUniqueOrThrow.mockResolvedValueOnce(
       assignmentDetail({
         volunteers: [
-          assignmentSlot("volunteer-1", "FIRST"),
-          assignmentSlot("volunteer-2", "SECOND")
+          assignmentSlot("volunteer-1", 1),
+          assignmentSlot("volunteer-2", 2)
         ],
         responses: [
           response("volunteer-1", "PENDING"),
@@ -793,8 +794,8 @@ describe("assignment automation orchestration", () => {
     mocks.tx.assignment.findUniqueOrThrow.mockResolvedValue(
       assignmentDetail({
         volunteers: [
-          assignmentSlot("volunteer-3", "FIRST"),
-          assignmentSlot("volunteer-2", "SECOND")
+          assignmentSlot("volunteer-3", 1),
+          assignmentSlot("volunteer-2", 2)
         ],
         responses: [
           response("volunteer-3", "PENDING"),
@@ -805,8 +806,8 @@ describe("assignment automation orchestration", () => {
 
     await updateAssignment("assignment-1", {
       volunteers: [
-        { volunteerId: "volunteer-3", position: "FIRST" },
-        { volunteerId: "volunteer-2", position: "SECOND" }
+        { volunteerId: "volunteer-3", slotNumber: 1 },
+        { volunteerId: "volunteer-2", slotNumber: 2 }
       ],
       actorUserId: "admin-1"
     });
@@ -861,8 +862,8 @@ describe("assignment automation orchestration", () => {
       assignmentDetail({
         status: "CONFIRMED",
         volunteers: [
-          assignmentSlot("volunteer-1", "FIRST"),
-          assignmentSlot("volunteer-2", "SECOND")
+          assignmentSlot("volunteer-1", 1),
+          assignmentSlot("volunteer-2", 2)
         ],
         responses: [
           response("volunteer-1", "CONFIRMED"),
@@ -903,8 +904,8 @@ describe("assignment automation orchestration", () => {
       assignmentDetail({
         status: "NEEDS_REPLACEMENT",
         volunteers: [
-          assignmentSlot("volunteer-1", "FIRST"),
-          assignmentSlot("volunteer-2", "SECOND")
+          assignmentSlot("volunteer-1", 1),
+          assignmentSlot("volunteer-2", 2)
         ],
         responses: [
           response("volunteer-1", "DECLINED"),
@@ -964,13 +965,13 @@ describe("assignment automation orchestration", () => {
     ).not.toHaveBeenCalled();
   });
 
-  it("assigns a manual replacement to the declined volunteer position", async () => {
+  it("assigns a manual replacement to the declined volunteer slot", async () => {
     mocks.db.assignment.findUniqueOrThrow.mockResolvedValueOnce(
       assignmentDetail({
         status: "NEEDS_REPLACEMENT",
         volunteers: [
-          assignmentSlot("volunteer-1", "FIRST"),
-          assignmentSlot("volunteer-2", "SECOND")
+          assignmentSlot("volunteer-1", 1),
+          assignmentSlot("volunteer-2", 2)
         ],
         responses: [
           response("volunteer-1", "DECLINED"),
@@ -992,7 +993,7 @@ describe("assignment automation orchestration", () => {
       data: {
         assignmentId: "assignment-1",
         volunteerId: "replacement-1",
-        position: "FIRST",
+        slotNumber: 1,
         isReplacement: true
       }
     });
@@ -1003,8 +1004,8 @@ describe("assignment automation orchestration", () => {
       assignmentDetail({
         status: "NEEDS_REPLACEMENT",
         volunteers: [
-          assignmentSlot("volunteer-1", "FIRST"),
-          assignmentSlot("volunteer-2", "SECOND")
+          assignmentSlot("volunteer-1", 1),
+          assignmentSlot("volunteer-2", 2)
         ],
         responses: [
           response("volunteer-1", "DECLINED"),
@@ -1039,8 +1040,8 @@ describe("assignment automation orchestration", () => {
       assignmentDetail({
         status: "SCHEDULED",
         volunteers: [
-          assignmentSlot("volunteer-1", "FIRST"),
-          assignmentSlot("volunteer-2", "SECOND")
+          assignmentSlot("volunteer-1", 1),
+          assignmentSlot("volunteer-2", 2)
         ],
         responses: [
           response("volunteer-1", "PENDING"),
@@ -1082,12 +1083,12 @@ describe("assignment automation orchestration", () => {
           {
             id: "slot-volunteer-1",
             volunteerId: "volunteer-1",
-            position: "FIRST"
+            slotNumber: 1
           },
           {
             id: "slot-volunteer-2",
             volunteerId: "volunteer-2",
-            position: "SECOND"
+            slotNumber: 2
           }
         ],
         responses: [
@@ -1100,10 +1101,10 @@ describe("assignment automation orchestration", () => {
           status: "REASSIGNED",
           volunteers: [
             {
-              ...assignmentSlot("replacement-1", "FIRST"),
+              ...assignmentSlot("replacement-1", 1),
               isReplacement: true
             },
-            assignmentSlot("volunteer-2", "SECOND")
+            assignmentSlot("volunteer-2", 2)
           ],
           responses: [
             response("replacement-1", "CONFIRMED"),
@@ -1124,7 +1125,7 @@ describe("assignment automation orchestration", () => {
       data: {
         assignmentId: "assignment-1",
         volunteerId: "replacement-1",
-        position: "FIRST",
+        slotNumber: 1,
         isReplacement: true
       }
     });
@@ -1157,7 +1158,7 @@ describe("assignment automation orchestration", () => {
     mocks.tx.assignment.findUniqueOrThrow.mockResolvedValue(
       assignmentDetail({
         status: "NEEDS_REPLACEMENT",
-        volunteers: [assignmentSlot("volunteer-1", "FIRST")],
+        volunteers: [assignmentSlot("volunteer-1", 1)],
         responses: [response("replacement-1", "DECLINED")]
       })
     );

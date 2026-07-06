@@ -21,7 +21,7 @@ export async function POST(
     const result = await assignReplacementVolunteer({
       assignmentId: id,
       volunteerId: body.volunteerId,
-      position: body.position,
+      slotNumber: body.slotNumber,
       actorUserId: auth.session.user.id
     });
     revalidateAssignmentViews({

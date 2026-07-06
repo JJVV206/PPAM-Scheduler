@@ -12,8 +12,7 @@ import {
   DayOfWeek,
   Prisma,
   ResponseStatus,
-  TimeSlot,
-  VolunteerPosition
+  TimeSlot
 } from "@prisma/client";
 
 import { db } from "@/lib/db/prisma";
@@ -75,6 +74,9 @@ const assignmentInclude = {
     }
   },
   volunteers: {
+    orderBy: {
+      slotNumber: "asc"
+    },
     include: {
       volunteer: {
         include: {
@@ -107,6 +109,8 @@ const assignmentInclude = {
 } satisfies Prisma.AssignmentInclude;
 
 const SAME_DAY_REPEAT_WARNING = "Integrante repetido este día";
+const MIN_ASSIGNMENT_VOLUNTEERS = 2;
+const BASE_ASSIGNMENT_SLOT_NUMBERS = [1, 2] as const;
 
 type SameDayRepeatAssignment = {
   id: string;
@@ -181,10 +185,11 @@ function sortTimeSlots(timeSlots: TimeSlot[]) {
   );
 }
 
-function getSameDayRepeatAssignmentIds(
-  assignments: SameDayRepeatAssignment[]
-) {
-  const assignmentsByVolunteerDay = new Map<string, SameDayRepeatAssignment[]>();
+function getSameDayRepeatAssignmentIds(assignments: SameDayRepeatAssignment[]) {
+  const assignmentsByVolunteerDay = new Map<
+    string,
+    SameDayRepeatAssignment[]
+  >();
 
   for (const assignment of assignments) {
     if (assignment.status === "CANCELLED") continue;
@@ -262,7 +267,9 @@ function calculateWarnings(input: {
 }
 
 function mapAssignmentDetail(
-  assignment: Prisma.AssignmentGetPayload<{ include: typeof assignmentInclude }>,
+  assignment: Prisma.AssignmentGetPayload<{
+    include: typeof assignmentInclude;
+  }>,
   options: {
     sameDayRepeat?: boolean;
     sameDayRepeatAssignmentIds?: Set<string>;
@@ -278,7 +285,7 @@ function mapAssignmentDetail(
         volunteerId: slot.volunteerId,
         assignmentVolunteerId: slot.id,
         responseId: response?.id ?? null,
-        position: slot.position,
+        slotNumber: slot.slotNumber,
         isReplacement: slot.isReplacement,
         responseStatus: response?.responseStatus ?? "PENDING",
         respondedAt: response?.respondedAt ?? null,
@@ -360,10 +367,11 @@ function mapAssignmentDetail(
 }
 
 function mapAssignmentDetails(
-  assignments: Prisma.AssignmentGetPayload<{ include: typeof assignmentInclude }>[]
+  assignments: Prisma.AssignmentGetPayload<{
+    include: typeof assignmentInclude;
+  }>[]
 ) {
-  const sameDayRepeatAssignmentIds =
-    getSameDayRepeatAssignmentIds(assignments);
+  const sameDayRepeatAssignmentIds = getSameDayRepeatAssignmentIds(assignments);
 
   return assignments.map((assignment) =>
     mapAssignmentDetail(assignment, { sameDayRepeatAssignmentIds })
@@ -373,8 +381,9 @@ function mapAssignmentDetails(
 async function mapAssignmentDetailWithSameDayWarnings(
   assignment: Prisma.AssignmentGetPayload<{ include: typeof assignmentInclude }>
 ) {
-  const sameDayRepeatAssignmentIds =
-    await getSameDayRepeatAssignmentIdsForDate(assignment.date);
+  const sameDayRepeatAssignmentIds = await getSameDayRepeatAssignmentIdsForDate(
+    assignment.date
+  );
 
   return mapAssignmentDetail(assignment, { sameDayRepeatAssignmentIds });
 }
@@ -584,7 +593,9 @@ async function assertVolunteersCanServeAsPrimary(volunteerIds: string[]) {
       }
     }
   });
-  const foundVolunteerIds = new Set(volunteers.map((volunteer) => volunteer.id));
+  const foundVolunteerIds = new Set(
+    volunteers.map((volunteer) => volunteer.id)
+  );
   const invalidVolunteerNames = volunteers
     .filter((volunteer) => !volunteer.canServeAsPrimary)
     .map((volunteer) => volunteer.user.name);
@@ -702,31 +713,49 @@ function difference(left: string[], right: string[]) {
   return left.filter((item) => !rightSet.has(item));
 }
 
-export function selectReplacementAssignmentPosition(input: {
-  volunteers: Array<{ volunteerId: string; position: VolunteerPosition }>;
-  responses: Array<{ volunteerId: string; responseStatus: ResponseStatus }>;
-}): VolunteerPosition | null {
-  const declinedResponse = input.responses.find(
-    (response) => response.responseStatus === "DECLINED"
+function getMissingBaseSlotNumbers(input: {
+  volunteers: Array<{ slotNumber: number }>;
+}) {
+  return BASE_ASSIGNMENT_SLOT_NUMBERS.filter(
+    (slotNumber) =>
+      !input.volunteers.some((volunteer) => volunteer.slotNumber === slotNumber)
   );
-  const declinedSlot = declinedResponse
-    ? input.volunteers.find(
-        (volunteer) => volunteer.volunteerId === declinedResponse.volunteerId
-      )
-    : null;
+}
 
-  if (declinedSlot) {
-    return declinedSlot.position;
+function getDeclinedSlotNumbers(input: {
+  volunteers: Array<{ volunteerId: string; slotNumber: number }>;
+  responses: Array<{ volunteerId: string; responseStatus: ResponseStatus }>;
+}) {
+  return input.responses
+    .filter((response) => response.responseStatus === "DECLINED")
+    .map((response) => {
+      const slot = input.volunteers.find(
+        (volunteer) => volunteer.volunteerId === response.volunteerId
+      );
+      return slot?.slotNumber;
+    })
+    .filter(
+      (slotNumber): slotNumber is number => typeof slotNumber === "number"
+    );
+}
+
+export function selectReplacementAssignmentSlotNumber(input: {
+  volunteers: Array<{ volunteerId: string; slotNumber: number }>;
+  responses: Array<{ volunteerId: string; responseStatus: ResponseStatus }>;
+}): number | null {
+  const [declinedSlotNumber] = getDeclinedSlotNumbers(input);
+
+  if (declinedSlotNumber) {
+    return declinedSlotNumber;
   }
 
-  return (
-    (["FIRST", "SECOND"] as VolunteerPosition[]).find(
-      (position) =>
-        !input.volunteers.some((volunteer) => volunteer.position === position)
-    ) ??
-    input.volunteers[input.volunteers.length - 1]?.position ??
-    null
-  );
+  const [missingBaseSlotNumber] = getMissingBaseSlotNumbers(input);
+
+  if (missingBaseSlotNumber) {
+    return missingBaseSlotNumber;
+  }
+
+  return input.volunteers[input.volunteers.length - 1]?.slotNumber ?? null;
 }
 
 export async function recalculateAssignmentStatus(
@@ -774,7 +803,7 @@ export async function createWeeklyAssignment(input: {
   preachingPointId: string;
   pairNumber?: number;
   notes?: string;
-  volunteers: Array<{ volunteerId: string; position: VolunteerPosition }>;
+  volunteers: Array<{ volunteerId: string; slotNumber: number }>;
   actorUserId: string;
 }) {
   const fixedPoint = await getSingletonPreachingPoint();
@@ -824,7 +853,7 @@ export async function createWeeklyAssignment(input: {
         data: input.volunteers.map((volunteer) => ({
           assignmentId: created.id,
           volunteerId: volunteer.volunteerId,
-          position: volunteer.position
+          slotNumber: volunteer.slotNumber
         }))
       });
 
@@ -884,7 +913,7 @@ export async function updateAssignment(
     preachingPointId?: string;
     status?: AssignmentStatus;
     notes?: string | null;
-    volunteers?: Array<{ volunteerId: string; position: VolunteerPosition }>;
+    volunteers?: Array<{ volunteerId: string; slotNumber: number }>;
     actorUserId: string;
   }
 ) {
@@ -1032,7 +1061,7 @@ export async function updateAssignment(
           data: input.volunteers.map((volunteer) => ({
             assignmentId,
             volunteerId: volunteer.volunteerId,
-            position: volunteer.position
+            slotNumber: volunteer.slotNumber
           }))
         });
         await createPendingPrimaryInvitationsForAssignment({
@@ -1130,8 +1159,9 @@ export async function getAssignmentsForScheduleSlot(input: {
     orderBy: [{ preachingPoint: { name: "asc" } }, { pairNumber: "asc" }]
   });
 
-  const sameDayRepeatAssignmentIds =
-    await getSameDayRepeatAssignmentIdsForDate(input.date);
+  const sameDayRepeatAssignmentIds = await getSameDayRepeatAssignmentIdsForDate(
+    input.date
+  );
 
   return assignments.map((assignment) =>
     mapAssignmentDetail(assignment, { sameDayRepeatAssignmentIds })
@@ -1165,6 +1195,9 @@ export async function getWeeklySchedule(input?: {
     include: {
       preachingPoint: true,
       volunteers: {
+        orderBy: {
+          slotNumber: "asc"
+        },
         include: {
           volunteer: {
             include: { user: true }
@@ -1180,8 +1213,7 @@ export async function getWeeklySchedule(input?: {
       { pairNumber: "asc" }
     ]
   });
-  const sameDayRepeatAssignmentIds =
-    getSameDayRepeatAssignmentIds(assignments);
+  const sameDayRepeatAssignmentIds = getSameDayRepeatAssignmentIds(assignments);
 
   const days = Array.from({ length: 7 }).map((_, index) => {
     const date = addDays(weekStart, index);
@@ -1345,7 +1377,7 @@ export async function duplicateScheduleWeek(input: {
       notes: assignment.notes ?? undefined,
       volunteers: assignment.volunteers.map((volunteer) => ({
         volunteerId: volunteer.volunteerId,
-        position: volunteer.position
+        slotNumber: volunteer.slotNumber
       })),
       actorUserId: input.actorUserId
     });
@@ -1792,20 +1824,20 @@ export async function respondToAssignmentInvitation(input: {
           responses: true
         }
       });
-      const targetPosition = selectReplacementAssignmentPosition({
+      const targetSlotNumber = selectReplacementAssignmentSlotNumber({
         volunteers: currentAssignment.volunteers,
         responses: currentAssignment.responses
       });
 
-      if (!targetPosition) {
+      if (!targetSlotNumber) {
         throw new AppError(
-          "No se encontró un puesto disponible para asignar el reemplazo.",
+          "No se encontró un espacio disponible para asignar el reemplazo.",
           400
         );
       }
 
-      const existingPosition = currentAssignment.volunteers.find(
-        (slot) => slot.position === targetPosition
+      const existingSlot = currentAssignment.volunteers.find(
+        (slot) => slot.slotNumber === targetSlotNumber
       );
       const existingReplacementSlot = currentAssignment.volunteers.find(
         (slot) => slot.volunteerId === invitation.volunteerId
@@ -1813,33 +1845,30 @@ export async function respondToAssignmentInvitation(input: {
 
       if (
         existingReplacementSlot &&
-        existingReplacementSlot.id !== existingPosition?.id
+        existingReplacementSlot.id !== existingSlot?.id
       ) {
         await tx.assignmentVolunteer.delete({
           where: { id: existingReplacementSlot.id }
         });
       }
 
-      if (
-        existingPosition &&
-        existingPosition.volunteerId !== invitation.volunteerId
-      ) {
+      if (existingSlot && existingSlot.volunteerId !== invitation.volunteerId) {
         await tx.assignmentVolunteer.delete({
-          where: { id: existingPosition.id }
+          where: { id: existingSlot.id }
         });
         await tx.assignmentResponse.deleteMany({
           where: {
             assignmentId: invitation.assignmentId,
-            volunteerId: existingPosition.volunteerId
+            volunteerId: existingSlot.volunteerId
           }
         });
       }
 
-      if (existingPosition?.volunteerId === invitation.volunteerId) {
+      if (existingSlot?.volunteerId === invitation.volunteerId) {
         await tx.assignmentVolunteer.update({
-          where: { id: existingPosition.id },
+          where: { id: existingSlot.id },
           data: {
-            position: targetPosition,
+            slotNumber: targetSlotNumber,
             isReplacement: true
           }
         });
@@ -1848,7 +1877,7 @@ export async function respondToAssignmentInvitation(input: {
           data: {
             assignmentId: invitation.assignmentId,
             volunteerId: invitation.volunteerId,
-            position: targetPosition,
+            slotNumber: targetSlotNumber,
             isReplacement: true
           }
         });
@@ -1863,7 +1892,7 @@ export async function respondToAssignmentInvitation(input: {
             responseStatus: input.responseStatus,
             respondedVia: "PUBLIC_INVITATION_LINK",
             responseRecordedAt: now.toISOString(),
-            assignedPosition: targetPosition
+            assignedSlotNumber: targetSlotNumber
           })
         }
       });
@@ -1879,7 +1908,7 @@ export async function respondToAssignmentInvitation(input: {
           responseStatus: input.responseStatus,
           respondedAt: now,
           source: "PUBLIC_INVITATION_LINK",
-          assignedPosition: targetPosition
+          assignedSlotNumber: targetSlotNumber
         }
       });
 
@@ -1916,7 +1945,7 @@ export async function respondToAssignmentInvitation(input: {
         metadata: {
           volunteerProfileId: invitation.volunteerId,
           invitationId: invitation.id,
-          position: targetPosition,
+          slotNumber: targetSlotNumber,
           source: "PUBLIC_INVITATION_LINK",
           note: input.note
         }
@@ -2204,12 +2233,7 @@ export async function getOpenSlots(): Promise<OpenSlotDto[]> {
       },
       status: {
         notIn: ["CANCELLED", "COMPLETED"]
-      },
-      OR: [
-        { status: { in: ["NEEDS_REPLACEMENT", "DECLINED"] } },
-        { volunteers: { none: { position: "FIRST" } } },
-        { volunteers: { none: { position: "SECOND" } } }
-      ]
+      }
     },
     include: {
       preachingPoint: true,
@@ -2224,27 +2248,18 @@ export async function getOpenSlots(): Promise<OpenSlotDto[]> {
       .filter(
         (assignment) =>
           assignment.status === "NEEDS_REPLACEMENT" ||
-          assignment.volunteers.length < 2
+          assignment.volunteers.length < MIN_ASSIGNMENT_VOLUNTEERS
       )
       .map(async (assignment) => {
-        const missingPositions = (
-          ["FIRST", "SECOND"] as VolunteerPosition[]
-        ).filter(
-          (position) =>
-            !assignment.volunteers.some((slot) => slot.position === position)
-        );
-        const declinedPositions = assignment.responses
-          .filter((response) => response.responseStatus === "DECLINED")
-          .map((response) => {
-            const slot = assignment.volunteers.find(
-              (volunteer) => volunteer.volunteerId === response.volunteerId
-            );
-            return slot?.position;
-          })
-          .filter(Boolean) as VolunteerPosition[];
-
-        const positions = [
-          ...new Set([...missingPositions, ...declinedPositions])
+        const missingSlotNumbers = getMissingBaseSlotNumbers({
+          volunteers: assignment.volunteers
+        });
+        const declinedSlotNumbers = getDeclinedSlotNumbers({
+          volunteers: assignment.volunteers,
+          responses: assignment.responses
+        });
+        const slotNumbers = [
+          ...new Set([...missingSlotNumbers, ...declinedSlotNumbers])
         ];
         const suggestions = await getReplacementCandidatesForAssignment({
           assignmentId: assignment.id,
@@ -2260,7 +2275,7 @@ export async function getOpenSlots(): Promise<OpenSlotDto[]> {
           preachingPointName: FIXED_PREACHING_POINT_NAME,
           area: assignment.preachingPoint.area,
           status: assignment.status,
-          missingPositions: positions.length ? positions : ["SECOND"],
+          missingSlotNumbers: slotNumbers.length ? slotNumbers : [2],
           urgencyLabel:
             differenceInCalendarDays(assignment.date, new Date()) <= 2
               ? "Urgente"
@@ -2278,7 +2293,7 @@ export async function assignReplacementVolunteer(input: {
   assignmentId: string;
   volunteerId: string;
   actorUserId: string;
-  position?: VolunteerPosition;
+  slotNumber?: number;
   requireOpenSlot?: boolean;
 }) {
   const assignment = await db.assignment.findUniqueOrThrow({
@@ -2290,34 +2305,26 @@ export async function assignReplacementVolunteer(input: {
     }
   });
 
-  const openPositions = [
+  const openSlotNumbers = [
     ...new Set([
-      ...(["FIRST", "SECOND"] as VolunteerPosition[]).filter(
-        (position) =>
-          !assignment.volunteers.some((slot) => slot.position === position)
-      ),
-      ...assignment.responses
-        .filter((response) => response.responseStatus === "DECLINED")
-        .map((response) => {
-          const slot = assignment.volunteers.find(
-            (volunteer) => volunteer.volunteerId === response.volunteerId
-          );
-          return slot?.position;
-        })
-        .filter(Boolean)
+      ...getMissingBaseSlotNumbers({ volunteers: assignment.volunteers }),
+      ...getDeclinedSlotNumbers({
+        volunteers: assignment.volunteers,
+        responses: assignment.responses
+      })
     ])
-  ] as VolunteerPosition[];
+  ];
 
-  if (input.requireOpenSlot && !openPositions.length) {
+  if (input.requireOpenSlot && !openSlotNumbers.length) {
     throw new AppError("Esta asignación no tiene una vacante disponible.", 409);
   }
 
   if (
     input.requireOpenSlot &&
-    input.position &&
-    !openPositions.includes(input.position)
+    input.slotNumber &&
+    !openSlotNumbers.includes(input.slotNumber)
   ) {
-    throw new AppError("La posición seleccionada no está vacante.", 409);
+    throw new AppError("El espacio seleccionado no está vacante.", 409);
   }
 
   await assertVolunteerCanServeAsReplacement(input.volunteerId);
@@ -2329,33 +2336,33 @@ export async function assignReplacementVolunteer(input: {
     volunteerIds: [input.volunteerId]
   });
 
-  const targetPosition =
-    input.position ??
-    selectReplacementAssignmentPosition({
+  const targetSlotNumber =
+    input.slotNumber ??
+    selectReplacementAssignmentSlotNumber({
       volunteers: assignment.volunteers,
       responses: assignment.responses
     });
 
-  if (!targetPosition) {
+  if (!targetSlotNumber) {
     throw new AppError(
-      "No se encontró un puesto disponible para el voluntario.",
+      "No se encontró un espacio disponible para el voluntario.",
       400
     );
   }
 
   const result = await db.$transaction(async (tx) => {
-    const existingPosition = assignment.volunteers.find(
-      (slot) => slot.position === targetPosition
+    const existingSlot = assignment.volunteers.find(
+      (slot) => slot.slotNumber === targetSlotNumber
     );
 
-    if (existingPosition) {
+    if (existingSlot) {
       await tx.assignmentVolunteer.delete({
-        where: { id: existingPosition.id }
+        where: { id: existingSlot.id }
       });
       await tx.assignmentResponse.deleteMany({
         where: {
           assignmentId: input.assignmentId,
-          volunteerId: existingPosition.volunteerId
+          volunteerId: existingSlot.volunteerId
         }
       });
     }
@@ -2364,7 +2371,7 @@ export async function assignReplacementVolunteer(input: {
       data: {
         assignmentId: input.assignmentId,
         volunteerId: input.volunteerId,
-        position: targetPosition,
+        slotNumber: targetSlotNumber,
         isReplacement: true
       }
     });
@@ -2374,7 +2381,7 @@ export async function assignReplacementVolunteer(input: {
       assignmentId: input.assignmentId,
       volunteerIds: [
         ...assignment.volunteers
-          .filter((slot) => slot.position !== targetPosition)
+          .filter((slot) => slot.slotNumber !== targetSlotNumber)
           .map((slot) => slot.volunteerId),
         input.volunteerId
       ]
@@ -2394,7 +2401,7 @@ export async function assignReplacementVolunteer(input: {
       event: "REPLACEMENT_ASSIGNED",
       metadata: {
         volunteerProfileId: input.volunteerId,
-        position: targetPosition,
+        slotNumber: targetSlotNumber,
         source: "manual_replacement_assignment"
       }
     });
@@ -2607,6 +2614,9 @@ export async function resendAssignmentConfirmation(assignmentId: string) {
       preachingPoint: true,
       responses: true,
       volunteers: {
+        orderBy: {
+          slotNumber: "asc"
+        },
         include: {
           volunteer: {
             include: { user: true }

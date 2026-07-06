@@ -3,8 +3,7 @@ import { z } from "zod";
 import {
   ASSIGNMENT_STATUSES,
   DAYS_OF_WEEK,
-  TIME_SLOTS,
-  VOLUNTEER_POSITIONS
+  TIME_SLOTS
 } from "@/lib/constants/domain";
 
 export const assignmentFiltersSchema = z.object({
@@ -24,17 +23,49 @@ export const scheduleFiltersSchema = z.object({
 
 export const assignmentVolunteerInputSchema = z.object({
   volunteerId: z.string().min(1, "Debes seleccionar un voluntario."),
-  position: z.enum(VOLUNTEER_POSITIONS)
+  slotNumber: z.number().int().min(1, "El número de integrante no es válido.")
 });
+
+function requireUniqueAssignmentVolunteers(
+  volunteers: Array<{ volunteerId: string; slotNumber: number }>,
+  context: z.RefinementCtx
+) {
+  const volunteerIds = new Set<string>();
+  const slotNumbers = new Set<number>();
+
+  volunteers.forEach((volunteer, index) => {
+    if (volunteerIds.has(volunteer.volunteerId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "No puedes seleccionar el mismo voluntario dos veces.",
+        path: [index, "volunteerId"]
+      });
+    }
+    volunteerIds.add(volunteer.volunteerId);
+
+    if (slotNumbers.has(volunteer.slotNumber)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Cada integrante debe tener un número único.",
+        path: [index, "slotNumber"]
+      });
+    }
+    slotNumbers.add(volunteer.slotNumber);
+  });
+}
 
 export const createAssignmentSchema = z.object({
   scheduleWeekId: z.string().min(1, "La semana es obligatoria."),
   date: z.string().datetime(),
   dayOfWeek: z.enum(DAYS_OF_WEEK),
   timeSlot: z.enum(TIME_SLOTS),
-  preachingPointId: z.string().min(1, "Debes seleccionar un punto de predicación."),
+  preachingPointId: z
+    .string()
+    .min(1, "Debes seleccionar un punto de predicación."),
   notes: z.string().max(1000, "No excedas 1000 caracteres.").optional(),
-  volunteers: z.array(assignmentVolunteerInputSchema).max(2, "Solo se permiten dos voluntarios.")
+  volunteers: z
+    .array(assignmentVolunteerInputSchema)
+    .superRefine(requireUniqueAssignmentVolunteers)
 });
 
 export const updateAssignmentSchema = z.object({
@@ -43,15 +74,36 @@ export const updateAssignmentSchema = z.object({
   timeSlot: z.enum(TIME_SLOTS).optional(),
   preachingPointId: z.string().optional(),
   status: z.enum(ASSIGNMENT_STATUSES).optional(),
-  notes: z.string().max(1000, "No excedas 1000 caracteres.").nullable().optional(),
-  volunteers: z.array(assignmentVolunteerInputSchema).max(2, "Solo se permiten dos voluntarios.").optional()
+  notes: z
+    .string()
+    .max(1000, "No excedas 1000 caracteres.")
+    .nullable()
+    .optional(),
+  volunteers: z
+    .array(assignmentVolunteerInputSchema)
+    .superRefine(requireUniqueAssignmentVolunteers)
+    .optional()
 });
 
 export const assignmentPreflightSchema = z.object({
   assignmentId: z.string().optional(),
   date: z.string().datetime(),
   timeSlot: z.enum(TIME_SLOTS),
-  volunteerIds: z.array(z.string().min(1)).max(2, "Solo se permiten dos voluntarios.")
+  volunteerIds: z
+    .array(z.string().min(1))
+    .superRefine((volunteerIds, context) => {
+      const uniqueIds = new Set<string>();
+      volunteerIds.forEach((volunteerId, index) => {
+        if (uniqueIds.has(volunteerId)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "No puedes seleccionar el mismo voluntario dos veces.",
+            path: [index]
+          });
+        }
+        uniqueIds.add(volunteerId);
+      });
+    })
 });
 
 export const confirmAssignmentSchema = z.object({
@@ -68,5 +120,5 @@ export const declineAssignmentSchema = z.object({
 
 export const replacementAssignmentSchema = z.object({
   volunteerId: z.string().min(1, "Debes seleccionar un voluntario."),
-  position: z.enum(VOLUNTEER_POSITIONS).optional()
+  slotNumber: z.number().int().min(1).optional()
 });

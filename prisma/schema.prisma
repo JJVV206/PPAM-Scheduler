@@ -55,11 +55,6 @@ enum ResponseStatus {
   DECLINED
 }
 
-enum VolunteerPosition {
-  FIRST
-  SECOND
-}
-
 enum AssignmentInvitationType {
   PRIMARY
   REPLACEMENT
@@ -152,19 +147,19 @@ enum AssignmentActivityType {
 }
 
 model User {
-  id                 String           @id @default(cuid())
+  id                 String               @id @default(cuid())
   name               String
-  email              String           @unique
+  email              String               @unique
   passwordHash       String
   role               UserRole
   phone              String
-  active             Boolean          @default(true)
-  accessStatus       UserAccessStatus @default(APPROVED)
+  active             Boolean              @default(true)
+  accessStatus       UserAccessStatus     @default(APPROVED)
   accessReviewedAt   DateTime?
   accessReviewedById String?
   accessReviewNote   String?
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
   volunteerProfile   VolunteerProfile?
   accounts           Account[]
   sessions           Session[]
@@ -174,8 +169,8 @@ model User {
   createdWeeks       ScheduleWeek[]
   createdCensuses    ReplacementCensus[]
   passwordResets     PasswordResetToken[]
-  accessReviewedBy   User?            @relation("UserAccessReviews", fields: [accessReviewedById], references: [id], onDelete: SetNull)
-  accessReviews      User[]           @relation("UserAccessReviews")
+  accessReviewedBy   User?                @relation("UserAccessReviews", fields: [accessReviewedById], references: [id], onDelete: SetNull)
+  accessReviews      User[]               @relation("UserAccessReviews")
 
   @@index([accessStatus, role, createdAt])
   @@index([accessReviewedById])
@@ -272,15 +267,15 @@ model Assignment {
 }
 
 model AssignmentVolunteer {
-  id            String            @id @default(cuid())
+  id            String           @id @default(cuid())
   assignmentId  String
   volunteerId   String
-  position      VolunteerPosition
-  isReplacement Boolean           @default(false)
-  assignment    Assignment        @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  volunteer     VolunteerProfile  @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+  slotNumber    Int
+  isReplacement Boolean          @default(false)
+  assignment    Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  volunteer     VolunteerProfile @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
 
-  @@unique([assignmentId, position])
+  @@unique([assignmentId, slotNumber])
   @@unique([assignmentId, volunteerId])
   @@index([volunteerId])
 }
@@ -468,21 +463,21 @@ model AppSetting {
 }
 
 model AutomationAuditLog {
-  id               String   @id @default(cuid())
-  eventType        String
-  eventCategory    String
-  status           String?
-  assignmentId     String?
-  scheduleWeekId   String?
-  censusId         String?
-  censusResponseId String?
-  invitationId     String?
+  id                String   @id @default(cuid())
+  eventType         String
+  eventCategory     String
+  status            String?
+  assignmentId      String?
+  scheduleWeekId    String?
+  censusId          String?
+  censusResponseId  String?
+  invitationId      String?
   notificationLogId String?
   appNotificationId String?
-  actorUserId      String?
-  automationRunId  String?
-  metadata         Json?
-  createdAt        DateTime @default(now())
+  actorUserId       String?
+  automationRunId   String?
+  metadata          Json?
+  createdAt         DateTime @default(now())
 
   @@index([eventType, createdAt])
   @@index([automationRunId, createdAt])

@@ -10,7 +10,10 @@ export function determineAssignmentStatus(args: {
   now?: Date;
 }): AssignmentStatus {
   const today = args.now ?? new Date();
-  const daysUntilAssignment = differenceInCalendarDays(args.assignmentDate, today);
+  const daysUntilAssignment = differenceInCalendarDays(
+    args.assignmentDate,
+    today
+  );
   const hasDeclined = args.responses.some(
     (response) => response.responseStatus === "DECLINED"
   );
@@ -22,7 +25,7 @@ export function determineAssignmentStatus(args: {
     return "NEEDS_REPLACEMENT";
   }
 
-  if (confirmedCount >= 2) {
+  if (confirmedCount >= args.volunteerCount) {
     return "CONFIRMED";
   }
 

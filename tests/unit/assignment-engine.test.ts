@@ -71,4 +71,20 @@ describe("determineAssignmentStatus", () => {
 
     expect(status).toBe("CONFIRMED");
   });
+
+  it("requires every assigned volunteer to confirm", () => {
+    const status = determineAssignmentStatus({
+      assignmentDate: new Date("2026-04-25T09:00:00.000Z"),
+      volunteerCount: 3,
+      responses: [
+        { responseStatus: "CONFIRMED" },
+        { responseStatus: "CONFIRMED" },
+        { responseStatus: "PENDING" }
+      ],
+      confirmationLeadDays: 8,
+      now: new Date("2026-04-19T09:00:00.000Z")
+    });
+
+    expect(status).toBe("PENDING_CONFIRMATION");
+  });
 });

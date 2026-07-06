@@ -12,8 +12,7 @@ import {
   PrismaClient,
   ResponseStatus,
   TimeSlot,
-  UserRole,
-  VolunteerPosition
+  UserRole
 } from "@prisma/client";
 
 function loadLocalEnv() {
@@ -197,27 +196,27 @@ async function main() {
       {
         assignmentId: assignment1.id,
         volunteerId: juliaProfile.id,
-        position: VolunteerPosition.FIRST
+        slotNumber: 1
       },
       {
         assignmentId: assignment1.id,
         volunteerId: marcoProfile.id,
-        position: VolunteerPosition.SECOND
+        slotNumber: 2
       },
       {
         assignmentId: assignment2.id,
         volunteerId: elenaProfile.id,
-        position: VolunteerPosition.FIRST
+        slotNumber: 1
       },
       {
         assignmentId: assignment3.id,
         volunteerId: juliaProfile.id,
-        position: VolunteerPosition.FIRST
+        slotNumber: 1
       },
       {
         assignmentId: assignment3.id,
         volunteerId: elenaProfile.id,
-        position: VolunteerPosition.SECOND
+        slotNumber: 2
       }
     ]
   });

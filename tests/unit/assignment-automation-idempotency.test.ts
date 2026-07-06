@@ -245,7 +245,7 @@ function replacementVolunteer(input: {
       id: `future-${input.id}-${index}`,
       assignmentId: `future-assignment-${index}`,
       volunteerId: input.id,
-      position: "FIRST",
+      slotNumber: 1,
       isReplacement: false
     }))
   };
@@ -399,7 +399,9 @@ beforeEach(() => {
   mocks.db.assignmentActivity.create.mockResolvedValue({ id: "activity-1" });
   mocks.db.assignment.updateMany.mockResolvedValue({ count: 1 });
   mocks.db.appNotification.findFirst.mockResolvedValue(null);
-  mocks.db.appNotification.create.mockResolvedValue({ id: "app-notification-1" });
+  mocks.db.appNotification.create.mockResolvedValue({
+    id: "app-notification-1"
+  });
   mocks.db.appSetting.upsert.mockResolvedValue({ id: "setting-1" });
   mocks.db.replacementCensus.findMany.mockResolvedValue([]);
   mocks.db.replacementCensusResponse.findMany.mockResolvedValue([]);
@@ -410,10 +412,14 @@ beforeEach(() => {
   mocks.tx.assignmentResponse.findUnique.mockResolvedValue(null);
   mocks.tx.assignmentActivity.findFirst.mockResolvedValue(null);
   mocks.tx.assignmentActivity.create.mockResolvedValue({ id: "activity-1" });
-  mocks.tx.assignmentInvitation.update.mockResolvedValue({ id: "invitation-1" });
+  mocks.tx.assignmentInvitation.update.mockResolvedValue({
+    id: "invitation-1"
+  });
   mocks.tx.assignmentInvitation.updateMany.mockResolvedValue({ count: 1 });
   mocks.tx.appNotification.findFirst.mockResolvedValue(null);
-  mocks.tx.appNotification.create.mockResolvedValue({ id: "app-notification-1" });
+  mocks.tx.appNotification.create.mockResolvedValue({
+    id: "app-notification-1"
+  });
   mocks.tx.appNotification.updateMany.mockResolvedValue({ count: 0 });
   mocks.tx.replacementCensus.updateMany.mockResolvedValue({ count: 1 });
   mocks.tx.replacementCensusResponse.updateMany.mockResolvedValue({ count: 0 });
@@ -503,11 +509,13 @@ describe("assignment automation idempotency QA", () => {
       })
     ]);
     mocks.db.assignmentInvitation.findFirst.mockResolvedValue(null);
-    mocks.db.assignmentInvitation.create.mockImplementation(async ({ data }) => ({
-      id: `invitation-${data.volunteerId}`,
-      ...data,
-      metadata: data.metadata ?? {}
-    }));
+    mocks.db.assignmentInvitation.create.mockImplementation(
+      async ({ data }) => ({
+        id: `invitation-${data.volunteerId}`,
+        ...data,
+        metadata: data.metadata ?? {}
+      })
+    );
     mocks.db.assignmentInvitation.update.mockResolvedValue({
       emailAttempts: 1,
       metadata: {}
@@ -632,7 +640,9 @@ describe("assignment automation idempotency QA", () => {
       mocks.tx.assignmentActivity.create.mock.calls.map(
         ([call]) => call.data.actionType
       )
-    ).toEqual(expect.arrayContaining(["INVITATION_EXPIRED", "REPLACEMENT_REQUIRED"]));
+    ).toEqual(
+      expect.arrayContaining(["INVITATION_EXPIRED", "REPLACEMENT_REQUIRED"])
+    );
   });
 
   it("expires replacement invitations after their response window", async () => {
@@ -681,7 +691,9 @@ describe("assignment automation idempotency QA", () => {
       mocks.tx.assignmentActivity.create.mock.calls.map(
         ([call]) => call.data.actionType
       )
-    ).toEqual(expect.arrayContaining(["INVITATION_EXPIRED", "REPLACEMENT_REQUIRED"]));
+    ).toEqual(
+      expect.arrayContaining(["INVITATION_EXPIRED", "REPLACEMENT_REQUIRED"])
+    );
   });
 
   it("expires a timed-out replacement and invites the next candidate in the same automation run", async () => {
@@ -709,33 +721,35 @@ describe("assignment automation idempotency QA", () => {
     mocks.db.assignment.findUniqueOrThrow.mockResolvedValue(
       replacementAssignment("NEEDS_REPLACEMENT")
     );
-    mocks.db.assignmentInvitation.findMany.mockImplementation(async ({ where }) => {
-      if (where?.type?.in?.includes("REPLACEMENT") && where?.expiresAt?.lte) {
-        return [
-          {
-            ...sentReplacementInvitation(),
-            expiresAt: now,
-            assignment: {
-              id: "assignment-1",
-              status: "PENDING_CONFIRMATION"
+    mocks.db.assignmentInvitation.findMany.mockImplementation(
+      async ({ where }) => {
+        if (where?.type?.in?.includes("REPLACEMENT") && where?.expiresAt?.lte) {
+          return [
+            {
+              ...sentReplacementInvitation(),
+              expiresAt: now,
+              assignment: {
+                id: "assignment-1",
+                status: "PENDING_CONFIRMATION"
+              }
             }
-          }
-        ];
-      }
+          ];
+        }
 
-      if (where?.type === "REPLACEMENT" && where?.status === "PENDING") {
-        return [
-          pendingReplacementInvitation({
-            id: "invitation-replacement-2",
-            volunteerId: "replacement-2",
-            userId: "user-replacement-2",
-            userName: "Bea"
-          })
-        ];
-      }
+        if (where?.type === "REPLACEMENT" && where?.status === "PENDING") {
+          return [
+            pendingReplacementInvitation({
+              id: "invitation-replacement-2",
+              volunteerId: "replacement-2",
+              userId: "user-replacement-2",
+              userName: "Bea"
+            })
+          ];
+        }
 
-      return [];
-    });
+        return [];
+      }
+    );
     mocks.db.volunteerProfile.findMany.mockResolvedValue([
       replacementVolunteer({
         id: "replacement-2",
@@ -750,11 +764,13 @@ describe("assignment automation idempotency QA", () => {
       })
     ]);
     mocks.db.assignmentInvitation.findFirst.mockResolvedValue(null);
-    mocks.db.assignmentInvitation.create.mockImplementation(async ({ data }) => ({
-      id: `invitation-${data.volunteerId}`,
-      ...data,
-      metadata: data.metadata ?? {}
-    }));
+    mocks.db.assignmentInvitation.create.mockImplementation(
+      async ({ data }) => ({
+        id: `invitation-${data.volunteerId}`,
+        ...data,
+        metadata: data.metadata ?? {}
+      })
+    );
     mocks.db.assignmentInvitation.update.mockResolvedValue({
       emailAttempts: 1,
       metadata: {}
@@ -932,7 +948,9 @@ describe("assignment automation idempotency QA", () => {
   });
 
   it("does not duplicate pending titular response-window reminders", async () => {
-    mocks.getAssignmentAutomationSettings.mockResolvedValue(automationSettings());
+    mocks.getAssignmentAutomationSettings.mockResolvedValue(
+      automationSettings()
+    );
     mocks.db.assignment.findMany.mockResolvedValue([]);
     mocks.db.assignmentInvitation.findMany.mockResolvedValue([
       pendingPrimaryInvitation()
@@ -971,7 +989,9 @@ describe("assignment automation idempotency QA", () => {
   });
 
   it("does not duplicate pending replacement response-window reminders", async () => {
-    mocks.getAssignmentAutomationSettings.mockResolvedValue(automationSettings());
+    mocks.getAssignmentAutomationSettings.mockResolvedValue(
+      automationSettings()
+    );
     mocks.db.assignment.findMany.mockResolvedValue([]);
     mocks.db.assignmentInvitation.findMany.mockResolvedValue([
       sentReplacementInvitation()
@@ -1010,7 +1030,9 @@ describe("assignment automation idempotency QA", () => {
   });
 
   it("uses configured replacement census reminder offsets", async () => {
-    mocks.getAssignmentAutomationSettings.mockResolvedValue(automationSettings());
+    mocks.getAssignmentAutomationSettings.mockResolvedValue(
+      automationSettings()
+    );
     mocks.db.replacementCensusResponse.findMany.mockResolvedValue([
       {
         id: "census-response-1",

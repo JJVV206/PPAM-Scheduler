@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { FeedbackMessage } from "@/components/ui/feedback-message";
@@ -53,6 +54,18 @@ function toAssignmentIsoDate(value: string) {
   return new Date(`${value}T12:00:00`).toISOString();
 }
 
+const MIN_VISIBLE_MEMBER_FIELDS = 2;
+const UNASSIGNED_VOLUNTEER_VALUE = "__unassigned__";
+
+function normalizeSelectedVolunteerIds(volunteerIds: string[]) {
+  return volunteerIds.filter(Boolean);
+}
+
+function hasDuplicateVolunteerIds(volunteerIds: string[]) {
+  const selectedVolunteerIds = normalizeSelectedVolunteerIds(volunteerIds);
+  return new Set(selectedVolunteerIds).size !== selectedVolunteerIds.length;
+}
+
 export function AssignmentAdminActions({
   assignment,
   preachingPoints,
@@ -69,13 +82,16 @@ export function AssignmentAdminActions({
   const [preachingPointId, setPreachingPointId] = useState(
     assignment.preachingPoint.id
   );
-  const [volunteerOneId, setVolunteerOneId] = useState(
-    assignment.volunteers.find((item) => item.position === "FIRST")
-      ?.volunteerId ?? ""
-  );
-  const [volunteerTwoId, setVolunteerTwoId] = useState(
-    assignment.volunteers.find((item) => item.position === "SECOND")
-      ?.volunteerId ?? ""
+  const [memberVolunteerIds, setMemberVolunteerIds] = useState(() =>
+    assignment.volunteers
+      .slice()
+      .sort((left, right) => left.slotNumber - right.slotNumber)
+      .map((item) => item.volunteerId)
+      .concat(Array.from({ length: MIN_VISIBLE_MEMBER_FIELDS }, () => ""))
+      .slice(
+        0,
+        Math.max(assignment.volunteers.length, MIN_VISIBLE_MEMBER_FIELDS)
+      )
   );
   const [notes, setNotes] = useState(assignment.notes ?? "");
   const [loading, setLoading] = useState<"save" | "resolve" | "cancel" | null>(
@@ -102,6 +118,11 @@ export function AssignmentAdminActions({
       left.name.localeCompare(right.name, "es-MX")
     );
   }, [assignment.volunteers, volunteers]);
+  const selectedMemberVolunteerIds = useMemo(
+    () => normalizeSelectedVolunteerIds(memberVolunteerIds),
+    [memberVolunteerIds]
+  );
+  const canAddMemberField = memberVolunteerIds.length < volunteerOptions.length;
 
   const selectedDayOfWeek = useMemo(
     () => getDayOfWeekFromDate(assignmentDate),
@@ -132,8 +153,48 @@ export function AssignmentAdminActions({
     assignmentId: assignment.id,
     date: assignmentIsoDate,
     timeSlot,
-    volunteerIds: [volunteerOneId, volunteerTwoId]
+    volunteerIds: selectedMemberVolunteerIds
   });
+
+  function setMemberVolunteerId(index: number, volunteerId: string) {
+    setMemberVolunteerIds((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? volunteerId : item
+      )
+    );
+  }
+
+  function addMemberField() {
+    setMemberVolunteerIds((current) =>
+      current.length < volunteerOptions.length ? [...current, ""] : current
+    );
+  }
+
+  function removeMemberField(index: number) {
+    setMemberVolunteerIds((current) => {
+      const next = current.filter((_, itemIndex) => itemIndex !== index);
+      return next.length >= MIN_VISIBLE_MEMBER_FIELDS
+        ? next
+        : Array.from(
+            { length: MIN_VISIBLE_MEMBER_FIELDS },
+            (_, itemIndex) => next[itemIndex] ?? ""
+          );
+    });
+  }
+
+  function getSelectableVolunteers(index: number) {
+    const selectedIds = new Set(
+      memberVolunteerIds.filter((volunteerId, itemIndex) => {
+        return itemIndex !== index && volunteerId;
+      })
+    );
+
+    return volunteerOptions.filter(
+      (volunteer) =>
+        volunteer.id === memberVolunteerIds[index] ||
+        !selectedIds.has(volunteer.id)
+    );
+  }
 
   useEffect(() => {
     if (
@@ -147,6 +208,17 @@ export function AssignmentAdminActions({
   async function handleSave() {
     setLoading("save");
     setFeedback(null);
+    const selectedVolunteerIds =
+      normalizeSelectedVolunteerIds(memberVolunteerIds);
+
+    if (hasDuplicateVolunteerIds(selectedVolunteerIds)) {
+      setLoading(null);
+      setFeedback({
+        tone: "error",
+        text: "No puedes seleccionar el mismo voluntario dos veces."
+      });
+      return;
+    }
 
     const response = await fetch(`/api/assignments/${assignment.id}`, {
       method: "PATCH",
@@ -159,14 +231,10 @@ export function AssignmentAdminActions({
         timeSlot,
         preachingPointId,
         notes: notes.trim() ? notes : null,
-        volunteers: [
-          volunteerOneId
-            ? { volunteerId: volunteerOneId, position: "FIRST" as const }
-            : null,
-          volunteerTwoId
-            ? { volunteerId: volunteerTwoId, position: "SECOND" as const }
-            : null
-        ].filter(Boolean)
+        volunteers: selectedVolunteerIds.map((volunteerId, index) => ({
+          volunteerId,
+          slotNumber: index + 1
+        }))
       })
     });
     const result = await response.json();
@@ -287,39 +355,75 @@ export function AssignmentAdminActions({
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <div className="grid gap-2">
-          <label className="text-sm font-medium">Voluntario 1</label>
-          <Select value={volunteerOneId} onValueChange={setVolunteerOneId}>
-            <SelectTrigger className={compact ? "h-10" : undefined}>
-              <SelectValue placeholder="Primer puesto" />
-            </SelectTrigger>
-            <SelectContent>
-              {volunteerOptions.map((volunteer) => (
-                <SelectItem key={volunteer.id} value={volunteer.id}>
-                  {volunteer.name}
-                  {volunteer.active ? "" : " (inactivo)"}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="space-y-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <label className="text-sm font-medium">Integrantes</label>
+          <Button
+            type="button"
+            size={compact ? "sm" : "default"}
+            variant="secondary"
+            className="w-full gap-2 sm:w-auto"
+            onClick={addMemberField}
+            disabled={!canAddMemberField}
+          >
+            <Plus className="h-4 w-4" />
+            Agregar integrante
+          </Button>
         </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {memberVolunteerIds.map((volunteerId, index) => {
+            const slotNumber = index + 1;
+            const selectableVolunteers = getSelectableVolunteers(index);
 
-        <div className="grid gap-2">
-          <label className="text-sm font-medium">Voluntario 2</label>
-          <Select value={volunteerTwoId} onValueChange={setVolunteerTwoId}>
-            <SelectTrigger className={compact ? "h-10" : undefined}>
-              <SelectValue placeholder="Segundo puesto" />
-            </SelectTrigger>
-            <SelectContent>
-              {volunteerOptions.map((volunteer) => (
-                <SelectItem key={volunteer.id} value={volunteer.id}>
-                  {volunteer.name}
-                  {volunteer.active ? "" : " (inactivo)"}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            return (
+              <div
+                key={slotNumber}
+                className="grid gap-2 rounded-lg border border-border/60 bg-background/35 p-3"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-sm font-medium">
+                    Integrante {slotNumber}
+                  </label>
+                  {memberVolunteerIds.length > MIN_VISIBLE_MEMBER_FIELDS ? (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground"
+                      onClick={() => removeMemberField(index)}
+                      aria-label={`Quitar integrante ${slotNumber}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                </div>
+                <Select
+                  value={volunteerId || UNASSIGNED_VOLUNTEER_VALUE}
+                  onValueChange={(nextValue) =>
+                    setMemberVolunteerId(
+                      index,
+                      nextValue === UNASSIGNED_VOLUNTEER_VALUE ? "" : nextValue
+                    )
+                  }
+                >
+                  <SelectTrigger className={compact ? "h-10" : undefined}>
+                    <SelectValue placeholder="Asignar voluntario" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNASSIGNED_VOLUNTEER_VALUE}>
+                      Sin asignar
+                    </SelectItem>
+                    {selectableVolunteers.map((volunteer) => (
+                      <SelectItem key={volunteer.id} value={volunteer.id}>
+                        {volunteer.name}
+                        {volunteer.active ? "" : " (inactivo)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -375,7 +479,7 @@ export function AssignmentAdminActions({
             loading !== null ||
             !assignmentDate ||
             !preachingPointId ||
-            (volunteerOneId !== "" && volunteerOneId === volunteerTwoId)
+            hasDuplicateVolunteerIds(memberVolunteerIds)
           }
         >
           {loading === "save" ? "Guardando..." : "Guardar cambios"}
