@@ -310,7 +310,7 @@ export function AssignmentAdminActions({
         </div>
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3">
         <div className="grid gap-2">
           <label className="text-sm font-medium">Fecha</label>
           <Input
@@ -335,14 +335,7 @@ export function AssignmentAdminActions({
 
       <div className="grid gap-3">
         <label className="text-sm font-medium">Horario</label>
-        <div
-          className={cn(
-            "grid gap-2",
-            compact
-              ? "grid-cols-2 md:grid-cols-3"
-              : "sm:grid-cols-2 xl:grid-cols-5"
-          )}
-        >
+        <div className="grid grid-cols-2 gap-2">
           {TIME_SLOTS.map((slot) => (
             <TimeSlotOptionButton
               key={slot}
@@ -356,13 +349,13 @@ export function AssignmentAdminActions({
       </div>
 
       <div className="space-y-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid gap-2">
           <label className="text-sm font-medium">Integrantes</label>
           <Button
             type="button"
             size={compact ? "sm" : "default"}
             variant="secondary"
-            className="w-full gap-2 sm:w-auto"
+            className="w-full gap-2"
             onClick={addMemberField}
             disabled={!canAddMemberField}
           >
@@ -370,7 +363,7 @@ export function AssignmentAdminActions({
             Agregar integrante
           </Button>
         </div>
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3">
           {memberVolunteerIds.map((volunteerId, index) => {
             const slotNumber = index + 1;
             const selectableVolunteers = getSelectableVolunteers(index);
@@ -450,30 +443,11 @@ export function AssignmentAdminActions({
         tone={feedback?.tone}
       />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button
-            type="button"
-            variant="secondary"
-            size={compact ? "sm" : "default"}
-            onClick={() => handleStatusOverride("CONFIRMED")}
-            disabled={loading !== null || assignment.status === "CONFIRMED"}
-          >
-            {loading === "resolve" ? "Marcando..." : "Marcar como resuelto"}
-          </Button>
-          <Button
-            type="button"
-            variant="danger"
-            size={compact ? "sm" : "default"}
-            onClick={() => handleStatusOverride("CANCELLED")}
-            disabled={loading !== null || assignment.status === "CANCELLED"}
-          >
-            {loading === "cancel" ? "Cancelando..." : "Cancelar asignación"}
-          </Button>
-        </div>
+      <div className="grid gap-2">
         <Button
           type="button"
           size={compact ? "sm" : "default"}
+          className="w-full"
           onClick={handleSave}
           disabled={
             loading !== null ||
@@ -483,6 +457,26 @@ export function AssignmentAdminActions({
           }
         >
           {loading === "save" ? "Guardando..." : "Guardar cambios"}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size={compact ? "sm" : "default"}
+          className="w-full"
+          onClick={() => handleStatusOverride("CONFIRMED")}
+          disabled={loading !== null || assignment.status === "CONFIRMED"}
+        >
+          {loading === "resolve" ? "Marcando..." : "Marcar como resuelto"}
+        </Button>
+        <Button
+          type="button"
+          variant="danger"
+          size={compact ? "sm" : "default"}
+          className="w-full"
+          onClick={() => handleStatusOverride("CANCELLED")}
+          disabled={loading !== null || assignment.status === "CANCELLED"}
+        >
+          {loading === "cancel" ? "Cancelando..." : "Cancelar asignación"}
         </Button>
       </div>
     </div>

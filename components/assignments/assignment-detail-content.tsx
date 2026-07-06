@@ -227,7 +227,7 @@ export function AssignmentDetailContent({
 
   if (!compact) {
     return (
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(28rem,32rem)]">
         <div className="space-y-5">
           <Card className="bg-background/25">
             <CardContent className="space-y-5 p-6">
@@ -379,9 +379,9 @@ export function AssignmentDetailContent({
           </Card>
         </div>
 
-        <div className="space-y-5 xl:sticky xl:top-6">
+        <div className="space-y-4 xl:sticky xl:top-6">
           <Card className="bg-background/25">
-            <CardContent className="space-y-4 p-6">
+            <CardContent className="space-y-4 p-5">
               <div className="space-y-2">
                 <p className="font-semibold">Confirmaciones</p>
                 <p className="text-sm text-muted-foreground">
@@ -398,7 +398,7 @@ export function AssignmentDetailContent({
 
           {preachingPoints && volunteers ? (
             <Card className="bg-background/25">
-              <CardContent className="space-y-4 p-6">
+              <CardContent className="space-y-4 p-5">
                 <div>
                   <p className="font-semibold">Overrides manuales</p>
                   <p className="text-sm text-muted-foreground">
