@@ -15,8 +15,8 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import {
-  TIME_SLOT_DEFINITIONS,
-  VOLUNTEER_POSITION_LABELS
+  formatVolunteerSlotList,
+  TIME_SLOT_DEFINITIONS
 } from "@/lib/constants/domain";
 import { formatDisplayDate } from "@/lib/utils";
 import type { OpenSlotDto } from "@/types/domain";
@@ -103,10 +103,7 @@ export function OpenSlotCard({
           </p>
           <p className="flex items-center gap-2">
             <Users2 className="h-4 w-4" />
-            Faltan{" "}
-            {openSlot.missingPositions
-              .map((position) => VOLUNTEER_POSITION_LABELS[position])
-              .join(" y ")}
+            Faltan {formatVolunteerSlotList(openSlot.missingSlotNumbers)}
           </p>
           {openSlot.notes ? (
             <p className="rounded-lg bg-background/35 p-3 text-foreground">

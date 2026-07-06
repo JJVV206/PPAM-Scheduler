@@ -249,7 +249,7 @@ async function seedAssignmentFixtures(input: {
         volunteers: {
           create: {
             volunteerId: input.volunteerProfileId,
-            position: "FIRST"
+            slotNumber: 1
           }
         },
         responses: {

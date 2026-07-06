@@ -1,29 +1,29 @@
 import { describe, expect, it } from "vitest";
 
-import { selectReplacementAssignmentPosition } from "@/services/assignment.service";
+import { selectReplacementAssignmentSlotNumber } from "@/services/assignment.service";
 
-describe("selectReplacementAssignmentPosition", () => {
-  it("uses the declined volunteer position first", () => {
+describe("selectReplacementAssignmentSlotNumber", () => {
+  it("uses the declined volunteer slot first", () => {
     expect(
-      selectReplacementAssignmentPosition({
+      selectReplacementAssignmentSlotNumber({
         volunteers: [
-          { volunteerId: "volunteer-1", position: "FIRST" },
-          { volunteerId: "volunteer-2", position: "SECOND" }
+          { volunteerId: "volunteer-1", slotNumber: 1 },
+          { volunteerId: "volunteer-2", slotNumber: 2 }
         ],
         responses: [
           { volunteerId: "volunteer-1", responseStatus: "CONFIRMED" },
           { volunteerId: "volunteer-2", responseStatus: "DECLINED" }
         ]
       })
-    ).toBe("SECOND");
+    ).toBe(2);
   });
 
-  it("falls back to the missing position when no volunteer declined", () => {
+  it("falls back to the missing base slot when no volunteer declined", () => {
     expect(
-      selectReplacementAssignmentPosition({
-        volunteers: [{ volunteerId: "volunteer-1", position: "FIRST" }],
+      selectReplacementAssignmentSlotNumber({
+        volunteers: [{ volunteerId: "volunteer-1", slotNumber: 1 }],
         responses: [{ volunteerId: "volunteer-1", responseStatus: "CONFIRMED" }]
       })
-    ).toBe("SECOND");
+    ).toBe(2);
   });
 });

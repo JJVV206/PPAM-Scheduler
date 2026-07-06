@@ -19,8 +19,8 @@ import {
   ASSIGNMENT_ACTIVITY_LABELS,
   ASSIGNMENT_INVITATION_STATUS_LABELS,
   ASSIGNMENT_INVITATION_TYPE_LABELS,
-  TIME_SLOT_DEFINITIONS,
-  VOLUNTEER_POSITION_LABELS
+  getVolunteerSlotLabel,
+  TIME_SLOT_DEFINITIONS
 } from "@/lib/constants/domain";
 import { formatDisplayDate } from "@/lib/utils";
 import type {
@@ -76,7 +76,12 @@ function getTimelineDetail(entry: AssignmentDetailDto["timeline"][number]) {
     entry.metadata,
     "notificationLogId"
   );
-  const position = getStringMetadata(entry.metadata, "position");
+  const slotNumber = getNumberMetadata(entry.metadata, "slotNumber");
+  const assignedSlotNumber = getNumberMetadata(
+    entry.metadata,
+    "assignedSlotNumber"
+  );
+  const replacementSlotNumber = slotNumber ?? assignedSlotNumber;
 
   switch (entry.actionType) {
     case "INVITATION_CREATED":
@@ -118,8 +123,8 @@ function getTimelineDetail(entry: AssignmentDetailDto["timeline"][number]) {
         .filter(Boolean)
         .join(" • ");
     case "REPLACEMENT_ASSIGNED":
-      return position === "FIRST" || position === "SECOND"
-        ? `Puesto actualizado: ${VOLUNTEER_POSITION_LABELS[position]}`
+      return replacementSlotNumber
+        ? `Integrante actualizado: ${getVolunteerSlotLabel(replacementSlotNumber)}`
         : "Suplente seleccionado";
     case "REPLACEMENT_SELECTED":
       return "Suplente seleccionado por reglas automáticas";
@@ -316,7 +321,7 @@ export function AssignmentDetailContent({
                           {volunteer.volunteer.name}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {VOLUNTEER_POSITION_LABELS[volunteer.position]}
+                          {getVolunteerSlotLabel(volunteer.slotNumber)}
                           {volunteer.isReplacement ? " • Reemplazo" : ""}
                         </p>
                       </div>
@@ -469,7 +474,7 @@ export function AssignmentDetailContent({
                     <div>
                       <p className="font-medium">{volunteer.volunteer.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {VOLUNTEER_POSITION_LABELS[volunteer.position]}
+                        {getVolunteerSlotLabel(volunteer.slotNumber)}
                         {volunteer.isReplacement ? " • Reemplazo" : ""}
                       </p>
                     </div>

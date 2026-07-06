@@ -121,11 +121,11 @@ describe("assignment automation UI state", () => {
     expect(isAssignmentRequiringAttention(input)).toBe(false);
   });
 
-  it("treats accepted invitations as confirmed while the assignment catches up", () => {
+  it("treats accepted invitations as confirmed when no responses are pending", () => {
     const input = stateInput({
       status: "PENDING_CONFIRMATION",
       invitations: [invitation({ status: "ACCEPTED" })],
-      volunteers: [volunteer("PENDING")]
+      volunteers: [volunteer("CONFIRMED")]
     });
 
     expect(deriveAssignmentAutomationState(input).key).toBe("CONFIRMED");

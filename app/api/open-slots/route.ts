@@ -1,7 +1,10 @@
 import { requireSession } from "@/lib/auth/guards";
 import { revalidateAssignmentViews } from "@/lib/cache/revalidate-assignment-views";
 import { replacementAssignmentSchema } from "@/lib/validations/assignment";
-import { assignReplacementVolunteer, getOpenSlots } from "@/services/assignment.service";
+import {
+  assignReplacementVolunteer,
+  getOpenSlots
+} from "@/services/assignment.service";
 import { AppError } from "@/services/errors";
 import { handleRouteError, ok } from "@/lib/utils/api";
 
@@ -38,7 +41,7 @@ export async function POST(request: Request) {
       assignmentId: body.assignmentId,
       volunteerId,
       actorUserId: auth.session.user.id,
-      position: body.position,
+      slotNumber: body.slotNumber,
       requireOpenSlot: true
     });
 
