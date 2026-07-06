@@ -24,6 +24,7 @@ import {
   getVolunteerAssignmentRoleLabel,
   getVolunteerAssignmentSlot
 } from "@/lib/volunteer-assignment";
+import type { VolunteerAssignmentCardVariant } from "@/lib/volunteer-ui-config";
 import type {
   AssignmentDetailDto,
   ResponseStatus,
@@ -37,6 +38,7 @@ type VolunteerAssignmentCardProps = {
   showResponseActions?: boolean;
   showDetailLink?: boolean;
   compact?: boolean;
+  variant?: VolunteerAssignmentCardVariant;
   className?: string;
 };
 
@@ -58,12 +60,20 @@ function getReminderText(reminders: VolunteerAssignmentReminderDto[]) {
   } recibido${reminders.length === 1 ? "" : "s"} • ${typeLabel} ${date}`;
 }
 
-function getResponseSummary(status: ResponseStatus) {
+function getResponseSummary(
+  status: ResponseStatus,
+  variant: VolunteerAssignmentCardVariant
+) {
+  const isReplacement = variant === "replacement";
+  const confirmedSummary = isReplacement
+    ? "Tu suplencia quedó confirmada. Revisa los recordatorios antes de asistir."
+    : "Tu turno quedó confirmado. Revisa los recordatorios antes de asistir.";
+
   if (status === "CONFIRMED") {
     return {
       icon: CheckCircle2,
       title: "Asistencia confirmada",
-      body: "Tu turno quedó confirmado. Revisa los recordatorios antes de asistir.",
+      body: confirmedSummary,
       className: "border-success/35 bg-success/[0.08] text-success"
     };
   }
@@ -80,7 +90,9 @@ function getResponseSummary(status: ResponseStatus) {
   return {
     icon: AlertTriangle,
     title: "Necesita respuesta",
-    body: "Confirma si asistirás o avisa si no puedes para buscar cobertura a tiempo.",
+    body: isReplacement
+      ? "Confirma si puedes cubrirla o avisa si no puedes tomar esta suplencia."
+      : "Confirma si asistirás o avisa si no puedes para buscar cobertura a tiempo.",
     className: "border-warning/35 bg-warning/[0.08] text-warning"
   };
 }
@@ -92,6 +104,7 @@ export function VolunteerAssignmentCard({
   showResponseActions = false,
   showDetailLink = true,
   compact = false,
+  variant = "mixed",
   className
 }: VolunteerAssignmentCardProps) {
   const volunteerSlot = getVolunteerAssignmentSlot(
@@ -102,8 +115,14 @@ export function VolunteerAssignmentCard({
     assignment,
     volunteerProfileId
   );
+  const cardVariant =
+    variant === "mixed"
+      ? roleLabel === "Suplente"
+        ? "replacement"
+        : "primary"
+      : variant;
   const responseStatus = volunteerSlot?.responseStatus ?? "PENDING";
-  const responseSummary = getResponseSummary(responseStatus);
+  const responseSummary = getResponseSummary(responseStatus, cardVariant);
   const ResponseIcon = responseSummary.icon;
   const responseId = canVolunteerRespondToAssignment(
     assignment,
@@ -131,7 +150,7 @@ export function VolunteerAssignmentCard({
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              Tu turno
+              {cardVariant === "replacement" ? "Tu suplencia" : "Tu turno"}
             </p>
             <h2 className="mt-1 font-heading text-xl font-semibold text-foreground">
               {assignment.preachingPoint.name}

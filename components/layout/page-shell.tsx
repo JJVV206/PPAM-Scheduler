@@ -2,18 +2,21 @@ import { ReactNode } from "react";
 
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { RouteTransitionIndicator } from "@/components/layout/route-transition-indicator";
+import type { VolunteerNavigationItem } from "@/lib/volunteer-ui-config";
 import type { UserRole } from "@/types/domain";
 
 type PageShellProps = {
   role: UserRole;
   children: ReactNode;
   unreadNotificationCount?: number;
+  volunteerNavigationItems?: VolunteerNavigationItem[];
 };
 
 export function PageShell({
   role,
   children,
-  unreadNotificationCount = 0
+  unreadNotificationCount = 0,
+  volunteerNavigationItems
 }: PageShellProps) {
   return (
     <div className="h-dvh overflow-hidden px-2.5 py-2.5 sm:px-3 sm:py-3">
@@ -22,6 +25,7 @@ export function PageShell({
         <AppSidebar
           role={role}
           unreadNotificationCount={unreadNotificationCount}
+          volunteerNavigationItems={volunteerNavigationItems}
         />
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
           {children}

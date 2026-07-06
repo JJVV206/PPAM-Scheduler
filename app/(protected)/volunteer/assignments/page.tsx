@@ -9,7 +9,7 @@ import {
   CardTitle
 } from "@/components/ui/card";
 import { getServerAuthSession } from "@/lib/auth/auth";
-import { getVolunteerAssignmentRoleLabel } from "@/lib/volunteer-assignment";
+import { getVolunteerDashboardModel } from "@/lib/volunteer-ui-config";
 import { getVolunteerDashboardData } from "@/services/dashboard.service";
 import { CalendarDays, Sparkles, UserCircle2 } from "lucide-react";
 
@@ -26,35 +26,26 @@ export default async function VolunteerAssignmentsPage() {
 
   const volunteerProfileId = session.user.volunteerProfileId;
   const dashboard = await getVolunteerDashboardData(volunteerProfileId);
-  const primaryAssignments = dashboard.upcomingAssignments.filter(
-    (assignment) =>
-      getVolunteerAssignmentRoleLabel(assignment, volunteerProfileId) ===
-      "Titular"
-  );
-  const replacementAssignments = dashboard.upcomingAssignments.filter(
-    (assignment) =>
-      getVolunteerAssignmentRoleLabel(assignment, volunteerProfileId) ===
-      "Suplente"
-  );
+  const model = getVolunteerDashboardModel(dashboard);
+  const { config } = model;
 
   return (
     <div className="space-y-6">
       <section className="surface-panel flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
         <div className="min-w-0 space-y-2">
           <h1 className="font-heading text-3xl font-semibold">
-            Mis asignaciones
+            {config.copy.assignmentsTitle}
           </h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-            Revisa tus turnos pendientes, confirmados y anteriores. Los turnos
-            pendientes muestran los botones para responder.
+            {config.copy.assignmentsDescription}
           </p>
         </div>
         <div className="grid gap-2 sm:flex sm:items-center">
-          {dashboard.openSlots.length ? (
+          {config.canSeeOpenSlots ? (
             <Button className="w-full sm:w-auto" asChild>
               <Link href="/volunteer/open-slots">
                 <Sparkles className="h-4 w-4" />
-                Ver vacantes
+                Ver suplencias
               </Link>
             </Button>
           ) : null}
@@ -68,50 +59,57 @@ export default async function VolunteerAssignmentsPage() {
       </section>
 
       <AssignmentSection
-        title="Pendientes de respuesta"
-        description="Confirma o avisa si no puedes asistir."
-        assignments={dashboard.pendingConfirmations}
+        title={config.copy.pendingTitle}
+        description={config.copy.pendingDescription}
+        assignments={model.visiblePendingAssignments}
         volunteerProfileId={volunteerProfileId}
         remindersByAssignmentId={dashboard.remindersByAssignmentId}
         showResponseActions
-        emptyText="No tienes asignaciones pendientes de respuesta."
+        emptyText={config.copy.pendingEmpty}
+        variant={config.cardVariant}
       />
       <AssignmentSection
-        title="Confirmadas"
-        description="Turnos próximos que ya quedaron registrados."
-        assignments={dashboard.confirmedAssignments}
+        title={config.copy.confirmedTitle}
+        description={config.copy.confirmedDescription}
+        assignments={model.visibleConfirmedAssignments}
         volunteerProfileId={volunteerProfileId}
         remindersByAssignmentId={dashboard.remindersByAssignmentId}
-        emptyText="No hay asignaciones confirmadas próximas."
+        emptyText={config.copy.confirmedEmpty}
+        variant={config.cardVariant}
       />
-      <section className="grid gap-6 xl:grid-cols-2">
-        <AssignmentSection
-          title="Como titular"
-          description="Turnos donde apareces como voluntario titular."
-          assignments={primaryAssignments}
-          volunteerProfileId={volunteerProfileId}
-          remindersByAssignmentId={dashboard.remindersByAssignmentId}
-          emptyText="No tienes turnos próximos como titular."
-          compact
-        />
-        <AssignmentSection
-          title="Como suplente"
-          description="Turnos donde cubres o fuiste invitado como suplente."
-          assignments={replacementAssignments}
-          volunteerProfileId={volunteerProfileId}
-          remindersByAssignmentId={dashboard.remindersByAssignmentId}
-          emptyText="No tienes turnos próximos como suplente."
-          compact
-        />
-      </section>
+      {config.serviceType === "PRIMARY_AND_REPLACEMENT" ? (
+        <section className="grid gap-6 xl:grid-cols-2">
+          <AssignmentSection
+            title="Como titular"
+            description="Turnos donde apareces como voluntario titular."
+            assignments={model.primaryAssignments}
+            volunteerProfileId={volunteerProfileId}
+            remindersByAssignmentId={dashboard.remindersByAssignmentId}
+            emptyText="No tienes turnos próximos como titular."
+            compact
+            variant="primary"
+          />
+          <AssignmentSection
+            title="Como suplente"
+            description="Turnos donde cubres o fuiste invitado como suplente."
+            assignments={model.replacementAssignments}
+            volunteerProfileId={volunteerProfileId}
+            remindersByAssignmentId={dashboard.remindersByAssignmentId}
+            emptyText="No tienes turnos próximos como suplente."
+            compact
+            variant="replacement"
+          />
+        </section>
+      ) : null}
       <AssignmentSection
-        title="Historial"
-        description="Turnos anteriores registrados en tu perfil."
-        assignments={dashboard.assignmentHistory}
+        title={config.copy.historyTitle}
+        description={config.copy.historyDescription}
+        assignments={model.visibleHistory}
         volunteerProfileId={volunteerProfileId}
         remindersByAssignmentId={dashboard.remindersByAssignmentId}
-        emptyText="Todavía no hay asignaciones anteriores."
+        emptyText={config.copy.historyEmpty}
         compact
+        variant={config.cardVariant}
       />
     </div>
   );
@@ -125,7 +123,8 @@ function AssignmentSection({
   remindersByAssignmentId,
   showResponseActions = false,
   compact = false,
-  emptyText
+  emptyText,
+  variant = "mixed"
 }: {
   title: string;
   description: string;
@@ -137,6 +136,7 @@ function AssignmentSection({
   showResponseActions?: boolean;
   compact?: boolean;
   emptyText: string;
+  variant?: "primary" | "replacement" | "mixed";
 }) {
   return (
     <Card className="surface-panel">
@@ -161,6 +161,7 @@ function AssignmentSection({
               reminders={remindersByAssignmentId[assignment.id]}
               showResponseActions={showResponseActions}
               compact={compact}
+              variant={variant}
             />
           ))
         ) : (
