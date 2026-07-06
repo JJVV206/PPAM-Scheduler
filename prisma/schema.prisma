@@ -106,6 +106,7 @@ enum NotificationChannel {
 enum NotificationStatus {
   PENDING
   SENT
+  DELIVERED
   FAILED
 }
 
@@ -403,21 +404,39 @@ model AvailabilityException {
 }
 
 model NotificationLog {
-  id           String              @id @default(cuid())
-  userId       String
-  assignmentId String?
-  type         NotificationType
-  channel      NotificationChannel
-  status       NotificationStatus
-  sentAt       DateTime?
-  errorMessage String?
-  metadata     Json?
-  createdAt    DateTime            @default(now())
-  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assignment   Assignment?         @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  id            String              @id @default(cuid())
+  userId        String
+  assignmentId  String?
+  type          NotificationType
+  channel       NotificationChannel
+  status        NotificationStatus
+  sentAt        DateTime?
+  errorMessage  String?
+  metadata      Json?
+  createdAt     DateTime            @default(now())
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignment    Assignment?         @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  webhookEvents EmailWebhookEvent[]
 
   @@index([userId, sentAt])
   @@index([assignmentId, userId, type, status])
+}
+
+model EmailWebhookEvent {
+  id                String           @id @default(cuid())
+  provider          String           @default("resend")
+  providerEventId   String           @unique
+  providerMessageId String?
+  eventType         String
+  notificationLogId String?
+  metadata          Json?
+  processedAt       DateTime         @default(now())
+  createdAt         DateTime         @default(now())
+  notificationLog   NotificationLog? @relation(fields: [notificationLogId], references: [id], onDelete: SetNull)
+
+  @@index([providerMessageId, createdAt])
+  @@index([notificationLogId, createdAt])
+  @@index([eventType, createdAt])
 }
 
 model AppNotification {

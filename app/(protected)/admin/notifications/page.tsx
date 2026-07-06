@@ -33,7 +33,7 @@ export default async function AdminNotificationsPage() {
 
       <DataTable
         title="Historial de emails"
-        description="Auditoría de solicitudes, recordatorios y entregas fallidas registradas en NotificationLog."
+        description="Auditoría de solicitudes, recordatorios, entregas y errores registrados en NotificationLog."
       >
         <NotificationTable notifications={notifications} />
       </DataTable>

@@ -1752,7 +1752,9 @@ async function hasSentReminder(input: {
       userId: input.userId,
       type: input.notificationType,
       channel: "EMAIL",
-      status: "SENT",
+      status: {
+        in: ["SENT", "DELIVERED"]
+      },
       metadata: {
         path: ["reminderKey"],
         equals: input.reminderKey
@@ -2231,7 +2233,9 @@ async function hasSentCensusReminder(input: {
       userId: input.userId,
       type: "CENSUS_REMINDER",
       channel: "EMAIL",
-      status: "SENT",
+      status: {
+        in: ["SENT", "DELIVERED"]
+      },
       metadata: {
         path: ["reminderKey"],
         equals: input.reminderKey

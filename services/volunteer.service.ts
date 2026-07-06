@@ -497,7 +497,9 @@ export async function getVolunteerAssignmentRemindersById(input: {
       type: {
         in: ["REMINDER", "FINAL_REMINDER"]
       },
-      status: "SENT"
+      status: {
+        in: ["SENT", "DELIVERED"]
+      }
     },
     orderBy: {
       createdAt: "desc"

@@ -63,27 +63,27 @@ export function AdminAttentionTable({ cases }: AdminAttentionTableProps) {
     setVisibleCases(cases);
   }, [cases]);
 
-  async function dismissCase(item: AdminAttentionCase) {
+  async function deleteCase(item: AdminAttentionCase) {
     if (!item.notificationId) return;
 
     setPendingId(item.id);
     setFeedback(null);
 
     const response = await fetch(
-      `/api/app-notifications/${encodeURIComponent(item.notificationId)}/read`,
+      `/api/app-notifications/${encodeURIComponent(item.notificationId)}`,
       {
-        method: "POST"
+        method: "DELETE"
       }
     );
     const result = (await response.json().catch(() => null)) as {
-      updatedCount?: number;
+      deletedCount?: number;
       error?: string;
     } | null;
 
     if (!response.ok) {
       setFeedback({
         tone: "error",
-        text: result?.error ?? "No se pudo descartar la alerta."
+        text: result?.error ?? "No se pudo borrar la alerta."
       });
       setPendingId(null);
       return;
@@ -93,10 +93,10 @@ export function AdminAttentionTable({ cases }: AdminAttentionTableProps) {
       currentCases.filter((currentCase) => currentCase.id !== item.id)
     );
     setFeedback({
-      tone: result?.updatedCount ? "success" : "warning",
-      text: result?.updatedCount
-        ? "Alerta descartada."
-        : "La alerta ya estaba descartada."
+      tone: result?.deletedCount ? "success" : "warning",
+      text: result?.deletedCount
+        ? "Alerta borrada."
+        : "La alerta ya no estaba activa."
     });
     setPendingId(null);
     router.refresh();
@@ -132,7 +132,7 @@ export function AdminAttentionTable({ cases }: AdminAttentionTableProps) {
                     </Badge>
                   </TableCell>
                   <TableCell className="min-w-[150px] text-sm text-muted-foreground">
-                    {formatDisplayDate(item.createdAt, "d MMM, HH:mm")}
+                    {formatDisplayDate(item.createdAt, "d 'de' MMMM, HH:mm")}
                   </TableCell>
                   <TableCell>
                     {formatDisplayDate(item.date, "d 'de' MMMM")}
@@ -152,13 +152,13 @@ export function AdminAttentionTable({ cases }: AdminAttentionTableProps) {
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={() => void dismissCase(item)}
+                          onClick={() => void deleteCase(item)}
                           disabled={pendingId === item.id}
                         >
                           <Trash2 className="h-4 w-4" />
                           {pendingId === item.id
-                            ? "Descartando..."
-                            : "Descartar"}
+                            ? "Borrando..."
+                            : "Borrar alerta"}
                         </Button>
                       ) : null}
                     </div>

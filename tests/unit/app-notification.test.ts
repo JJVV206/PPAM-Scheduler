@@ -22,6 +22,7 @@ vi.mock("@/lib/db/prisma", () => ({ db: mocks.db }));
 
 import {
   createAppNotificationOnce,
+  dismissAdminAttentionNotification,
   getUnreadAppNotificationCount,
   markAppNotificationRead
 } from "@/services/app-notification.service";
@@ -119,6 +120,35 @@ describe("app notification service", () => {
       },
       data: {
         readAt: new Date("2026-06-16T12:00:00.000Z")
+      }
+    });
+  });
+
+  it("deletes admin attention alerts by marking only owned unread admin alerts as read", async () => {
+    const readAt = new Date("2026-06-17T13:00:00.000Z");
+    mocks.db.appNotification.updateMany.mockResolvedValue({ count: 1 });
+
+    await dismissAdminAttentionNotification({
+      userId: "admin-1",
+      notificationId: "notification-1",
+      readAt
+    });
+
+    expect(mocks.db.appNotification.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "notification-1",
+        userId: "admin-1",
+        type: {
+          in: [
+            "ADMIN_ATTENTION_REQUIRED",
+            "EMAIL_FAILED",
+            "REPLACEMENT_NEEDED"
+          ]
+        },
+        readAt: null
+      },
+      data: {
+        readAt
       }
     });
   });

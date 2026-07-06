@@ -938,6 +938,9 @@ describe("assignment automation idempotency QA", () => {
     expect(mocks.db.notificationLog.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
+          status: {
+            in: ["SENT", "DELIVERED"]
+          },
           metadata: {
             path: ["reminderKey"],
             equals: expectedKey
@@ -979,6 +982,9 @@ describe("assignment automation idempotency QA", () => {
     expect(mocks.db.notificationLog.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
+          status: {
+            in: ["SENT", "DELIVERED"]
+          },
           metadata: {
             path: ["reminderKey"],
             equals: "pending-confirmation-invitation-1-12h"
@@ -1020,6 +1026,9 @@ describe("assignment automation idempotency QA", () => {
     expect(mocks.db.notificationLog.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
+          status: {
+            in: ["SENT", "DELIVERED"]
+          },
           metadata: {
             path: ["reminderKey"],
             equals: "pending-confirmation-replacement-invitation-1-4h"
@@ -1087,6 +1096,9 @@ describe("assignment automation idempotency QA", () => {
     expect(mocks.db.notificationLog.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
+          status: {
+            in: ["SENT", "DELIVERED"]
+          },
           metadata: {
             path: ["reminderKey"],
             equals: "census-reminder:census-response-1:48h"

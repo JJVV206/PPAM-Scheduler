@@ -26,6 +26,7 @@ Production:
 - `CRON_SECRET`
 - `RESEND_API_KEY` when using Resend API for production email
 - `RESEND_FROM` when using Resend API for production email
+- `RESEND_WEBHOOK_SECRET` when using Resend delivery webhooks
 - `SMTP_HOST` only when using SMTP fallback instead of Resend
 - `SMTP_PORT` only when using SMTP fallback instead of Resend
 - `SMTP_SECURE` only when using SMTP fallback instead of Resend
@@ -43,6 +44,10 @@ Generate `CRON_SECRET` the same way. Vercel will call `/api/cron/assignment-auto
 once per day on Hobby projects and must send `Authorization: Bearer $CRON_SECRET`.
 Use Vercel Pro or an external scheduler if production needs the automation to
 run more frequently than daily.
+For PPAM production reminders, prefer a 15-60 minute schedule when the hosting
+plan or external scheduler supports it. The automation is designed to be
+idempotent, and hourly/near-hourly execution keeps 2h, 4h, 8h, 12h, and 24h
+email windows closer to their intended times than the default daily cron.
 The cron response intentionally exposes only an operational summary, not step
 details, email metadata, tokens, or internal error messages.
 
@@ -57,6 +62,7 @@ Use Resend API for production email when possible:
 ```text
 RESEND_API_KEY=re_xxxxxxxxx
 RESEND_FROM=PPAM <no-reply@ppam.services>
+RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxx
 ```
 
 Replace `re_xxxxxxxxx` with the real API key from Resend. For a first free-plan
@@ -64,6 +70,27 @@ test, Resend allows `onboarding@resend.dev` only for approved test recipients.
 Before sending invitations to real volunteers, verify `ppam.services` in Resend
 and use a sender from that domain. SMTP variables are optional fallback values
 when `RESEND_API_KEY` and `RESEND_FROM` are not configured.
+
+When Resend webhooks are enabled, create a webhook endpoint in Resend pointing
+to:
+
+```text
+https://YOUR_PRODUCTION_URL/api/webhooks/resend
+```
+
+Enable at least these events:
+
+```text
+email.sent
+email.delivered
+email.failed
+email.bounced
+email.suppressed
+```
+
+`email.complained` can also be enabled for operational review. Copy the webhook
+signing secret into `RESEND_WEBHOOK_SECRET`. Do not paste the secret into logs,
+docs, commits, or chat messages.
 
 Do not configure production to use Mailpit. Mailpit is local-only and should
 only be used through:
