@@ -1,36 +1,39 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import { expectNoHorizontalOverflow, expectStatus } from "./support/assertions";
 import { e2eUsers } from "./support/config";
-import { e2eAssignmentFixtures, e2eAssignmentNotes } from "./support/fixtures";
-import {
-  clearMailpitInbox,
-  getMailpitMessageDetail,
-  waitForMailpitMessage
-} from "./support/mailpit";
+import { getAdminAssignmentIdByNote } from "./support/pages/admin-assignments-page";
+import { expect, test } from "./support/test";
 
-type AssignmentApiItem = {
-  id: string;
-  notes: string | null;
-};
+async function gotoAdminPageWithoutServerError(page: Page, path: string) {
+  let lastError: unknown;
 
-async function getAssignmentIdByNote(
-  request: APIRequestContext,
-  note: string
-) {
-  const response = await request.get("/api/assignments");
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await page.goto(path, {
+        waitUntil: "domcontentloaded"
+      });
 
-  await expectStatus(response, 200);
+      expect(response?.status()).toBeLessThan(500);
+      await expect(page).not.toHaveURL(/\/login$/);
+      await expect(page.locator("body")).toBeVisible();
+      return;
+    } catch (error) {
+      lastError = error;
 
-  const assignments = (await response.json()) as AssignmentApiItem[];
-  const assignment = assignments.find((item) => item.notes === note);
+      if (!String(error).includes("ERR_ABORTED")) {
+        throw error;
+      }
+    }
+  }
 
-  expect(assignment, `Expected E2E assignment with note "${note}"`).toBeTruthy();
-  return assignment!.id;
+  throw lastError;
 }
 
 test.describe("admin workspace", () => {
-  test("loads the admin dashboard and primary navigation", async ({ page }) => {
+  test("loads the admin dashboard and primary navigation @smoke", async ({
+    page
+  }) => {
     await page.goto("/admin");
 
     await expect(
@@ -54,7 +57,7 @@ test.describe("admin workspace", () => {
     ).toBeVisible();
   });
 
-  test("serves critical admin APIs and enforces role isolation", async ({
+  test("serves critical admin APIs and enforces role isolation @critical", async ({
     request
   }) => {
     const endpoints: Array<[string, number]> = [
@@ -71,55 +74,42 @@ test.describe("admin workspace", () => {
     }
   });
 
-  test("can open core admin pages without server errors", async ({ page }) => {
+  test("can open core admin pages without server errors @smoke", async ({
+    page
+  }) => {
     test.slow();
 
     const pages = [
       "/admin/schedule",
       "/admin/assignments",
       "/admin/open-slots",
+      "/admin/notifications",
+      "/admin/points",
+      "/admin/replacements",
       "/admin/volunteers",
       "/admin/settings"
     ];
 
     for (const path of pages) {
-      const response = await page.goto(path, {
-        waitUntil: "domcontentloaded"
-      });
-
-      expect(response?.status()).toBeLessThan(500);
-      await expect(page).not.toHaveURL(/\/login$/);
-      await expect(page.locator("body")).toBeVisible();
+      await gotoAdminPageWithoutServerError(page, path);
     }
   });
 
-  test("opens a full assignment detail page from the assignments list", async ({
+  test("opens a full assignment detail page from the assignments list @critical", async ({
+    adminAssignmentsPage,
     page
   }) => {
     test.slow();
 
-    await page.goto("/admin/assignments");
-
-    const detailLink = page.locator('a[href^="/admin/assignments/"]').first();
-
-    await expect(detailLink).toBeVisible();
-    const detailHref = await detailLink.getAttribute("href");
-
-    expect(detailHref).toMatch(/^\/admin\/assignments\/[^/]+$/);
-
-    await Promise.all([
-      page.waitForURL(new RegExp(`${detailHref}$`), { timeout: 30_000 }),
-      detailLink.click()
-    ]);
+    await adminAssignmentsPage.gotoList();
+    await adminAssignmentsPage.openFirstDetail();
 
     await expect(page).toHaveURL(/\/admin\/assignments\/[^/]+$/);
-    await expect(
-      page.getByRole("heading", { name: /hospital dr josé g\. parres/i })
-    ).toBeVisible();
+    await adminAssignmentsPage.expectHospitalDetailLoaded();
     await expect(page.getByText(/proceso automático/i)).toBeVisible();
   });
 
-  test("keeps the weekly schedule accessible without page overflow", async ({
+  test("keeps the weekly schedule accessible without page overflow @responsive", async ({
     page
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -134,42 +124,41 @@ test.describe("admin workspace", () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test("sends an assignment invitation email through Mailpit", async ({
+  test("sends an assignment invitation email through Mailpit @critical @write @email", async ({
+    adminAssignmentsPage,
+    e2eData,
+    mailpit,
     page,
     request
   }) => {
     test.slow();
 
-    await clearMailpitInbox(request);
-    const assignmentId = await getAssignmentIdByNote(
+    await mailpit.clearInbox(request);
+    const assignmentId = await getAdminAssignmentIdByNote(
       request,
-      e2eAssignmentNotes.emailFlow
+      e2eData.notes.emailFlow
     );
     const sentAfter = new Date();
 
-    await page.goto(`/admin/assignments/${assignmentId}`);
-    await expect(
-      page.getByRole("heading", { name: /hospital dr josé g\. parres/i })
-    ).toBeVisible();
+    await adminAssignmentsPage.gotoDetail(assignmentId);
+    await adminAssignmentsPage.expectHospitalDetailLoaded();
 
-    await page
-      .getByRole("button", { name: /enviar invitación pendiente/i })
-      .click();
+    await adminAssignmentsPage.sendPendingInvitation();
 
     await expect(
       page.getByText(/invitaciones pendientes enviadas \(1\)/i)
     ).toBeVisible();
 
-    const message = await waitForMailpitMessage(request, {
+    const message = await mailpit.waitForMessage(request, {
       subject: "Confirma tu asignación titular de PPAM",
       to: e2eUsers.volunteer.email,
       createdAfter: sentAfter
     });
-    const detail = await getMailpitMessageDetail(request, message.ID);
+    const detail = await mailpit.getMessageDetail(request, message.ID);
     const body = `${detail.Text ?? ""}\n${detail.HTML ?? ""}`;
 
     expect(body).toContain(
-      `/confirm-assignment/${e2eAssignmentFixtures.emailInvitationToken}`
+      `/confirm-assignment/${e2eData.fixtures.emailInvitationToken}`
     );
   });
 });

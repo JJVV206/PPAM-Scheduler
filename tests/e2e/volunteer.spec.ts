@@ -1,7 +1,7 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import type { APIRequestContext } from "@playwright/test";
 
 import { expectNoHorizontalOverflow, expectStatus } from "./support/assertions";
-import { e2eAssignmentNotes } from "./support/fixtures";
+import { expect, test } from "./support/test";
 
 type VolunteerDashboardAssignment = {
   id: string;
@@ -33,7 +33,7 @@ async function getVolunteerAssignmentIdByNote(
 }
 
 test.describe("volunteer workspace", () => {
-  test("loads volunteer dashboard and key self-service actions", async ({
+  test("loads volunteer dashboard and key self-service actions @smoke", async ({
     page
   }) => {
     await page.goto("/volunteer");
@@ -46,7 +46,9 @@ test.describe("volunteer workspace", () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test("serves volunteer APIs and blocks admin APIs", async ({ request }) => {
+  test("serves volunteer APIs and blocks admin APIs @critical", async ({
+    request
+  }) => {
     const endpoints: Array<[string, number]> = [
       ["/api/dashboard/volunteer", 200],
       ["/api/open-slots", 200],
@@ -60,12 +62,14 @@ test.describe("volunteer workspace", () => {
     }
   });
 
-  test("redirects volunteers away from admin routes", async ({ page }) => {
+  test("redirects volunteers away from admin routes @critical", async ({
+    page
+  }) => {
     await page.goto("/admin");
     await expect(page).toHaveURL(/\/volunteer$/);
   });
 
-  test("can open core volunteer pages without server errors", async ({
+  test("can open core volunteer pages without server errors @smoke", async ({
     page
   }) => {
     test.slow();
@@ -88,35 +92,65 @@ test.describe("volunteer workspace", () => {
     }
   });
 
-  test("shows pending assignment actions and opens assignment detail", async ({
+  test("saves volunteer availability through authenticated API @critical @write", async ({
     page,
     request
   }) => {
+    const response = await request.put("/api/availability", {
+      data: {
+        items: [
+          {
+            dayOfWeek: "MONDAY",
+            timeSlot: "SLOT_09_11",
+            available: true,
+            recurring: true
+          },
+          {
+            dayOfWeek: "FRIDAY",
+            timeSlot: "SLOT_09_11",
+            available: true,
+            recurring: true
+          }
+        ],
+        temporaryUnavailable: false
+      }
+    });
+
+    await expectStatus(response, 200);
+
+    await page.goto("/volunteer/availability");
+    await expect(page.getByText(/2 horarios marcados/i)).toBeVisible();
+  });
+
+  test("shows pending assignment actions and opens assignment detail @critical", async ({
+    e2eData,
+    request,
+    volunteerAssignmentsPage
+  }) => {
     const assignmentId = await getVolunteerAssignmentIdByNote(
       request,
-      e2eAssignmentNotes.volunteerPending
+      e2eData.notes.volunteerPending
     );
 
-    await page.goto("/volunteer/assignments");
+    await volunteerAssignmentsPage.gotoList();
+    await volunteerAssignmentsPage.expectPendingActions();
 
-    await expect(
-      page.getByRole("heading", { name: /pendientes de respuesta/i })
-    ).toBeVisible();
-    await expect(page.getByText(/necesita respuesta/i).first()).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /^confirmar$/i }).first()
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /no puedo asistir/i }).first()
-    ).toBeVisible();
+    await volunteerAssignmentsPage.gotoDetail(assignmentId);
+    await volunteerAssignmentsPage.expectDetailActions();
+  });
 
-    await page.goto(`/volunteer/assignments/${assignmentId}`);
+  test("confirms an assignment from the authenticated volunteer detail @critical @write", async ({
+    e2eData,
+    request,
+    volunteerAssignmentsPage
+  }) => {
+    const assignmentId = await getVolunteerAssignmentIdByNote(
+      request,
+      e2eData.notes.volunteerAuthConfirm
+    );
 
-    await expect(
-      page.getByRole("heading", { name: /hospital dr josé g\. parres/i })
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /^confirmar$/i })
-    ).toBeVisible();
+    await volunteerAssignmentsPage.gotoDetail(assignmentId);
+    await volunteerAssignmentsPage.expectDetailActions();
+    await volunteerAssignmentsPage.confirmFromDetail();
   });
 });

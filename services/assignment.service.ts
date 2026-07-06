@@ -118,6 +118,10 @@ type SameDayRepeatAssignment = {
   }>;
 };
 
+function getOperationalAssignmentStatusFilter(status?: AssignmentStatus) {
+  return status ?? { not: "CANCELLED" as const };
+}
+
 function mapVolunteerSummary(record: {
   id: string;
   userId: string;
@@ -1119,7 +1123,8 @@ export async function getAssignmentsForScheduleSlot(input: {
         gte: startOfDay(input.date),
         lte: endOfDay(input.date)
       },
-      timeSlot: input.timeSlot
+      timeSlot: input.timeSlot,
+      status: getOperationalAssignmentStatusFilter()
     },
     include: assignmentInclude,
     orderBy: [{ preachingPoint: { name: "asc" } }, { pairNumber: "asc" }]
@@ -1155,7 +1160,7 @@ export async function getWeeklySchedule(input?: {
       },
       dayOfWeek: input?.filters?.day,
       preachingPointId: input?.filters?.pointId,
-      status: input?.filters?.status
+      status: getOperationalAssignmentStatusFilter(input?.filters?.status)
     },
     include: {
       preachingPoint: true,
@@ -2423,7 +2428,8 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
         date: {
           gte: weekStart,
           lte: weekEnd
-        }
+        },
+        status: getOperationalAssignmentStatusFilter()
       },
       include: assignmentInclude,
       orderBy: [{ date: "asc" }, { timeSlot: "asc" }, { pairNumber: "asc" }]
@@ -2712,7 +2718,7 @@ export async function getAssignments(input?: {
   const assignments = await db.assignment.findMany({
     where: {
       preachingPointId: input?.pointId,
-      status: input?.status,
+      status: getOperationalAssignmentStatusFilter(input?.status),
       date: input?.date ? new Date(input.date) : undefined,
       volunteers: input?.volunteerId
         ? {

@@ -1,9 +1,8 @@
-import { expect, test } from "@playwright/test";
-
 import { expectNoHorizontalOverflow } from "./support/assertions";
+import { expect, test } from "./support/test";
 
 test.describe("mobile responsive smoke", () => {
-  test("keeps primary admin pages usable on mobile viewport", async ({
+  test("keeps primary admin pages usable on mobile viewport @smoke @responsive", async ({
     page
   }) => {
     test.slow();
@@ -21,7 +20,7 @@ test.describe("mobile responsive smoke", () => {
     }
   });
 
-  test("keeps critical admin pages stable on laptop viewport", async ({
+  test("keeps critical admin pages stable on laptop viewport @responsive", async ({
     page
   }) => {
     test.slow();

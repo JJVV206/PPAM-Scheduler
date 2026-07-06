@@ -22,7 +22,8 @@ Use this checklist before promoting a build to real PPAM production traffic.
 npm run typecheck
 npm run lint
 npm run ready:prod
-npm run test:e2e
+npm run test:e2e:critical
+E2E_BASE_URL="https://YOUR_PRODUCTION_URL" npm run test:e2e:prod
 npm audit --omit=dev
 ```
 

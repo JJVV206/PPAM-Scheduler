@@ -14,6 +14,13 @@ export const e2eUsers = {
       "e2e+ppam-volunteer@example.invalid",
     password: process.env.E2E_VOLUNTEER_PASSWORD ?? "E2EVolunteer123!",
     homePath: "/volunteer"
+  },
+  replacement: {
+    email:
+      process.env.E2E_REPLACEMENT_EMAIL ??
+      "e2e+ppam-replacement@example.invalid",
+    password: process.env.E2E_REPLACEMENT_PASSWORD ?? "E2EReplacement123!",
+    homePath: "/volunteer"
   }
 } as const;
 
@@ -21,4 +28,3 @@ export const storageStatePaths = {
   admin: path.join(authDir, "admin.json"),
   volunteer: path.join(authDir, "volunteer.json")
 } as const;
-

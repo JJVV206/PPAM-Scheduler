@@ -51,6 +51,7 @@ const mocks = vi.hoisted(() => {
       findUniqueOrThrow: vi.fn()
     },
     assignmentInvitation: {
+      count: vi.fn(),
       findUnique: vi.fn()
     },
     assignmentVolunteer: {
@@ -58,6 +59,12 @@ const mocks = vi.hoisted(() => {
     },
     preachingPoint: {
       findUniqueOrThrow: vi.fn()
+    },
+    notificationLog: {
+      count: vi.fn()
+    },
+    replacementCensus: {
+      findFirst: vi.fn()
     },
     scheduleWeek: {
       create: vi.fn(),
@@ -120,8 +127,12 @@ import {
   createWeeklyAssignment,
   declineAssignment,
   duplicateScheduleWeek,
+  getAdminDashboardStats,
   getAssignmentDetail,
+  getAssignments,
+  getAssignmentsForScheduleSlot,
   getSameDayVolunteerRepeatWarnings,
+  getWeeklySchedule,
   respondToAssignmentInvitation,
   updateAssignment
 } from "@/services/assignment.service";
@@ -301,6 +312,9 @@ function setupAssignmentDefaults() {
     })
   );
   mocks.db.assignment.findMany.mockResolvedValue([]);
+  mocks.db.assignmentInvitation.count.mockResolvedValue(0);
+  mocks.db.notificationLog.count.mockResolvedValue(0);
+  mocks.db.replacementCensus.findFirst.mockResolvedValue(null);
   mocks.createPendingPrimaryInvitationsForAssignment.mockResolvedValue({
     createdCount: 2,
     skippedCount: 0
@@ -584,6 +598,101 @@ describe("assignment automation orchestration", () => {
     const result = await getAssignmentDetail("assignment-1");
 
     expect(result.warnings).toContain("Integrante repetido este día");
+  });
+
+  it("hides cancelled assignments from assignment lists by default", async () => {
+    await getAssignments();
+
+    expect(mocks.db.assignment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: { not: "CANCELLED" }
+        })
+      })
+    );
+  });
+
+  it("allows explicitly requesting cancelled assignments in assignment lists", async () => {
+    await getAssignments({ status: "CANCELLED" });
+
+    expect(mocks.db.assignment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: "CANCELLED"
+        })
+      })
+    );
+  });
+
+  it("hides cancelled assignments from the weekly schedule by default", async () => {
+    await getWeeklySchedule({
+      weekStart: new Date("2026-07-20T12:00:00.000Z")
+    });
+
+    expect(mocks.db.assignment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: { not: "CANCELLED" }
+        })
+      })
+    );
+  });
+
+  it("allows explicitly requesting cancelled assignments in the weekly schedule", async () => {
+    await getWeeklySchedule({
+      weekStart: new Date("2026-07-20T12:00:00.000Z"),
+      filters: {
+        status: "CANCELLED"
+      }
+    });
+
+    expect(mocks.db.assignment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: "CANCELLED"
+        })
+      })
+    );
+  });
+
+  it("hides cancelled assignments from schedule slot views", async () => {
+    await getAssignmentsForScheduleSlot({
+      date: new Date("2026-07-20T12:00:00.000Z"),
+      timeSlot: "SLOT_13_15"
+    });
+
+    expect(mocks.db.assignment.findMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: { not: "CANCELLED" }
+        })
+      })
+    );
+  });
+
+  it("keeps cancelled assignments available through direct detail reads", async () => {
+    mocks.db.assignment.findUniqueOrThrow.mockResolvedValueOnce(
+      assignmentDetail({
+        status: "CANCELLED"
+      })
+    );
+
+    const result = await getAssignmentDetail("assignment-1");
+
+    expect(result.status).toBe("CANCELLED");
+  });
+
+  it("hides cancelled assignments from admin dashboard operational totals", async () => {
+    await getAdminDashboardStats();
+
+    expect(mocks.db.assignment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: { not: "CANCELLED" }
+        })
+      })
+    );
   });
 
   it("duplicates a week and generates titular invitations for every copied assignment", async () => {
