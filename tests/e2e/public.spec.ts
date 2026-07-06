@@ -1,10 +1,9 @@
-import { expect, test } from "@playwright/test";
-
 import { expectStatus } from "./support/assertions";
-import { e2eAssignmentFixtures } from "./support/fixtures";
+import { e2eUsers } from "./support/config";
+import { expect, test } from "./support/test";
 
 test.describe("public and unauthenticated service checks", () => {
-  test("loads login and redirects protected admin route to login", async ({
+  test("loads login and redirects protected admin route to login @smoke @prod-safe", async ({
     page
   }) => {
     await page.goto("/login");
@@ -16,7 +15,7 @@ test.describe("public and unauthenticated service checks", () => {
     await expect(page).toHaveURL(/\/login$/);
   });
 
-  test("reports core health without requiring authentication", async ({
+  test("reports core health without requiring authentication @smoke @prod-safe", async ({
     request
   }) => {
     const response = await request.get("/api/health");
@@ -28,14 +27,14 @@ test.describe("public and unauthenticated service checks", () => {
     expect(["ok", "core_ok"]).toContain(body.status);
   });
 
-  test("protects assignment automation cron without bearer secret", async ({
+  test("protects assignment automation cron without bearer secret @critical @prod-safe", async ({
     request
   }) => {
     const response = await request.get("/api/cron/assignment-automation");
     await expectStatus(response, 401);
   });
 
-  test("shows safe public copy for an invalid assignment token", async ({
+  test("shows safe public copy for an invalid assignment token @smoke @prod-safe", async ({
     page
   }) => {
     await page.goto("/confirm-assignment/not-a-real-token");
@@ -46,23 +45,63 @@ test.describe("public and unauthenticated service checks", () => {
     await expect(page.getByText(/el enlace no es válido/i)).toBeVisible();
   });
 
-  test("lets a volunteer confirm from a public assignment invitation link", async ({
-    page
+  test("lets a volunteer confirm from a public assignment invitation link @critical @write", async ({
+    e2eData,
+    publicConfirmationPage
   }) => {
-    await page.goto(
-      `/confirm-assignment/${e2eAssignmentFixtures.publicConfirmationToken}`
+    await publicConfirmationPage.gotoToken(
+      e2eData.fixtures.publicConfirmationToken
     );
 
-    await expect(
-      page.getByRole("heading", { name: /confirma tu asistencia/i })
-    ).toBeVisible();
-    await expect(page.getByText(/hospital dr josé g\. parres/i)).toBeVisible();
+    await publicConfirmationPage.expectReady();
+    await publicConfirmationPage.confirm();
 
-    await page.getByRole("button", { name: /^confirmar$/i }).click();
+    await publicConfirmationPage.expectRegistered(/confirmaste tu asistencia/i);
+  });
 
-    await expect(page.getByText(/respuesta registrada/i)).toBeVisible();
-    await expect(
-      page.getByText(/confirmaste tu asistencia/i)
-    ).toBeVisible();
+  test("lets a volunteer decline and invites an eligible replacement through Mailpit @critical @write @email", async ({
+    e2eData,
+    mailpit,
+    publicConfirmationPage,
+    request
+  }) => {
+    await mailpit.clearInbox(request);
+    const sentAfter = new Date();
+
+    await publicConfirmationPage.gotoToken(e2eData.fixtures.publicDeclineToken);
+    await publicConfirmationPage.expectReady();
+    await publicConfirmationPage.decline();
+
+    await publicConfirmationPage.expectRegistered(/no puedes asistir/i);
+
+    const message = await mailpit.waitForMessage(request, {
+      subject: "Invitación para cubrir como suplente en PPAM",
+      to: e2eUsers.replacement.email,
+      createdAfter: sentAfter
+    });
+    const detail = await mailpit.getMessageDetail(request, message.ID);
+    const body = `${detail.Text ?? ""}\n${detail.HTML ?? ""}`;
+
+    expect(body).toContain("/confirm-assignment/");
+    expect(body).toContain("suplente");
+  });
+
+  test("shows expired and already-responded public invitation states @critical", async ({
+    e2eData,
+    publicConfirmationPage
+  }) => {
+    await publicConfirmationPage.gotoToken(e2eData.fixtures.publicExpiredToken);
+    await publicConfirmationPage.expectUnavailable(
+      /invitación expirada/i,
+      /tiempo para responder/i
+    );
+
+    await publicConfirmationPage.gotoToken(
+      e2eData.fixtures.publicRespondedToken
+    );
+    await publicConfirmationPage.expectUnavailable(
+      /respuesta registrada/i,
+      /ya fue respondida/i
+    );
   });
 });

@@ -5,7 +5,10 @@ const defaultBaseUrl = `http://localhost:${port}`;
 const baseURL = process.env.E2E_BASE_URL ?? defaultBaseUrl;
 const useManagedWebServer = !process.env.E2E_BASE_URL;
 const authDir = "tests/e2e/.auth";
-const workers = Number(process.env.E2E_WORKERS ?? (process.env.CI ? 2 : 1));
+const workers = Number(process.env.E2E_WORKERS ?? 1);
+const chromium = devices["Desktop Chrome"];
+const includeCrossBrowser = process.env.E2E_CROSS_BROWSER === "true";
+const reuseExistingServer = process.env.E2E_REUSE_SERVER === "true";
 
 function compactEnv(env: Record<string, string | undefined>) {
   return Object.fromEntries(
@@ -26,11 +29,15 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers,
   reporter: process.env.CI
-    ? [["github"], ["html", { open: "never" }]]
+    ? [
+        ["github"],
+        ["junit", { outputFile: "test-results/e2e-junit.xml" }],
+        ["html", { open: "never" }]
+      ]
     : [["list"], ["html", { open: "never" }]],
   use: {
     baseURL,
-    trace: "retain-on-failure",
+    trace: process.env.CI ? "on-first-retry" : "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure"
   },
@@ -40,7 +47,7 @@ export default defineConfig({
           process.env.E2E_WEB_SERVER_COMMAND ??
           `npm run dev -- --hostname localhost --port ${port}`,
         url: baseURL,
-        reuseExistingServer: !process.env.CI,
+        reuseExistingServer,
         timeout: 120_000,
         env: compactEnv({
           ...process.env,
@@ -69,7 +76,7 @@ export default defineConfig({
       name: "public-chromium",
       testMatch: /.*public\.spec\.ts/,
       use: {
-        ...devices["Desktop Chrome"]
+        ...chromium
       }
     },
     {
@@ -77,7 +84,7 @@ export default defineConfig({
       dependencies: ["setup"],
       testMatch: /.*admin\.spec\.ts/,
       use: {
-        ...devices["Desktop Chrome"],
+        ...chromium,
         storageState: `${authDir}/admin.json`
       }
     },
@@ -86,18 +93,57 @@ export default defineConfig({
       dependencies: ["setup"],
       testMatch: /.*volunteer\.spec\.ts/,
       use: {
-        ...devices["Desktop Chrome"],
+        ...chromium,
         storageState: `${authDir}/volunteer.json`
       }
     },
     {
-      name: "admin-mobile",
+      name: "responsive-chromium",
       dependencies: ["setup"],
       testMatch: /.*responsive\.spec\.ts/,
       use: {
         ...devices["Pixel 5"],
         storageState: `${authDir}/admin.json`
       }
+    },
+    {
+      name: "critical-regression",
+      dependencies: ["setup"],
+      testMatch: /.*critical-regression\.spec\.ts/,
+      use: {
+        ...chromium,
+        storageState: `${authDir}/admin.json`
+      }
+    },
+    {
+      name: "production-smoke-readonly",
+      testMatch: /.*production-smoke\.spec\.ts/,
+      use: {
+        ...chromium
+      }
     }
-  ]
+  ].concat(
+    includeCrossBrowser
+      ? [
+          {
+            name: "critical-firefox",
+            dependencies: ["setup"],
+            testMatch: /.*critical-regression\.spec\.ts/,
+            use: {
+              ...devices["Desktop Firefox"],
+              storageState: `${authDir}/admin.json`
+            }
+          },
+          {
+            name: "critical-webkit",
+            dependencies: ["setup"],
+            testMatch: /.*critical-regression\.spec\.ts/,
+            use: {
+              ...devices["Desktop Safari"],
+              storageState: `${authDir}/admin.json`
+            }
+          }
+        ]
+      : []
+  )
 });

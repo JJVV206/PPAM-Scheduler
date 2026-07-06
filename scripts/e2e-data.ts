@@ -9,6 +9,10 @@ const E2E_WEEK_START = new Date("2026-07-20T00:00:00.000Z");
 const E2E_WEEK_END = addDays(E2E_WEEK_START, 6);
 const E2E_EMAIL_INVITATION_TOKEN = "e2e-email-flow-token";
 const E2E_PUBLIC_CONFIRMATION_TOKEN = "e2e-public-confirmation-token";
+const E2E_PUBLIC_DECLINE_TOKEN = "e2e-public-decline-token";
+const E2E_PUBLIC_EXPIRED_TOKEN = "e2e-public-expired-token";
+const E2E_PUBLIC_RESPONDED_TOKEN = "e2e-public-responded-token";
+const E2E_VOLUNTEER_AUTH_CONFIRM_TOKEN = "e2e-volunteer-auth-confirm-token";
 const E2E_VOLUNTEER_PENDING_TOKEN = "e2e-volunteer-pending-token";
 
 const adminEmail =
@@ -19,6 +23,11 @@ const volunteerEmail =
   `${E2E_EMAIL_PREFIX}volunteer${E2E_EMAIL_DOMAIN}`;
 const volunteerPassword =
   process.env.E2E_VOLUNTEER_PASSWORD ?? "E2EVolunteer123!";
+const replacementEmail =
+  process.env.E2E_REPLACEMENT_EMAIL ??
+  `${E2E_EMAIL_PREFIX}replacement${E2E_EMAIL_DOMAIN}`;
+const replacementPassword =
+  process.env.E2E_REPLACEMENT_PASSWORD ?? "E2EReplacement123!";
 
 function assertWriteAllowed() {
   if (process.env.ALLOW_E2E_DATA_WRITE !== "true") {
@@ -42,6 +51,40 @@ function addDays(date: Date, days: number) {
 function addHours(date: Date, hours: number) {
   return new Date(date.getTime() + hours * 60 * 60 * 1000);
 }
+
+type E2eAssignmentFixture = {
+  assignmentStatus?:
+    | "SCHEDULED"
+    | "PENDING_CONFIRMATION"
+    | "CONFIRMED"
+    | "DECLINED"
+    | "NEEDS_REPLACEMENT"
+    | "REASSIGNED"
+    | "COMPLETED"
+    | "CANCELLED";
+  date: Date;
+  dayOfWeek:
+    | "MONDAY"
+    | "TUESDAY"
+    | "WEDNESDAY"
+    | "THURSDAY"
+    | "FRIDAY"
+    | "SATURDAY"
+    | "SUNDAY";
+  expiresAt?: Date;
+  invitationStatus: "PENDING" | "SENT" | "ACCEPTED" | "DECLINED" | "EXPIRED";
+  notes: string;
+  pairNumber: number;
+  respondedAt?: Date | null;
+  responseStatus?: "PENDING" | "CONFIRMED" | "DECLINED";
+  timeSlot:
+    | "SLOT_07_09"
+    | "SLOT_09_11"
+    | "SLOT_11_13"
+    | "SLOT_13_15"
+    | "SLOT_15_17";
+  token: string;
+};
 
 async function ensurePreachingPoint() {
   const point =
@@ -117,7 +160,9 @@ async function seedAssignmentFixtures(input: {
     }
   });
   const expiresAt = addHours(new Date(), 48);
-  const fixtures = [
+  const expiredAt = addHours(new Date(), -2);
+  const respondedAt = addHours(new Date(), -1);
+  const fixtures: E2eAssignmentFixture[] = [
     {
       date: E2E_WEEK_START,
       dayOfWeek: "MONDAY" as const,
@@ -137,6 +182,46 @@ async function seedAssignmentFixtures(input: {
       invitationStatus: "SENT" as const
     },
     {
+      date: addDays(E2E_WEEK_START, 1),
+      dayOfWeek: "TUESDAY" as const,
+      timeSlot: "SLOT_11_13" as const,
+      pairNumber: 2,
+      notes: "E2E public decline replacement flow",
+      token: E2E_PUBLIC_DECLINE_TOKEN,
+      invitationStatus: "SENT" as const
+    },
+    {
+      date: addDays(E2E_WEEK_START, 2),
+      dayOfWeek: "WEDNESDAY" as const,
+      timeSlot: "SLOT_13_15" as const,
+      pairNumber: 1,
+      notes: "E2E public expired token flow",
+      token: E2E_PUBLIC_EXPIRED_TOKEN,
+      invitationStatus: "SENT" as const,
+      expiresAt: expiredAt
+    },
+    {
+      date: addDays(E2E_WEEK_START, 3),
+      dayOfWeek: "THURSDAY" as const,
+      timeSlot: "SLOT_15_17" as const,
+      pairNumber: 1,
+      notes: "E2E public responded token flow",
+      token: E2E_PUBLIC_RESPONDED_TOKEN,
+      invitationStatus: "ACCEPTED" as const,
+      responseStatus: "CONFIRMED" as const,
+      respondedAt,
+      assignmentStatus: "CONFIRMED" as const
+    },
+    {
+      date: addDays(E2E_WEEK_START, 4),
+      dayOfWeek: "FRIDAY" as const,
+      timeSlot: "SLOT_09_11" as const,
+      pairNumber: 1,
+      notes: "E2E volunteer authenticated confirm flow",
+      token: E2E_VOLUNTEER_AUTH_CONFIRM_TOKEN,
+      invitationStatus: "SENT" as const
+    },
+    {
       date: addDays(E2E_WEEK_START, 5),
       dayOfWeek: "SATURDAY" as const,
       timeSlot: "SLOT_09_11" as const,
@@ -148,6 +233,9 @@ async function seedAssignmentFixtures(input: {
   ];
 
   for (const fixture of fixtures) {
+    const responseStatus = fixture.responseStatus ?? "PENDING";
+    const respondedAtValue = fixture.respondedAt ?? null;
+
     await db.assignment.create({
       data: {
         scheduleWeekId: week.id,
@@ -156,7 +244,7 @@ async function seedAssignmentFixtures(input: {
         timeSlot: fixture.timeSlot,
         preachingPointId: input.pointId,
         pairNumber: fixture.pairNumber,
-        status: "PENDING_CONFIRMATION",
+        status: fixture.assignmentStatus ?? "PENDING_CONFIRMATION",
         notes: fixture.notes,
         volunteers: {
           create: {
@@ -167,7 +255,8 @@ async function seedAssignmentFixtures(input: {
         responses: {
           create: {
             volunteerId: input.volunteerProfileId,
-            responseStatus: "PENDING"
+            responseStatus,
+            respondedAt: respondedAtValue
           }
         },
         invitations: {
@@ -176,8 +265,13 @@ async function seedAssignmentFixtures(input: {
             type: "PRIMARY",
             status: fixture.invitationStatus,
             token: fixture.token,
-            expiresAt,
-            sentAt: fixture.invitationStatus === "SENT" ? new Date() : null,
+            expiresAt: fixture.expiresAt ?? expiresAt,
+            sentAt:
+              fixture.invitationStatus === "SENT" ||
+              fixture.invitationStatus === "ACCEPTED"
+                ? new Date()
+                : null,
+            respondedAt: respondedAtValue,
             metadata: {
               source: "e2e_seed"
             }
@@ -209,6 +303,10 @@ async function seedAssignmentFixtures(input: {
 
   return {
     publicConfirmationToken: E2E_PUBLIC_CONFIRMATION_TOKEN,
+    publicDeclineToken: E2E_PUBLIC_DECLINE_TOKEN,
+    publicExpiredToken: E2E_PUBLIC_EXPIRED_TOKEN,
+    publicRespondedToken: E2E_PUBLIC_RESPONDED_TOKEN,
+    volunteerAuthConfirmToken: E2E_VOLUNTEER_AUTH_CONFIRM_TOKEN,
     volunteerPendingToken: E2E_VOLUNTEER_PENDING_TOKEN,
     emailInvitationToken: E2E_EMAIL_INVITATION_TOKEN,
     weekId: week.id
@@ -218,10 +316,12 @@ async function seedAssignmentFixtures(input: {
 async function seed() {
   assertWriteAllowed();
 
-  const [adminPasswordHash, volunteerPasswordHash] = await Promise.all([
-    hashPassword(adminPassword),
-    hashPassword(volunteerPassword)
-  ]);
+  const [adminPasswordHash, volunteerPasswordHash, replacementPasswordHash] =
+    await Promise.all([
+      hashPassword(adminPassword),
+      hashPassword(volunteerPassword),
+      hashPassword(replacementPassword)
+    ]);
 
   const admin = await db.user.upsert({
     where: { email: adminEmail },
@@ -263,6 +363,26 @@ async function seed() {
     }
   });
 
+  const replacement = await db.user.upsert({
+    where: { email: replacementEmail },
+    update: {
+      active: true,
+      accessStatus: "APPROVED",
+      name: "E2E Replacement",
+      passwordHash: replacementPasswordHash,
+      phone: "000-000-0002",
+      role: "VOLUNTEER"
+    },
+    create: {
+      active: true,
+      email: replacementEmail,
+      name: "E2E Replacement",
+      passwordHash: replacementPasswordHash,
+      phone: "000-000-0002",
+      role: "VOLUNTEER"
+    }
+  });
+
   const volunteerProfile = await db.volunteerProfile.upsert({
     where: { userId: volunteer.id },
     update: {
@@ -284,6 +404,31 @@ async function seed() {
     }
   });
 
+  const replacementProfile = await db.volunteerProfile.upsert({
+    where: { userId: replacement.id },
+    update: {
+      active: true,
+      canServeAsPrimary: false,
+      canServeAsReplacement: true,
+      notes: "Created by E2E seed",
+      preferredAreas: ["E2E"],
+      reliabilityScore: 100,
+      temporaryUnavailable: false,
+      transportationNotes: "E2E generated replacement volunteer"
+    },
+    create: {
+      userId: replacement.id,
+      active: true,
+      canServeAsPrimary: false,
+      canServeAsReplacement: true,
+      notes: "Created by E2E seed",
+      preferredAreas: ["E2E"],
+      reliabilityScore: 100,
+      temporaryUnavailable: false,
+      transportationNotes: "E2E generated replacement volunteer"
+    }
+  });
+
   await db.volunteerAvailability.createMany({
     data: [
       {
@@ -295,6 +440,24 @@ async function seed() {
       {
         volunteerId: volunteerProfile.id,
         dayOfWeek: "SATURDAY",
+        timeSlot: "SLOT_09_11",
+        areaPreference: "E2E"
+      }
+    ],
+    skipDuplicates: true
+  });
+
+  await db.volunteerAvailability.createMany({
+    data: [
+      {
+        volunteerId: replacementProfile.id,
+        dayOfWeek: "TUESDAY",
+        timeSlot: "SLOT_11_13",
+        areaPreference: "E2E"
+      },
+      {
+        volunteerId: replacementProfile.id,
+        dayOfWeek: "FRIDAY",
         timeSlot: "SLOT_09_11",
         areaPreference: "E2E"
       }
@@ -314,6 +477,8 @@ async function seed() {
       {
         adminEmail,
         pointId: point.id,
+        replacementEmail,
+        replacementProfileId: replacementProfile.id,
         status: "seeded",
         volunteerEmail,
         volunteerProfileId: volunteerProfile.id,

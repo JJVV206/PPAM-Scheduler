@@ -1,0 +1,84 @@
+name: E2E QA
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  playwright-smoke:
+    name: Playwright smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ppam_scheduler
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ppam_scheduler"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      mailpit:
+        image: axllent/mailpit:v1.21
+        ports:
+          - 1025:1025
+          - 8025:8025
+
+    env:
+      ALLOW_E2E_DATA_WRITE: "true"
+      CI: "true"
+      CRON_SECRET: ppam-e2e-local-cron-secret-change-outside-tests
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ppam_scheduler?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/ppam_scheduler?schema=public
+      NEXTAUTH_SECRET: ppam-e2e-ci-secret-change-outside-tests
+      NEXTAUTH_URL: http://localhost:3100
+      SMTP_FROM: PPAM Scheduler <no-reply@ppam.local>
+      SMTP_HOST: localhost
+      SMTP_PORT: "1025"
+      SMTP_SECURE: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare database
+        run: npm run db:push
+
+      - name: Seed E2E data
+        run: npm run e2e:data:seed
+
+      - name: Run smoke E2E suite
+        run: npm run test:e2e:smoke
+
+      - name: Cleanup E2E data
+        if: always()
+        run: npm run e2e:data:cleanup
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
