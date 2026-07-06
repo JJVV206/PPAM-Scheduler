@@ -16,6 +16,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
+  Sparkles,
   UserCircle2,
   UserCheck,
   Users,
@@ -33,10 +34,15 @@ import {
   DialogTitle,
   DialogTrigger
 } from "@/components/ui/dialog";
+import type {
+  VolunteerNavigationItem,
+  VolunteerRouteKey
+} from "@/lib/volunteer-ui-config";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/types/domain";
 
 type NavItem = {
+  key?: VolunteerRouteKey;
   href: string;
   label: string;
   icon: typeof Home;
@@ -58,25 +64,35 @@ const adminItems: NavItem[] = [
   { href: "/admin/settings", label: "Configuración", icon: Settings }
 ];
 
-const volunteerItems: NavItem[] = [
-  { href: "/volunteer", label: "Inicio", icon: Home },
+const defaultVolunteerItems: VolunteerNavigationItem[] = [
+  { key: "home", href: "/volunteer", label: "Inicio" },
+  { key: "assignments", href: "/volunteer/assignments", label: "Mis turnos" },
   {
-    href: "/volunteer/assignments",
-    label: "Mis asignaciones",
-    icon: CalendarDays
-  },
-  {
+    key: "availability",
     href: "/volunteer/availability",
-    label: "Disponibilidad",
-    icon: UserCircle2
+    label: "Disponibilidad"
   },
-  { href: "/volunteer/notifications", label: "Notificaciones", icon: Bell },
-  { href: "/volunteer/profile", label: "Perfil", icon: Settings }
+  {
+    key: "notifications",
+    href: "/volunteer/notifications",
+    label: "Notificaciones"
+  },
+  { key: "profile", href: "/volunteer/profile", label: "Perfil" }
 ];
+
+const volunteerItemIcons: Record<VolunteerRouteKey, typeof Home> = {
+  home: Home,
+  assignments: CalendarDays,
+  openSlots: Sparkles,
+  availability: UserCircle2,
+  notifications: Bell,
+  profile: Settings
+};
 
 type AppSidebarProps = {
   role: UserRole;
   unreadNotificationCount?: number;
+  volunteerNavigationItems?: VolunteerNavigationItem[];
 };
 
 type NavigationContentProps = {
@@ -99,12 +115,33 @@ function isActiveRoute(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function getNavItems(role: UserRole) {
-  return role === "ADMIN" ? adminItems : volunteerItems;
+function mapVolunteerNavItems(items: VolunteerNavigationItem[]): NavItem[] {
+  return items.map((item) => ({
+    ...item,
+    icon: volunteerItemIcons[item.key]
+  }));
+}
+
+function getNavItems(
+  role: UserRole,
+  volunteerNavigationItems?: VolunteerNavigationItem[]
+) {
+  return role === "ADMIN"
+    ? adminItems
+    : mapVolunteerNavItems(volunteerNavigationItems ?? defaultVolunteerItems);
 }
 
 function getCurrentSectionLabel(pathname: string, items: NavItem[]) {
   const activeItem = items.find((item) => isActiveRoute(pathname, item.href));
+  const hasAssignmentsItem = items.some((item) => item.key === "assignments");
+  const hasOpenSlotsItem = items.some((item) => item.key === "openSlots");
+
+  if (!activeItem && pathname.startsWith("/volunteer/assignments")) {
+    return hasAssignmentsItem || !hasOpenSlotsItem
+      ? "Mis turnos"
+      : "Mis suplencias";
+  }
+
   return activeItem?.label ?? "Navegación";
 }
 
@@ -172,13 +209,14 @@ function NavigationContent({
 
 export function AppSidebar({
   role,
-  unreadNotificationCount = 0
+  unreadNotificationCount = 0,
+  volunteerNavigationItems
 }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const items = getNavItems(role);
+  const items = getNavItems(role, volunteerNavigationItems);
   const currentSectionLabel = getCurrentSectionLabel(pathname, items);
   const notificationsHref =
     role === "ADMIN" ? "/admin/attention" : "/volunteer/notifications";

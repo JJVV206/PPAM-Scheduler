@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OpenSlotCard } from "@/components/assignments/open-slot-card";
 import { VolunteerAssignmentCard } from "@/components/volunteer/volunteer-assignment-card";
 import { DashboardStatCard } from "@/components/dashboard/dashboard-stat-card";
 import { EmptyState } from "@/components/forms/empty-state";
@@ -15,6 +16,7 @@ import { getServerAuthSession } from "@/lib/auth/auth";
 import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
 import { formatDisplayDate } from "@/lib/utils";
 import { getVolunteerAssignmentRoleLabel } from "@/lib/volunteer-assignment";
+import { getVolunteerDashboardModel } from "@/lib/volunteer-ui-config";
 import { getVolunteerDashboardData } from "@/services/dashboard.service";
 import {
   AlertTriangle,
@@ -36,13 +38,44 @@ export default async function VolunteerDashboardPage() {
 
   const volunteerProfileId = session.user.volunteerProfileId;
   const dashboard = await getVolunteerDashboardData(volunteerProfileId);
-  const nextPendingAssignment = dashboard.pendingConfirmations[0];
-  const nextConfirmedAssignment = dashboard.confirmedAssignments[0];
-  const focusAssignment =
-    nextPendingAssignment ??
-    nextConfirmedAssignment ??
-    dashboard.upcomingAssignments[0];
+  const model = getVolunteerDashboardModel(dashboard);
+  const { config } = model;
+  const nextPendingAssignment = model.visiblePendingAssignments[0];
+  const focusAssignment = model.focusAssignment;
+  const focusOpenSlot = model.focusOpenSlot;
+  const focusDate = focusAssignment?.date ?? focusOpenSlot?.date;
+  const focusTimeSlot = focusAssignment?.timeSlot ?? focusOpenSlot?.timeSlot;
+  const focusPointName =
+    focusAssignment?.preachingPoint.name ?? focusOpenSlot?.preachingPointName;
   const firstName = dashboard.volunteer.name.split(" ")[0];
+  const hasFocusPendingAssignment = Boolean(
+    focusAssignment &&
+    model.visiblePendingAssignments.some(
+      (assignment) => assignment.id === focusAssignment.id
+    )
+  );
+  const heroTitle = focusOpenSlot
+    ? `${model.visibleOpenSlots.length} suplencia${
+        model.visibleOpenSlots.length === 1 ? "" : "s"
+      } compatible${model.visibleOpenSlots.length === 1 ? "" : "s"}`
+    : focusAssignment
+      ? hasFocusPendingAssignment
+        ? config.serviceType === "REPLACEMENT"
+          ? "Tienes una suplencia esperando respuesta"
+          : "Tienes un turno esperando respuesta"
+        : config.serviceType === "REPLACEMENT"
+          ? "Tu próxima suplencia está confirmada"
+          : "Tu próximo turno está confirmado"
+      : config.copy.dashboardTitle;
+  const heroDescription = focusOpenSlot
+    ? "Revisa si puedes cubrir el horario completo antes de aceptar."
+    : focusAssignment
+      ? hasFocusPendingAssignment
+        ? config.serviceType === "REPLACEMENT"
+          ? "Responde si puedes cubrir esta suplencia para confirmar la cobertura."
+          : "Confirma si asistirás o avisa si no puedes para que se busque cobertura a tiempo."
+        : "Revisa los datos y los recordatorios antes de asistir."
+      : config.copy.dashboardEmptyDescription;
 
   return (
     <div className="space-y-6">
@@ -53,18 +86,10 @@ export default async function VolunteerDashboardPage() {
           <div className="min-w-0 space-y-2">
             <p className="text-sm text-muted-foreground">Hola, {firstName}</p>
             <h2 className="text-balance font-heading text-2xl font-semibold sm:text-3xl">
-              {nextPendingAssignment
-                ? "Tienes un turno esperando respuesta"
-                : nextConfirmedAssignment
-                  ? "Tu próximo turno está confirmado"
-                  : "No tienes turnos próximos asignados"}
+              {heroTitle}
             </h2>
             <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-              {nextPendingAssignment
-                ? "Confirma si asistirás o avisa si no puedes para que se busque cobertura a tiempo."
-                : nextConfirmedAssignment
-                  ? "Revisa los datos del turno y los recordatorios antes de asistir."
-                  : "Cuando recibas una asignación, aparecerá aquí con sus acciones principales."}
+              {heroDescription}
             </p>
           </div>
 
@@ -72,20 +97,21 @@ export default async function VolunteerDashboardPage() {
             {focusAssignment ? (
               <Button className="w-full sm:w-auto" asChild>
                 <Link href={`/volunteer/assignments/${focusAssignment.id}`}>
-                  {nextPendingAssignment ? "Responder ahora" : "Ver detalles"}
+                  {hasFocusPendingAssignment
+                    ? "Responder ahora"
+                    : "Ver detalles"}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
             ) : null}
-            {dashboard.volunteer.canServeAsReplacement &&
-            dashboard.openSlots.length ? (
+            {focusOpenSlot || model.visibleOpenSlots.length ? (
               <Button
                 variant={focusAssignment ? "secondary" : "default"}
                 className="w-full sm:w-auto"
                 asChild
               >
                 <Link href="/volunteer/open-slots">
-                  Ver vacantes
+                  Ver suplencias
                   <Sparkles className="h-4 w-4" />
                 </Link>
               </Button>
@@ -98,7 +124,7 @@ export default async function VolunteerDashboardPage() {
           </div>
         </div>
 
-        {focusAssignment ? (
+        {focusAssignment || focusOpenSlot ? (
           <div className="mt-4 grid gap-2 rounded-lg border border-border/70 bg-background/35 p-3 text-sm sm:grid-cols-3">
             <div className="rounded-lg bg-white/[0.03] px-3 py-2">
               <p className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -106,7 +132,9 @@ export default async function VolunteerDashboardPage() {
                 Fecha
               </p>
               <p className="mt-1 font-medium">
-                {formatDisplayDate(focusAssignment.date, "EEEE d 'de' MMM")}
+                {focusDate
+                  ? formatDisplayDate(focusDate, "EEEE d 'de' MMM")
+                  : null}
               </p>
             </div>
             <div className="rounded-lg bg-white/[0.03] px-3 py-2">
@@ -115,7 +143,9 @@ export default async function VolunteerDashboardPage() {
                 Horario
               </p>
               <p className="mt-1 font-medium">
-                {TIME_SLOT_DEFINITIONS[focusAssignment.timeSlot].label}
+                {focusTimeSlot
+                  ? TIME_SLOT_DEFINITIONS[focusTimeSlot].label
+                  : null}
               </p>
             </div>
             <div className="rounded-lg bg-white/[0.03] px-3 py-2">
@@ -123,16 +153,26 @@ export default async function VolunteerDashboardPage() {
                 <MapPin className="h-4 w-4" />
                 Punto
               </p>
-              <p className="mt-1 font-medium">
-                {focusAssignment.preachingPoint.name}
-              </p>
+              <p className="mt-1 font-medium">{focusPointName}</p>
             </div>
             <div className="sm:col-span-3">
-              <Badge variant={nextPendingAssignment ? "warning" : "success"}>
-                {getVolunteerAssignmentRoleLabel(
-                  focusAssignment,
-                  volunteerProfileId
-                )}
+              <Badge
+                variant={
+                  focusOpenSlot
+                    ? "default"
+                    : nextPendingAssignment
+                      ? "warning"
+                      : "success"
+                }
+              >
+                {focusOpenSlot
+                  ? "Suplencia compatible"
+                  : focusAssignment
+                    ? getVolunteerAssignmentRoleLabel(
+                        focusAssignment,
+                        volunteerProfileId
+                      )
+                    : null}
               </Badge>
             </div>
           </div>
@@ -140,76 +180,110 @@ export default async function VolunteerDashboardPage() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {config.canSeePrimaryAssignments ? (
+          <DashboardStatCard
+            label="Pendientes"
+            value={model.primaryPendingAssignments.length}
+            icon={AlertTriangle}
+            hint="Necesitan respuesta"
+          />
+        ) : null}
         <DashboardStatCard
-          label="Pendientes"
-          value={dashboard.pendingConfirmations.length}
-          icon={AlertTriangle}
-          hint="Necesitan respuesta"
-        />
-        <DashboardStatCard
-          label="Confirmadas"
-          value={dashboard.confirmedAssignments.length}
+          label={
+            config.serviceType === "REPLACEMENT" ? "Aceptadas" : "Confirmadas"
+          }
+          value={model.visibleConfirmedAssignments.length}
           icon={CheckCircle2}
           hint="Próximos turnos"
         />
-        <DashboardStatCard
-          label={
-            dashboard.volunteer.canServeAsReplacement
-              ? "Vacantes para ti"
-              : "Disponibilidad"
-          }
-          value={dashboard.openSlots.length}
-          icon={Sparkles}
-          hint={
-            dashboard.volunteer.canServeAsReplacement
-              ? "Puedes cubrir"
-              : "Sin suplencias activas"
-          }
-        />
+        {config.canSeeOpenSlots ? (
+          <DashboardStatCard
+            label="Suplencias"
+            value={model.visibleOpenSlots.length}
+            icon={Sparkles}
+            hint="Puedes cubrir"
+          />
+        ) : null}
         <DashboardStatCard
           label="Historial"
-          value={dashboard.assignmentHistory.length}
+          value={model.visibleHistory.length}
           icon={History}
           hint="Turnos anteriores"
         />
       </section>
 
-      <Card className="surface-panel">
-        <CardHeader>
-          <CardTitle>Turnos que necesitan respuesta</CardTitle>
-          <CardDescription>
-            Responde lo antes posible para confirmar o buscar cobertura.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 lg:grid-cols-2">
-          {dashboard.pendingConfirmations.length ? (
-            dashboard.pendingConfirmations.map((assignment) => (
-              <VolunteerAssignmentCard
-                key={assignment.id}
-                assignment={assignment}
-                volunteerProfileId={volunteerProfileId}
-                reminders={dashboard.remindersByAssignmentId[assignment.id]}
-                showResponseActions
+      {config.canSeePrimaryAssignments ||
+      config.serviceType === "REPLACEMENT" ? (
+        <Card className="surface-panel">
+          <CardHeader>
+            <CardTitle>{config.copy.pendingTitle}</CardTitle>
+            <CardDescription>{config.copy.pendingDescription}</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 lg:grid-cols-2">
+            {model.visiblePendingAssignments.length ? (
+              model.visiblePendingAssignments.map((assignment) => (
+                <VolunteerAssignmentCard
+                  key={assignment.id}
+                  assignment={assignment}
+                  volunteerProfileId={volunteerProfileId}
+                  reminders={dashboard.remindersByAssignmentId[assignment.id]}
+                  showResponseActions
+                  variant={config.cardVariant}
+                />
+              ))
+            ) : (
+              <EmptyState
+                title={config.copy.pendingEmpty}
+                description={config.copy.dashboardEmptyDescription}
+                className="lg:col-span-2"
               />
-            ))
-          ) : (
-            <EmptyState
-              title="Sin respuestas pendientes"
-              description="No tienes asignaciones esperando confirmación."
-              className="lg:col-span-2"
-            />
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {config.canSeeOpenSlots ? (
+        <Card className="surface-panel">
+          <CardHeader>
+            <CardTitle>{config.copy.openSlotsTitle}</CardTitle>
+            <CardDescription>
+              {config.copy.openSlotsDescription}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 lg:grid-cols-2">
+            {model.visibleOpenSlots.length ? (
+              model.visibleOpenSlots
+                .slice(0, 2)
+                .map((slot) => (
+                  <OpenSlotCard
+                    key={slot.assignmentId}
+                    openSlot={slot}
+                    mode="volunteer"
+                    currentVolunteerId={volunteerProfileId}
+                  />
+                ))
+            ) : (
+              <EmptyState
+                title={config.copy.openSlotsEmptyTitle}
+                description={config.copy.openSlotsEmptyDescription}
+                className="lg:col-span-2"
+              />
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <section className="grid gap-6 xl:grid-cols-2">
         <Card className="surface-panel">
           <CardHeader>
-            <CardTitle>Asignaciones confirmadas</CardTitle>
+            <CardTitle>{config.copy.confirmedTitle}</CardTitle>
+            <CardDescription>
+              {config.copy.confirmedDescription}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {dashboard.confirmedAssignments.length ? (
-              dashboard.confirmedAssignments
+            {model.visibleConfirmedAssignments.length ? (
+              model.visibleConfirmedAssignments
                 .slice(0, 4)
                 .map((assignment) => (
                   <VolunteerAssignmentCard
@@ -218,11 +292,12 @@ export default async function VolunteerDashboardPage() {
                     volunteerProfileId={volunteerProfileId}
                     reminders={dashboard.remindersByAssignmentId[assignment.id]}
                     compact
+                    variant={config.cardVariant}
                   />
                 ))
             ) : (
               <p className="text-sm text-muted-foreground">
-                Tus asignaciones confirmadas aparecerán aquí.
+                {config.copy.confirmedEmpty}
               </p>
             )}
           </CardContent>
@@ -230,11 +305,12 @@ export default async function VolunteerDashboardPage() {
 
         <Card className="surface-panel">
           <CardHeader>
-            <CardTitle>Historial</CardTitle>
+            <CardTitle>{config.copy.historyTitle}</CardTitle>
+            <CardDescription>{config.copy.historyDescription}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {dashboard.assignmentHistory.length ? (
-              dashboard.assignmentHistory
+            {model.visibleHistory.length ? (
+              model.visibleHistory
                 .slice(0, 4)
                 .map((assignment) => (
                   <VolunteerAssignmentCard
@@ -243,11 +319,12 @@ export default async function VolunteerDashboardPage() {
                     volunteerProfileId={volunteerProfileId}
                     reminders={dashboard.remindersByAssignmentId[assignment.id]}
                     compact
+                    variant={config.cardVariant}
                   />
                 ))
             ) : (
               <p className="text-sm text-muted-foreground">
-                Tu historial se llenará cuando pasen tus primeras asignaciones.
+                {config.copy.historyEmpty}
               </p>
             )}
           </CardContent>

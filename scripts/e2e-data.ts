@@ -387,6 +387,7 @@ async function seed() {
     where: { userId: volunteer.id },
     update: {
       active: true,
+      canServeAsPrimary: true,
       canServeAsReplacement: true,
       notes: "Created by E2E seed",
       preferredAreas: ["E2E"],
@@ -396,6 +397,7 @@ async function seed() {
     create: {
       userId: volunteer.id,
       active: true,
+      canServeAsPrimary: true,
       canServeAsReplacement: true,
       notes: "Created by E2E seed",
       preferredAreas: ["E2E"],

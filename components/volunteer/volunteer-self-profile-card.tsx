@@ -7,9 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DAYS_OF_WEEK,
   DAY_LABELS,
-  TIME_SLOT_DEFINITIONS,
-  VOLUNTEER_SERVICE_TYPE_LABELS
+  TIME_SLOT_DEFINITIONS
 } from "@/lib/constants/domain";
+import { getVolunteerUiConfig } from "@/lib/volunteer-ui-config";
 import type { DayOfWeek, TimeSlot, VolunteerServiceType } from "@/types/domain";
 
 type VolunteerSelfProfileCardProps = {
@@ -34,6 +34,7 @@ type VolunteerSelfProfileCardProps = {
 export function VolunteerSelfProfileCard({
   volunteer
 }: VolunteerSelfProfileCardProps) {
+  const uiConfig = getVolunteerUiConfig(volunteer);
   const availabilityByDay =
     volunteer.availability
       ?.filter((item) => item.available !== false)
@@ -71,9 +72,7 @@ export function VolunteerSelfProfileCard({
               {volunteer.temporaryUnavailable ? (
                 <Badge variant="warning">No disponible</Badge>
               ) : null}
-              <Badge variant="secondary">
-                {VOLUNTEER_SERVICE_TYPE_LABELS[volunteer.serviceType]}
-              </Badge>
+              <Badge variant="secondary">{uiConfig.serviceTypeLabel}</Badge>
             </div>
           </div>
           <Button variant="secondary" className="w-full sm:w-auto" asChild>
