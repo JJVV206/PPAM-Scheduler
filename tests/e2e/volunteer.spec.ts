@@ -42,7 +42,12 @@ test.describe("volunteer workspace", () => {
     await page.goto("/volunteer");
 
     await expect(page.getByText(/^Hola,/i)).toBeVisible();
-    await expect(page.getByText(/suplencias disponibles/i)).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        exact: true,
+        name: "Suplencias disponibles"
+      })
+    ).toBeVisible();
     await expect(
       page.getByRole("link", { name: /^Suplencias$/i }).first()
     ).toBeVisible();
