@@ -64,7 +64,12 @@ export const NOTIFICATION_CHANNELS = [
   "WHATSAPP",
   "IN_APP"
 ] as const;
-export const NOTIFICATION_STATUSES = ["PENDING", "SENT", "FAILED"] as const;
+export const NOTIFICATION_STATUSES = [
+  "PENDING",
+  "SENT",
+  "DELIVERED",
+  "FAILED"
+] as const;
 export const ASSIGNMENT_ACTIVITY_TYPES = [
   "ASSIGNED",
   "INVITATION_CREATED",
@@ -198,6 +203,7 @@ export const NOTIFICATION_CHANNEL_LABELS = {
 export const NOTIFICATION_STATUS_LABELS = {
   PENDING: "Pendiente",
   SENT: "Enviado",
+  DELIVERED: "Entregado",
   FAILED: "Fallido"
 } as const;
 

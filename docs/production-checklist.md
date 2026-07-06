@@ -11,8 +11,12 @@ Use this checklist before promoting a build to real PPAM production traffic.
 - Confirm `NEXTAUTH_URL` matches the final Vercel/custom domain.
 - Confirm `CRON_SECRET` is a strong random value.
 - Confirm `RESEND_API_KEY` and `RESEND_FROM` are configured when email readiness is required.
+- Confirm `RESEND_WEBHOOK_SECRET` is configured when delivery-state webhooks are required.
 - Confirm the Resend sender domain is verified before sending to real volunteers.
 - Confirm `RESEND_FROM` uses a verified domain email, not `onboarding@resend.dev`, before production traffic.
+- Confirm the Resend webhook points to `https://YOUR_PRODUCTION_URL/api/webhooks/resend`
+  with `email.sent`, `email.delivered`, `email.failed`, `email.bounced`, and
+  `email.suppressed` enabled.
 - Confirm SMTP variables only if using SMTP instead of Resend API.
 - Confirm Vercel domain aliases point to the intended production deployment.
 - Confirm the Neon production branch is not the local/dev branch.
@@ -142,6 +146,13 @@ Then verify a volunteer account can access:
 For email readiness, send one controlled assignment invitation to a test
 volunteer using the production sender domain and confirm delivery in the
 recipient inbox. Do not use a real weekly rollout as the first email test.
+If Resend webhooks are enabled, confirm the related `NotificationLog` moves from
+`SENT` to `DELIVERED` after the provider delivery event.
+
+The default Vercel cron in this repo runs daily. For production reminders with
+hour-level windows, configure a Vercel plan or external scheduler that can call
+`/api/cron/assignment-automation` every 15-60 minutes with
+`Authorization: Bearer $CRON_SECRET`.
 
 ## Rollback
 

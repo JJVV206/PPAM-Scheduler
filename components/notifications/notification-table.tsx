@@ -25,10 +25,20 @@ type NotificationTableProps = {
     createdAt: Date;
     sentAt?: Date | null;
     errorMessage?: string | null;
+    metadata?: unknown;
     user: { name: string };
     assignment?: { preachingPoint: { name: string } } | null;
   }>;
 };
+
+function getMetadataString(metadata: unknown, key: string) {
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+    const value = (metadata as Record<string, unknown>)[key];
+    return typeof value === "string" ? value : null;
+  }
+
+  return null;
+}
 
 export function NotificationTable({ notifications }: NotificationTableProps) {
   return (
@@ -61,7 +71,8 @@ export function NotificationTable({ notifications }: NotificationTableProps) {
             <TableCell>
               <Badge
                 variant={
-                  notification.status === "SENT"
+                  notification.status === "SENT" ||
+                  notification.status === "DELIVERED"
                     ? "success"
                     : notification.status === "FAILED"
                       ? "danger"
@@ -85,6 +96,15 @@ export function NotificationTable({ notifications }: NotificationTableProps) {
             >
               {notification.errorMessage
                 ? humanizeErrorMessage(notification.errorMessage)
+                : notification.status === "DELIVERED"
+                  ? `Entregada ${formatDisplayDate(
+                      new Date(
+                        getMetadataString(notification.metadata, "deliveredAt") ??
+                          notification.sentAt ??
+                          notification.createdAt
+                      ),
+                      "d 'de' MMM, h:mm a"
+                    )}`
                 : notification.sentAt
                   ? `Enviada ${formatDisplayDate(notification.sentAt, "d 'de' MMM, h:mm a")}`
                   : "Registrada en entorno local"}

@@ -27,7 +27,7 @@ type AssignmentSummary = {
   timeSlot: TimeSlot;
 };
 
-const ADMIN_ATTENTION_NOTIFICATION_TYPES: AppNotificationType[] = [
+export const ADMIN_ATTENTION_NOTIFICATION_TYPES: AppNotificationType[] = [
   "ADMIN_ATTENTION_REQUIRED",
   "EMAIL_FAILED",
   "REPLACEMENT_NEEDED"
@@ -390,6 +390,26 @@ export async function markAppNotificationRead(input: {
     where: {
       id: input.notificationId,
       userId: input.userId,
+      readAt: null
+    },
+    data: {
+      readAt: input.readAt ?? new Date()
+    }
+  });
+}
+
+export async function dismissAdminAttentionNotification(input: {
+  userId: string;
+  notificationId: string;
+  readAt?: Date;
+}) {
+  return db.appNotification.updateMany({
+    where: {
+      id: input.notificationId,
+      userId: input.userId,
+      type: {
+        in: ADMIN_ATTENTION_NOTIFICATION_TYPES
+      },
       readAt: null
     },
     data: {

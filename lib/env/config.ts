@@ -166,6 +166,11 @@ export function getResendConfig(): ResendConfig | null {
   };
 }
 
+export function getResendWebhookSecret() {
+  const secret = process.env.RESEND_WEBHOOK_SECRET?.trim();
+  return hasValue(secret) ? secret : null;
+}
+
 export function getEmailDeliveryConfig(): EmailDeliveryConfig | null {
   const resend = getResendConfig();
   if (resend) {
