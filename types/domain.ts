@@ -122,6 +122,7 @@ export type AssignmentInvitationDto = {
   expiresAt: Date;
   emailAttempts: number;
   createdAt: Date;
+  responseUrlCopyAvailable: boolean;
 };
 
 export type AssignmentDetailDto = {

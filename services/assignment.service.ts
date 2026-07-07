@@ -123,12 +123,8 @@ export type DuplicateScheduleWeekResult = {
   week: ScheduleWeek;
   created: boolean;
   assignmentCount: number;
-  primaryInvitations?: PrepareScheduleWeekAutomationResult[
-    "primaryInvitations"
-  ];
-  replacementCensus?: PrepareScheduleWeekAutomationResult[
-    "replacementCensus"
-  ];
+  primaryInvitations?: PrepareScheduleWeekAutomationResult["primaryInvitations"];
+  replacementCensus?: PrepareScheduleWeekAutomationResult["replacementCensus"];
   skippedReason?: "existing_week";
 };
 
@@ -330,7 +326,13 @@ function mapAssignmentDetail(
       respondedAt: invitation.respondedAt,
       expiresAt: invitation.expiresAt,
       emailAttempts: invitation.emailAttempts,
-      createdAt: invitation.createdAt
+      createdAt: invitation.createdAt,
+      responseUrlCopyAvailable:
+        getAssignmentInvitationAvailability({
+          status: invitation.status,
+          expiresAt: invitation.expiresAt,
+          respondedAt: invitation.respondedAt
+        }) === "READY"
     })
   );
   const timeline = assignment.activities.map((activity) => ({

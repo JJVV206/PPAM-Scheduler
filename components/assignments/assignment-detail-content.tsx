@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import {
   ChevronDown,
+  Check,
+  Copy,
   MailCheck,
   MapPin,
   NotebookPen,
@@ -146,11 +149,62 @@ function getTimelineDetail(entry: AssignmentDetailDto["timeline"][number]) {
 
 function InvitationList({
   assignment,
-  compact = false
+  compact = false,
+  allowLinkCopy = false
 }: {
   assignment: AssignmentDetailDto;
   compact?: boolean;
+  allowLinkCopy?: boolean;
 }) {
+  const [copyingInvitationId, setCopyingInvitationId] = useState<string | null>(
+    null
+  );
+  const [copyFeedback, setCopyFeedback] = useState<{
+    invitationId: string;
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  async function copyInvitationUrl(invitationId: string) {
+    setCopyingInvitationId(invitationId);
+    setCopyFeedback(null);
+
+    try {
+      const response = await fetch(
+        `/api/admin/assignment-invitations/${encodeURIComponent(invitationId)}/response-url`
+      );
+      const result = (await response.json()) as {
+        responseUrl?: string;
+        volunteerName?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !result.responseUrl) {
+        setCopyFeedback({
+          invitationId,
+          tone: "error",
+          text: result.error ?? "No fue posible copiar el enlace."
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(result.responseUrl);
+      setCopyFeedback({
+        invitationId,
+        tone: "success",
+        text: `Enlace copiado para ${result.volunteerName}.`
+      });
+    } catch {
+      setCopyFeedback({
+        invitationId,
+        tone: "error",
+        text: "No fue posible copiar el enlace."
+      });
+    } finally {
+      setCopyingInvitationId(null);
+    }
+  }
+
   if (!assignment.invitations.length) {
     return (
       <p
@@ -211,6 +265,37 @@ function InvitationList({
               ? ` • ${invitation.emailAttempts} intento${invitation.emailAttempts === 1 ? "" : "s"}`
               : ""}
           </p>
+          {allowLinkCopy && invitation.responseUrlCopyAvailable ? (
+            <div className="mt-3 space-y-2">
+              <button
+                type="button"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground transition hover:bg-secondary/80 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => copyInvitationUrl(invitation.id)}
+                disabled={copyingInvitationId === invitation.id}
+              >
+                {copyFeedback?.invitationId === invitation.id &&
+                copyFeedback.tone === "success" ? (
+                  <Check className="h-3.5 w-3.5" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+                {copyingInvitationId === invitation.id
+                  ? "Copiando..."
+                  : "Copiar enlace"}
+              </button>
+              {copyFeedback?.invitationId === invitation.id ? (
+                <p
+                  className={
+                    copyFeedback.tone === "success"
+                      ? "text-xs text-primary"
+                      : "text-xs text-danger"
+                  }
+                >
+                  {copyFeedback.text}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ))}
     </div>
@@ -299,7 +384,10 @@ export function AssignmentDetailContent({
                 </div>
                 <AutomationStateBadge state={assignment.automationState} />
               </div>
-              <InvitationList assignment={assignment} />
+              <InvitationList
+                assignment={assignment}
+                allowLinkCopy={Boolean(preachingPoints && volunteers)}
+              />
             </CardContent>
           </Card>
 
@@ -524,7 +612,11 @@ export function AssignmentDetailContent({
               <p className="text-xs text-muted-foreground">
                 {assignment.automationState.description}
               </p>
-              <InvitationList assignment={assignment} compact />
+              <InvitationList
+                assignment={assignment}
+                compact
+                allowLinkCopy={Boolean(preachingPoints && volunteers)}
+              />
             </div>
           </details>
         </CardContent>

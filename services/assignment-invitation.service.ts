@@ -10,10 +10,7 @@ import type {
 
 import { db } from "@/lib/db/prisma";
 import { getAppBaseUrl } from "@/lib/env/config";
-import {
-  DAY_LABELS,
-  TIME_SLOT_DEFINITIONS
-} from "@/lib/constants/domain";
+import { DAY_LABELS, TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
 import {
   DEFAULT_PRIMARY_RESPONSE_TIMEOUT_HOURS,
   DEFAULT_REPLACEMENT_RESPONSE_TIMEOUT_HOURS
@@ -32,6 +29,7 @@ import { sendEmailNotification } from "@/services/notification.service";
 import { getAssignmentAutomationSettings } from "@/services/setting.service";
 import { recordAssignmentAuditActivity } from "@/services/assignment-audit.service";
 import { createAppNotificationOnce } from "@/services/app-notification.service";
+import { AppError } from "@/services/errors";
 import {
   buildPrimaryAssignmentInvitationEmail,
   buildReplacementAssignmentInvitationEmail
@@ -97,7 +95,10 @@ export function getAssignmentInvitationAvailability(input: {
     return "FAILED";
   }
 
-  if (input.status === "EXPIRED" || input.expiresAt <= (input.now ?? new Date())) {
+  if (
+    input.status === "EXPIRED" ||
+    input.expiresAt <= (input.now ?? new Date())
+  ) {
     return "EXPIRED";
   }
 
@@ -132,6 +133,47 @@ export function buildAssignmentInvitationResponseUrl(token: string) {
   return `${getAppBaseUrl()}/confirm-assignment/${encodeURIComponent(token)}`;
 }
 
+export async function getAssignmentInvitationResponseUrlForAdmin(
+  invitationId: string
+) {
+  const invitation = await db.assignmentInvitation.findUnique({
+    where: {
+      id: invitationId
+    },
+    include: {
+      volunteer: {
+        include: {
+          user: true
+        }
+      }
+    }
+  });
+
+  if (!invitation) {
+    throw new AppError("No se encontró la invitación.", 404);
+  }
+
+  const availability = getAssignmentInvitationAvailability({
+    status: invitation.status,
+    expiresAt: invitation.expiresAt,
+    respondedAt: invitation.respondedAt
+  });
+
+  if (availability !== "READY") {
+    throw new AppError(
+      "Esta invitación ya no está disponible para responder.",
+      409
+    );
+  }
+
+  return {
+    responseUrl: buildAssignmentInvitationResponseUrl(invitation.token),
+    volunteerName: invitation.volunteer.user.name,
+    status: invitation.status,
+    expiresAt: invitation.expiresAt.toISOString()
+  };
+}
+
 async function createInvitationWithUniqueToken(input: {
   client: AssignmentInvitationClient;
   assignmentId: string;
@@ -140,7 +182,11 @@ async function createInvitationWithUniqueToken(input: {
   expiresAt: Date;
   metadata: Prisma.InputJsonObject;
 }) {
-  for (let attempt = 1; attempt <= MAX_TOKEN_GENERATION_ATTEMPTS; attempt += 1) {
+  for (
+    let attempt = 1;
+    attempt <= MAX_TOKEN_GENERATION_ATTEMPTS;
+    attempt += 1
+  ) {
     try {
       return await input.client.assignmentInvitation.create({
         data: {
@@ -153,7 +199,10 @@ async function createInvitationWithUniqueToken(input: {
         }
       });
     } catch (error) {
-      if (isUniqueTokenConflict(error) && attempt < MAX_TOKEN_GENERATION_ATTEMPTS) {
+      if (
+        isUniqueTokenConflict(error) &&
+        attempt < MAX_TOKEN_GENERATION_ATTEMPTS
+      ) {
         continue;
       }
 
@@ -188,22 +237,21 @@ export async function createPendingPrimaryInvitationsForAssignment(input: {
     };
   }
 
-  const existingActiveInvitations =
-    await client.assignmentInvitation.findMany({
-      where: {
-        assignmentId: input.assignmentId,
-        volunteerId: {
-          in: volunteerIds
-        },
-        type: "PRIMARY",
-        status: {
-          in: ACTIVE_ASSIGNMENT_INVITATION_STATUSES
-        }
+  const existingActiveInvitations = await client.assignmentInvitation.findMany({
+    where: {
+      assignmentId: input.assignmentId,
+      volunteerId: {
+        in: volunteerIds
       },
-      select: {
-        volunteerId: true
+      type: "PRIMARY",
+      status: {
+        in: ACTIVE_ASSIGNMENT_INVITATION_STATUSES
       }
-    });
+    },
+    select: {
+      volunteerId: true
+    }
+  });
 
   const existingVolunteerIds = new Set(
     existingActiveInvitations.map((invitation) => invitation.volunteerId)
