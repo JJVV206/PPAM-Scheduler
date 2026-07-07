@@ -47,6 +47,16 @@ function getPriorityVariant(priority: string) {
   return "secondary" as const;
 }
 
+function getMetadataString(metadata: unknown, key: string) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return null;
+  }
+
+  const value = (metadata as Record<string, unknown>)[key];
+
+  return typeof value === "string" && value ? value : null;
+}
+
 function getNotificationHref(
   notification: AppNotificationListItem,
   role: UserRole
@@ -58,10 +68,32 @@ function getNotificationHref(
   }
 
   if (notification.censusId) {
+    const responseToken = getMetadataString(
+      notification.metadata,
+      "responseToken"
+    );
+
+    if (role === "VOLUNTEER" && notification.type === "CENSUS_PENDING") {
+      return responseToken
+        ? `/replacement-census/${encodeURIComponent(responseToken)}`
+        : "/volunteer/availability";
+    }
+
     return role === "ADMIN" ? "/admin/replacements" : "/volunteer/availability";
   }
 
   return role === "ADMIN" ? "/admin" : "/volunteer";
+}
+
+function getNotificationActionLabel(
+  notification: AppNotificationListItem,
+  role: UserRole
+) {
+  if (role === "VOLUNTEER" && notification.type === "CENSUS_PENDING") {
+    return "Responder censo";
+  }
+
+  return "Ver detalles";
 }
 
 export function AppNotificationList({
@@ -170,6 +202,7 @@ export function AppNotificationList({
         {notifications.map((notification) => {
           const unread = !notification.readAt;
           const href = getNotificationHref(notification, role);
+          const actionLabel = getNotificationActionLabel(notification, role);
 
           return (
             <article
@@ -215,7 +248,7 @@ export function AppNotificationList({
                   <Button variant="secondary" size="sm" asChild>
                     <Link href={href}>
                       <ExternalLink className="h-4 w-4" />
-                      Ver detalles
+                      {actionLabel}
                     </Link>
                   </Button>
                   {unread ? (

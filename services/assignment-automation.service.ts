@@ -71,6 +71,7 @@ import {
 import {
   buildReplacementCensusResponseUrl,
   openReplacementCensusForWeek,
+  refreshCensusPendingAppNotification,
   sendPendingReplacementCensusInvitations
 } from "@/services/replacement-census.service";
 
@@ -2259,18 +2260,7 @@ export async function sendReplacementCensusReminders(input?: {
   const settings = getNormalizedReminderSettings(
     await getAssignmentAutomationSettings()
   );
-
-  if (!settings.notificationChannels.includes("EMAIL")) {
-    return {
-      status: "skipped",
-      processedCount: 0,
-      skippedCount: 0,
-      sentCount: 0,
-      failedCount: 0,
-      duplicateCount: 0,
-      detail: "Email census reminders are disabled in notification settings."
-    };
-  }
+  const emailEnabled = settings.notificationChannels.includes("EMAIL");
 
   const maxReminderOffsetHours =
     settings.censusReminderOffsetsHours.at(-1) ??
@@ -2342,31 +2332,50 @@ export async function sendReplacementCensusReminders(input?: {
       startDate: response.census.scheduleWeek.startDate,
       endDate: response.census.scheduleWeek.endDate
     });
-    const email = buildReplacementCensusReminderEmail({
-      volunteerName: response.volunteer.user.name,
-      weekLabel,
-      closesAtLabel: formatDisplayDate(
-        response.expiresAt,
-        "d 'de' MMMM 'de' yyyy, HH:mm"
-      ),
-      responseUrl: buildReplacementCensusResponseUrl(response.token)
-    });
-    const notification = await sendEmailNotification({
+    const notification = emailEnabled
+      ? await sendEmailNotification({
+          userId: response.volunteer.userId,
+          type: "CENSUS_REMINDER",
+          ...buildReplacementCensusReminderEmail({
+            volunteerName: response.volunteer.user.name,
+            weekLabel,
+            closesAtLabel: formatDisplayDate(
+              response.expiresAt,
+              "d 'de' MMMM 'de' yyyy, HH:mm"
+            ),
+            responseUrl: buildReplacementCensusResponseUrl(response.token)
+          }),
+          metadata: {
+            reminderKey,
+            reminderOffsetHours,
+            censusId: response.censusId,
+            censusResponseId: response.id,
+            scheduleWeekId: response.census.scheduleWeekId,
+            closesAt: response.expiresAt.toISOString(),
+            automationRunId: input?.automationRunId
+          }
+        })
+      : null;
+    await refreshCensusPendingAppNotification({
       userId: response.volunteer.userId,
-      type: "CENSUS_REMINDER",
-      subject: email.subject,
-      html: email.html,
-      text: email.text,
+      censusId: response.censusId,
+      censusResponseId: response.id,
+      responseToken: response.token,
+      weekLabel,
+      closesAt: response.expiresAt,
+      priority: "HIGH",
       metadata: {
+        source: "census_reminder",
         reminderKey,
         reminderOffsetHours,
-        censusId: response.censusId,
-        censusResponseId: response.id,
         scheduleWeekId: response.census.scheduleWeekId,
-        closesAt: response.expiresAt.toISOString(),
         automationRunId: input?.automationRunId
       }
     });
+
+    if (!notification) {
+      continue;
+    }
 
     if (notification.status === "SENT") {
       sentCount += 1;
@@ -2594,19 +2603,17 @@ export async function createDueAppNotifications(input?: {
       startDate: response.census.scheduleWeek.startDate,
       endDate: response.census.scheduleWeek.endDate
     });
-    const notification = await createAppNotificationOnce({
+    const notification = await refreshCensusPendingAppNotification({
       userId: response.volunteer.userId,
       censusId: response.censusId,
-      type: "CENSUS_PENDING",
+      censusResponseId: response.id,
+      responseToken: response.token,
       priority: "NORMAL",
-      title: "Censo semanal pendiente",
-      body: `Indica tu disponibilidad como suplente para ${weekLabel}.`,
+      weekLabel,
+      closesAt: response.expiresAt,
       metadata: {
         source: "create_due_app_notifications",
-        censusResponseId: response.id,
         scheduleWeekId: response.census.scheduleWeekId,
-        weekLabel,
-        closesAt: response.expiresAt.toISOString(),
         automationRunId: input?.automationRunId
       }
     });

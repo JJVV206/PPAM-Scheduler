@@ -1116,6 +1116,21 @@ describe("assignment automation idempotency QA", () => {
         })
       })
     );
+    expect(mocks.db.appNotification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "user-1",
+          censusId: "census-1",
+          type: "CENSUS_PENDING",
+          priority: "HIGH",
+          metadata: expect.objectContaining({
+            censusResponseId: "census-response-1",
+            responseToken: "census-token",
+            reminderKey: "census-reminder:census-response-1:48h"
+          })
+        })
+      })
+    );
   });
 
   it("creates internal admin notifications for low-response replacement census", async () => {

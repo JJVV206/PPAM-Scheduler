@@ -45,7 +45,10 @@ import {
   getAssignmentInvitationAvailability,
   sendPendingPrimaryInvitationsForAssignment
 } from "@/services/assignment-invitation.service";
-import { prepareScheduleWeekAutomation } from "@/services/schedule-week-preparation.service";
+import {
+  prepareScheduleWeekAutomation,
+  type PrepareScheduleWeekAutomationResult
+} from "@/services/schedule-week-preparation.service";
 import { formatDateRange, safePercentage } from "@/lib/utils";
 import { mergeJsonMetadata } from "@/lib/utils/safe-metadata";
 import { determineAssignmentStatus } from "@/services/assignment-engine";
@@ -120,7 +123,18 @@ export type DuplicateScheduleWeekResult = {
   week: ScheduleWeek;
   created: boolean;
   assignmentCount: number;
+  primaryInvitations?: PrepareScheduleWeekAutomationResult[
+    "primaryInvitations"
+  ];
+  replacementCensus?: PrepareScheduleWeekAutomationResult[
+    "replacementCensus"
+  ];
   skippedReason?: "existing_week";
+};
+
+export type CreateScheduleWeekResult = {
+  week: ScheduleWeek;
+  automation: PrepareScheduleWeekAutomationResult;
 };
 
 type SameDayRepeatAssignment = {
@@ -1382,7 +1396,7 @@ export async function getWeeklySchedule(input?: {
 export async function createScheduleWeek(input: {
   targetWeekStart: Date;
   actorUserId: string;
-}) {
+}): Promise<CreateScheduleWeekResult> {
   const weekStart = normalizeScheduleWeekStart(input.targetWeekStart);
   await assertWeekDoesNotExist(weekStart);
 
@@ -1406,12 +1420,15 @@ export async function createScheduleWeek(input: {
     }
   });
 
-  await prepareScheduleWeekAutomation({
+  const automation = await prepareScheduleWeekAutomation({
     scheduleWeekId: week.id,
     actorUserId: input.actorUserId
   });
 
-  return week;
+  return {
+    week,
+    automation
+  };
 }
 
 export async function duplicateScheduleWeek(input: {
@@ -1611,20 +1628,21 @@ export async function duplicateScheduleWeek(input: {
     };
   });
 
-  if (sendInvitations && duplication.created) {
-    for (const assignmentId of duplication.createdAssignmentIds) {
-      await sendPendingPrimaryInvitationsForAssignment({
-        assignmentId,
+  const automation = duplication.created
+    ? await prepareScheduleWeekAutomation({
+        scheduleWeekId: duplication.week.id,
         actorUserId: input.actorUserId,
+        sendEmails: sendInvitations,
         automationRunId: input.automationRunId
-      });
-    }
-  }
+      })
+    : null;
 
   return {
     week: duplication.week,
     created: duplication.created,
     assignmentCount: duplication.assignmentCount,
+    primaryInvitations: automation?.primaryInvitations,
+    replacementCensus: automation?.replacementCensus,
     skippedReason:
       "skippedReason" in duplication ? duplication.skippedReason : undefined
   };

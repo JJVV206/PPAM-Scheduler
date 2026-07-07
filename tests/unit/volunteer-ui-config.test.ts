@@ -101,6 +101,7 @@ function dashboard(input: {
     assignmentHistory: input.assignmentHistory ?? [],
     remindersByAssignmentId: {},
     openSlots: input.openSlots ?? [],
+    pendingReplacementCensus: null,
     weeklyAvailabilitySummary: []
   };
 }

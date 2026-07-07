@@ -27,11 +27,16 @@ export async function POST(request: Request) {
     const temporaryPassword = randomBytes(8).toString("hex");
     const passwordHash = await hashPassword(temporaryPassword);
 
-    const result = await createVolunteer({
-      ...body,
-      preferredAreas: body.preferredAreas ?? [],
-      passwordHash
-    });
+    const result = await createVolunteer(
+      {
+        ...body,
+        preferredAreas: body.preferredAreas ?? [],
+        passwordHash
+      },
+      {
+        actorUserId: auth.session.user.id
+      }
+    );
     revalidateVolunteerViews(result.volunteerProfile?.id ?? undefined);
 
     let warning: string | undefined;

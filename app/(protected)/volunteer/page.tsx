@@ -179,6 +179,51 @@ export default async function VolunteerDashboardPage() {
         ) : null}
       </section>
 
+      {model.pendingReplacementCensus ? (
+        <section className="surface-panel border-primary/30 bg-primary/[0.06] p-4 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="warning">Pendiente</Badge>
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Censo semanal de suplentes
+                </span>
+              </div>
+              <h2 className="font-heading text-xl font-semibold">
+                Indica tu disponibilidad para la semana del{" "}
+                {formatDisplayDate(
+                  model.pendingReplacementCensus.weekStart,
+                  "d 'de' MMMM"
+                )}
+                {" al "}
+                {formatDisplayDate(
+                  model.pendingReplacementCensus.weekEnd,
+                  "d 'de' MMMM"
+                )}
+              </h2>
+              <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <Clock3 className="h-4 w-4" />
+                Cierra el{" "}
+                {formatDisplayDate(
+                  model.pendingReplacementCensus.closesAt,
+                  "d 'de' MMMM, h:mm a"
+                )}
+              </p>
+            </div>
+            <Button className="w-full sm:w-auto" asChild>
+              <Link
+                href={`/replacement-census/${encodeURIComponent(
+                  model.pendingReplacementCensus.token
+                )}`}
+              >
+                Responder censo
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {config.canSeePrimaryAssignments ? (
           <DashboardStatCard
