@@ -39,6 +39,8 @@ const defaultSettings: SettingsDto = {
   censusResponseTimeoutHours: 72,
   censusReminderOffsetsHours: [24, 48],
   urgentThresholdHours: 72,
+  autoPrepareNextWeekEnabled: false,
+  autoPrepareWeeksAhead: 1,
   adminAlertEmail: "admin@ppam.local",
   notificationChannels: ["EMAIL"]
 };

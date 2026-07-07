@@ -173,6 +173,7 @@ export async function createPendingPrimaryInvitationsForAssignment(input: {
     | "assignment_created"
     | "assignment_updated"
     | "manual_confirmation_request"
+    | "week_duplicate"
     | "week_preparation";
   expiresAt?: Date;
   metadata?: Record<string, unknown>;

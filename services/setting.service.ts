@@ -4,6 +4,8 @@ import { NOTIFICATION_CHANNELS } from "@/lib/constants/domain";
 import { db } from "@/lib/db/prisma";
 import {
   DEFAULT_ADMIN_ALERT_EMAIL,
+  DEFAULT_AUTO_PREPARE_NEXT_WEEK_ENABLED,
+  DEFAULT_AUTO_PREPARE_WEEKS_AHEAD,
   DEFAULT_CENSUS_REMINDER_OFFSETS_HOURS,
   DEFAULT_CENSUS_RESPONSE_TIMEOUT_HOURS,
   DEFAULT_CONFIRMATION_LEAD_DAYS,
@@ -74,6 +76,10 @@ function isPositiveInteger(value: unknown): value is number {
 
 function normalizePositiveInteger(value: unknown, fallback: number): number {
   return isPositiveInteger(value) ? value : fallback;
+}
+
+function normalizeBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
 }
 
 function normalizeNumberList(
@@ -166,6 +172,14 @@ function normalizeSettings(input: SettingsDto): SettingsDto {
       input.urgentThresholdHours,
       DEFAULT_URGENT_THRESHOLD_HOURS
     ),
+    autoPrepareNextWeekEnabled: normalizeBoolean(
+      input.autoPrepareNextWeekEnabled,
+      DEFAULT_AUTO_PREPARE_NEXT_WEEK_ENABLED
+    ),
+    autoPrepareWeeksAhead: normalizePositiveInteger(
+      input.autoPrepareWeeksAhead,
+      DEFAULT_AUTO_PREPARE_WEEKS_AHEAD
+    ),
     adminAlertEmail: normalizeAdminAlertEmail(input.adminAlertEmail),
     notificationChannels: normalizeNotificationChannels(input.notificationChannels)
   };
@@ -231,6 +245,8 @@ export async function getAppSettings(): Promise<SettingsDto> {
     censusResponseTimeoutHours,
     censusReminderOffsetsHours,
     urgentThresholdHours,
+    autoPrepareNextWeekEnabled,
+    autoPrepareWeeksAhead,
     adminAlertEmail,
     notificationChannels
   ] = await Promise.all([
@@ -265,6 +281,11 @@ export async function getAppSettings(): Promise<SettingsDto> {
       [...DEFAULT_CENSUS_REMINDER_OFFSETS_HOURS]
     ),
     getSettingValue("urgentThresholdHours", DEFAULT_URGENT_THRESHOLD_HOURS),
+    getSettingValue(
+      "autoPrepareNextWeekEnabled",
+      DEFAULT_AUTO_PREPARE_NEXT_WEEK_ENABLED
+    ),
+    getSettingValue("autoPrepareWeeksAhead", DEFAULT_AUTO_PREPARE_WEEKS_AHEAD),
     getSettingValue("adminAlertEmail", DEFAULT_ADMIN_ALERT_EMAIL),
     getSettingValue<SettingsDto["notificationChannels"]>("notificationChannels", [
       "EMAIL"
@@ -282,6 +303,8 @@ export async function getAppSettings(): Promise<SettingsDto> {
     censusResponseTimeoutHours,
     censusReminderOffsetsHours,
     urgentThresholdHours,
+    autoPrepareNextWeekEnabled,
+    autoPrepareWeeksAhead,
     adminAlertEmail,
     notificationChannels
   });

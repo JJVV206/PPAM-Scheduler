@@ -5,7 +5,10 @@ import { AssignmentForm } from "@/components/assignments/assignment-form";
 import { WeeklyScheduleGrid } from "@/components/schedule/weekly-schedule-grid";
 import { ScheduleWeekToolbar } from "@/components/schedule/schedule-week-toolbar";
 import { Card, CardContent } from "@/components/ui/card";
-import { getWeeklySchedule } from "@/services/assignment.service";
+import {
+  getScheduleWeekPreparationContext,
+  getWeeklySchedule
+} from "@/services/assignment.service";
 import { getPreachingPoints } from "@/services/point.service";
 import { getVolunteers } from "@/services/volunteer.service";
 import { db } from "@/lib/db/prisma";
@@ -36,7 +39,7 @@ export default async function AdminSchedulePage({
     schedule.endDate
   );
 
-  const [preachingPoints, volunteers, currentWeek, availableWeeks] =
+  const [preachingPoints, volunteers, currentWeek, availableWeeks, preparation] =
     await Promise.all([
       getPreachingPoints(),
       getVolunteers({ activeOnly: true }),
@@ -49,6 +52,9 @@ export default async function AdminSchedulePage({
         orderBy: {
           startDate: "desc"
         }
+      }),
+      getScheduleWeekPreparationContext({
+        selectedWeekStart: schedule.startDate
       })
     ]);
   const formattedPoints = preachingPoints.map((point) => ({
@@ -80,6 +86,10 @@ export default async function AdminSchedulePage({
             <ScheduleWeekToolbar
               selectedWeekStart={schedule.startDate.toISOString().slice(0, 10)}
               currentWeekStart={currentWeekStart}
+              recommendedTargetWeekStart={preparation.recommendedTargetWeekStart
+                .toISOString()
+                .slice(0, 10)}
+              recommendedSourceWeekId={preparation.recommendedSourceWeekId}
               availableWeeks={availableWeeks.map((week) => ({
                 id: week.id,
                 label: week.label,

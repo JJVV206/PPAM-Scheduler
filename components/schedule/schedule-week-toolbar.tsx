@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { addDays, format } from "date-fns";
+import { addDays, format, startOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   CalendarDays,
@@ -35,6 +35,8 @@ import {
 type ScheduleWeekToolbarProps = {
   currentWeekStart: string;
   selectedWeekStart: string;
+  recommendedTargetWeekStart: string;
+  recommendedSourceWeekId: string | null;
   availableWeeks: Array<{
     id: string;
     label: string;
@@ -45,12 +47,21 @@ type ScheduleWeekToolbarProps = {
 type CreationMode = "EMPTY" | "DUPLICATE";
 
 function toIsoWeekStart(value: string) {
-  return new Date(`${value}T12:00:00`).toISOString();
+  return new Date(`${getWeekStartValue(value)}T12:00:00`).toISOString();
+}
+
+function getWeekStartValue(value: string) {
+  return format(
+    startOfWeek(new Date(`${value}T12:00:00`), { weekStartsOn: 1 }),
+    "yyyy-MM-dd"
+  );
 }
 
 export function ScheduleWeekToolbar({
   currentWeekStart,
   selectedWeekStart,
+  recommendedTargetWeekStart,
+  recommendedSourceWeekId,
   availableWeeks
 }: ScheduleWeekToolbarProps) {
   const router = useRouter();
@@ -58,31 +69,73 @@ export function ScheduleWeekToolbar({
   const [mode, setMode] = useState<CreationMode>(
     availableWeeks.length ? "DUPLICATE" : "EMPTY"
   );
-  const [targetWeekStart, setTargetWeekStart] = useState(selectedWeekStart);
-  const [sourceWeekId, setSourceWeekId] = useState(availableWeeks[0]?.id ?? "");
+  const [targetWeekStart, setTargetWeekStart] = useState(
+    recommendedTargetWeekStart
+  );
+  const [sourceWeekId, setSourceWeekId] = useState(
+    recommendedSourceWeekId ?? availableWeeks[0]?.id ?? ""
+  );
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{
-    tone: "success" | "error";
+    tone: "success" | "error" | "warning";
     text: string;
   } | null>(null);
 
   useEffect(() => {
-    setTargetWeekStart(selectedWeekStart);
-  }, [selectedWeekStart]);
+    if (!open) return;
+
+    setTargetWeekStart(recommendedTargetWeekStart);
+    setSourceWeekId(recommendedSourceWeekId ?? availableWeeks[0]?.id ?? "");
+    setFeedback(null);
+  }, [
+    availableWeeks,
+    open,
+    recommendedSourceWeekId,
+    recommendedTargetWeekStart
+  ]);
 
   useEffect(() => {
-    if (!sourceWeekId && availableWeeks[0]?.id) {
-      setSourceWeekId(availableWeeks[0].id);
+    if (sourceWeekId || !recommendedSourceWeekId) {
+      return;
     }
-  }, [availableWeeks, sourceWeekId]);
+
+    setSourceWeekId(recommendedSourceWeekId);
+  }, [recommendedSourceWeekId, sourceWeekId]);
 
   const viewingCurrentWeek = selectedWeekStart === currentWeekStart;
+  const existingWeekStarts = new Set(
+    availableWeeks.map((week) => getWeekStartValue(week.startDate))
+  );
+  const normalizedTargetWeekStart = targetWeekStart
+    ? getWeekStartValue(targetWeekStart)
+    : "";
+  const targetWeekExists = normalizedTargetWeekStart
+    ? existingWeekStarts.has(normalizedTargetWeekStart)
+    : false;
+  const recommendedSourceIdForTarget =
+    availableWeeks.find(
+      (week) => getWeekStartValue(week.startDate) < normalizedTargetWeekStart
+    )?.id ??
+    recommendedSourceWeekId ??
+    availableWeeks[0]?.id ??
+    "";
 
   function navigateToWeek(value: string) {
     router.push(`/admin/schedule?weekStart=${value}`);
   }
 
   async function handleSubmit() {
+    if (targetWeekExists) {
+      setFeedback({
+        tone: "warning",
+        text: `Ya existe una semana creada para el ${format(
+          new Date(`${normalizedTargetWeekStart}T12:00:00`),
+          "dd/MM/yyyy"
+        )}.`
+      });
+      return;
+    }
+
     setSubmitting(true);
     setFeedback(null);
 
@@ -123,7 +176,7 @@ export function ScheduleWeekToolbar({
     });
     setSubmitting(false);
     setOpen(false);
-    router.push(`/admin/schedule?weekStart=${targetWeekStart}`);
+    router.push(`/admin/schedule?weekStart=${normalizedTargetWeekStart}`);
     router.refresh();
   }
 
@@ -237,19 +290,49 @@ export function ScheduleWeekToolbar({
                 id="targetWeekStart"
                 type="date"
                 value={targetWeekStart}
-                onChange={(event) => setTargetWeekStart(event.target.value)}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  setTargetWeekStart(nextValue);
+                  setFeedback(null);
+
+                  if (!nextValue) {
+                    return;
+                  }
+
+                  const nextWeekStart = getWeekStartValue(nextValue);
+                  const nextRecommendedSourceId =
+                    availableWeeks.find(
+                      (week) => getWeekStartValue(week.startDate) < nextWeekStart
+                    )?.id ?? "";
+
+                  if (nextRecommendedSourceId) {
+                    setSourceWeekId(nextRecommendedSourceId);
+                  }
+                }}
               />
               <p className="text-xs text-muted-foreground">
                 El sistema tomará el lunes de esta fecha. Vista previa:{" "}
-                {format(
-                  new Date(`${targetWeekStart}T12:00:00`),
-                  "EEEE d 'de' MMMM",
-                  {
-                    locale: es
-                  }
-                )}
+                {normalizedTargetWeekStart
+                  ? format(
+                      new Date(`${normalizedTargetWeekStart}T12:00:00`),
+                      "EEEE d 'de' MMMM",
+                      {
+                        locale: es
+                      }
+                    )
+                  : "selecciona una fecha"}
               </p>
             </div>
+
+            {targetWeekExists ? (
+              <FeedbackMessage
+                tone="warning"
+                message={`Ya existe una semana creada para el ${format(
+                  new Date(`${normalizedTargetWeekStart}T12:00:00`),
+                  "dd/MM/yyyy"
+                )}. Elige otro lunes para evitar duplicados.`}
+              />
+            ) : null}
 
             {mode === "DUPLICATE" ? (
               <div className="grid gap-2">
@@ -265,10 +348,17 @@ export function ScheduleWeekToolbar({
                         {format(new Date(week.startDate), "d 'de' MMM", {
                           locale: es
                         })}
+                        {week.id === recommendedSourceIdForTarget
+                          ? " • recomendada"
+                          : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Al duplicar se crearán invitaciones nuevas y se enviarán
+                  emails de designación para la semana destino.
+                </p>
               </div>
             ) : null}
 
@@ -288,6 +378,7 @@ export function ScheduleWeekToolbar({
                 disabled={
                   submitting ||
                   !targetWeekStart ||
+                  targetWeekExists ||
                   (mode === "DUPLICATE" && !sourceWeekId)
                 }
               >
