@@ -8,7 +8,7 @@ Use this checklist before promoting a build to real PPAM production traffic.
 - Confirm `DATABASE_URL` uses the pooled Neon URL.
 - Confirm `DIRECT_URL` uses the direct Neon URL.
 - Confirm `NEXTAUTH_SECRET` is a strong random value.
-- Confirm `NEXTAUTH_URL` matches the final Vercel/custom domain.
+- Confirm `NEXTAUTH_URL` and `APP_BASE_URL` match the final custom domain.
 - Confirm `CRON_SECRET` is a strong random value.
 - Confirm `RESEND_API_KEY` and `RESEND_FROM` are configured when email readiness is required.
 - Confirm `RESEND_WEBHOOK_SECRET` is configured when delivery-state webhooks are required.

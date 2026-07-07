@@ -37,14 +37,19 @@ export function isProductionRuntime() {
 
 export function getRequiredAppEnvKeys() {
   return isProductionRuntime()
-    ? ["DATABASE_URL", "NEXTAUTH_SECRET", "NEXTAUTH_URL", "CRON_SECRET"] as const
-    : ["DATABASE_URL"] as const;
+    ? ([
+        "DATABASE_URL",
+        "NEXTAUTH_SECRET",
+        "NEXTAUTH_URL",
+        "CRON_SECRET"
+      ] as const)
+    : (["DATABASE_URL"] as const);
 }
 
 export function getRequiredAuthEnvKeys() {
   return isProductionRuntime()
-    ? ["DATABASE_URL", "NEXTAUTH_SECRET", "NEXTAUTH_URL"] as const
-    : ["DATABASE_URL"] as const;
+    ? (["DATABASE_URL", "NEXTAUTH_SECRET", "NEXTAUTH_URL"] as const)
+    : (["DATABASE_URL"] as const);
 }
 
 function getMissingEnv(keys: readonly string[]) {
@@ -88,14 +93,18 @@ export function getSessionSecret() {
 }
 
 export function getAppBaseUrl() {
-  const rawValue = process.env.NEXTAUTH_URL?.trim();
+  const appBaseUrl = process.env.APP_BASE_URL?.trim();
+  const nextAuthUrl = process.env.NEXTAUTH_URL?.trim();
+  const rawValue = hasValue(appBaseUrl) ? appBaseUrl : nextAuthUrl;
 
   if (!hasValue(rawValue)) {
     if (!isProductionRuntime()) {
       return LOCAL_DEV_BASE_URL;
     }
 
-    throw new Error("NEXTAUTH_URL es obligatorio en producción.");
+    throw new Error(
+      "APP_BASE_URL o NEXTAUTH_URL es obligatorio en producción."
+    );
   }
 
   const url = new URL(rawValue);
@@ -127,7 +136,10 @@ export function getSmtpConfig(): SmtpConfig | null {
   const user = process.env.SMTP_USER?.trim();
   const pass = process.env.SMTP_PASS?.trim();
 
-  if ((hasValue(user) && !hasValue(pass)) || (!hasValue(user) && hasValue(pass))) {
+  if (
+    (hasValue(user) && !hasValue(pass)) ||
+    (!hasValue(user) && hasValue(pass))
+  ) {
     throw new Error(
       "SMTP_USER y SMTP_PASS deben configurarse juntos cuando se use autenticación SMTP."
     );
@@ -135,7 +147,11 @@ export function getSmtpConfig(): SmtpConfig | null {
 
   const secureValue = process.env.SMTP_SECURE?.trim().toLowerCase();
   const secure =
-    secureValue === "true" ? true : secureValue === "false" ? false : port === 465;
+    secureValue === "true"
+      ? true
+      : secureValue === "false"
+        ? false
+        : port === 465;
 
   return {
     host,

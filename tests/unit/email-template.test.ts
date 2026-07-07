@@ -20,7 +20,10 @@ const assignmentContext = {
 
 function expectTemplateContract(email: EmailTemplate, url?: string) {
   expect(email.subject.length).toBeGreaterThan(10);
-  expect(email.html).toContain("<p>");
+  expect(email.html).toContain("<!doctype html>");
+  expect(email.html).toContain("PPAM Organizer");
+  expect(email.html).toContain("border-radius");
+  expect(email.html).toContain("<p");
   expect(email.text.length).toBeGreaterThan(20);
 
   if (url) {
@@ -41,6 +44,7 @@ describe("assignment email templates", () => {
     expect(email.html).toContain("Hola Julia &lt;Westbrook&gt;");
     expect(email.html).toContain("pendiente de confirmación");
     expect(email.html).toContain("Confirmar o rechazar asignación");
+    expect(email.html).toContain("background:#14b8a6");
     expect(email.text).toContain("Fecha: Viernes, 12 de junio de 2026");
     expectTemplateContract(email, responseUrl);
   });
@@ -214,6 +218,7 @@ describe("assignment email templates", () => {
     expect(email.html).toContain("Elena");
     expect(email.html).toContain("Suplente");
     expect(email.html).toContain("SMTP rejected recipient");
+    expect(email.html).toContain("background:#dc2626");
     expect(email.text).not.toContain("token");
     expectTemplateContract(email, assignmentUrl);
   });
