@@ -9,8 +9,15 @@ import {
 } from "@/services/assignment-invitation.service";
 
 const originalNextAuthUrl = process.env.NEXTAUTH_URL;
+const originalAppBaseUrl = process.env.APP_BASE_URL;
 
 afterEach(() => {
+  if (originalAppBaseUrl === undefined) {
+    delete process.env.APP_BASE_URL;
+  } else {
+    process.env.APP_BASE_URL = originalAppBaseUrl;
+  }
+
   if (originalNextAuthUrl === undefined) {
     delete process.env.NEXTAUTH_URL;
     return;
@@ -25,10 +32,20 @@ describe("assignment invitation helpers", () => {
   });
 
   it("builds token-based response URLs for the public confirmation screen", () => {
+    delete process.env.APP_BASE_URL;
     process.env.NEXTAUTH_URL = "https://ppam.example.org/";
 
     expect(buildAssignmentInvitationResponseUrl("abc 123")).toBe(
       "https://ppam.example.org/confirm-assignment/abc%20123"
+    );
+  });
+
+  it("prefers APP_BASE_URL for token-based response URLs", () => {
+    process.env.APP_BASE_URL = "https://ppam.services/";
+    process.env.NEXTAUTH_URL = "https://ppam-scheduler.vercel.app";
+
+    expect(buildAssignmentInvitationResponseUrl("abc 123")).toBe(
+      "https://ppam.services/confirm-assignment/abc%20123"
     );
   });
 
@@ -58,7 +75,8 @@ describe("assignment invitation helpers", () => {
       dateLabel: "Viernes, 12 de junio de 2026",
       timeSlotLabel: "11:00 - 13:00",
       pointName: "Hospital Dr Jose G. Parres",
-      responseUrl: "https://ppam.example.org/confirm-assignment/replacement-token"
+      responseUrl:
+        "https://ppam.example.org/confirm-assignment/replacement-token"
     });
 
     expect(email.subject).toBe("Invitación para cubrir como suplente en PPAM");

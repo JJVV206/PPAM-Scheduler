@@ -23,6 +23,7 @@ Production:
 - `DIRECT_URL`
 - `NEXTAUTH_SECRET`
 - `NEXTAUTH_URL`
+- `APP_BASE_URL`
 - `CRON_SECRET`
 - `RESEND_API_KEY` when using Resend API for production email
 - `RESEND_FROM` when using Resend API for production email
@@ -51,10 +52,13 @@ email windows closer to their intended times than the default daily cron.
 The cron response intentionally exposes only an operational summary, not step
 details, email metadata, tokens, or internal error messages.
 
-Set `NEXTAUTH_URL` to the final production URL, for example:
+Set `NEXTAUTH_URL` and `APP_BASE_URL` to the final production URL. PPAM
+email links use `APP_BASE_URL` first, then fall back to `NEXTAUTH_URL`.
+For the current production domain:
 
 ```text
-https://ppam-scheduler.vercel.app
+NEXTAUTH_URL=https://ppam.services
+APP_BASE_URL=https://ppam.services
 ```
 
 Use Resend API for production email when possible:
