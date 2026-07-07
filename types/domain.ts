@@ -122,6 +122,7 @@ export type AssignmentInvitationDto = {
   expiresAt: Date;
   emailAttempts: number;
   createdAt: Date;
+  responseUrlCopyAvailable: boolean;
 };
 
 export type AssignmentDetailDto = {
@@ -191,6 +192,16 @@ export type DashboardStat = {
   changeLabel?: string;
 };
 
+export type PendingReplacementCensusDto = {
+  responseId: string;
+  censusId: string;
+  token: string;
+  weekStart: Date;
+  weekEnd: Date;
+  closesAt: Date;
+  status: "PENDING" | "SENT";
+};
+
 export type AdminDashboardStats = {
   weekLabel: string;
   stats: {
@@ -241,6 +252,7 @@ export type VolunteerDashboardData = {
   assignmentHistory: AssignmentDetailDto[];
   remindersByAssignmentId: Record<string, VolunteerAssignmentReminderDto[]>;
   openSlots: OpenSlotDto[];
+  pendingReplacementCensus: PendingReplacementCensusDto | null;
   weeklyAvailabilitySummary: Array<{
     dayOfWeek: DayOfWeek;
     slots: TimeSlot[];

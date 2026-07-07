@@ -46,6 +46,37 @@ type ScheduleWeekToolbarProps = {
 
 type CreationMode = "EMPTY" | "DUPLICATE";
 
+type WeekPreparationSummary = {
+  assignmentCount?: number;
+  primaryInvitations?: {
+    sentCount: number;
+    failedCount: number;
+  };
+  replacementCensus?: {
+    censusId: string;
+    replacementCount: number;
+    createdResponseCount: number;
+    skippedResponseCount: number;
+    sentCount: number;
+    failedCount: number;
+  };
+  automation?: {
+    assignmentCount: number;
+    primaryInvitations: {
+      sentCount: number;
+      failedCount: number;
+    };
+    replacementCensus: {
+      censusId: string;
+      replacementCount: number;
+      createdResponseCount: number;
+      skippedResponseCount: number;
+      sentCount: number;
+      failedCount: number;
+    };
+  };
+};
+
 function toIsoWeekStart(value: string) {
   return new Date(`${getWeekStartValue(value)}T12:00:00`).toISOString();
 }
@@ -55,6 +86,50 @@ function getWeekStartValue(value: string) {
     startOfWeek(new Date(`${value}T12:00:00`), { weekStartsOn: 1 }),
     "yyyy-MM-dd"
   );
+}
+
+function buildPreparationFeedback(
+  result: WeekPreparationSummary,
+  mode: CreationMode
+) {
+  const assignmentCount =
+    result.assignmentCount ?? result.automation?.assignmentCount ?? 0;
+  const primaryInvitations =
+    result.primaryInvitations ?? result.automation?.primaryInvitations;
+  const replacementCensus =
+    result.replacementCensus ?? result.automation?.replacementCensus;
+  const parts = [
+    mode === "EMPTY" ? "Semana creada" : "Semana duplicada",
+    `Asignaciones creadas: ${assignmentCount}`
+  ];
+
+  if (primaryInvitations) {
+    parts.push(`Titulares notificados: ${primaryInvitations.sentCount}`);
+
+    if (primaryInvitations.failedCount) {
+      parts.push(`Titulares fallidos: ${primaryInvitations.failedCount}`);
+    }
+  }
+
+  if (replacementCensus) {
+    const pendingCount = Math.max(
+      replacementCensus.createdResponseCount +
+        replacementCensus.skippedResponseCount -
+        replacementCensus.sentCount -
+        replacementCensus.failedCount,
+      0
+    );
+
+    parts.push("Censo de suplentes abierto");
+    parts.push(`Suplentes consultados: ${replacementCensus.replacementCount}`);
+    parts.push(`Pendientes: ${pendingCount}`);
+
+    if (replacementCensus.failedCount) {
+      parts.push(`Emails de censo fallidos: ${replacementCensus.failedCount}`);
+    }
+  }
+
+  return `${parts.join(" · ")}.`;
 }
 
 export function ScheduleWeekToolbar({
@@ -171,8 +246,7 @@ export function ScheduleWeekToolbar({
 
     setFeedback({
       tone: "success",
-      text:
-        mode === "EMPTY" ? "Semana creada." : "Semana duplicada correctamente."
+      text: buildPreparationFeedback(result, mode)
     });
     setSubmitting(false);
     setOpen(false);
@@ -357,7 +431,8 @@ export function ScheduleWeekToolbar({
                 </Select>
                 <p className="text-xs text-muted-foreground">
                   Al duplicar se crearán invitaciones nuevas y se enviarán
-                  emails de designación para la semana destino.
+                  emails de designación y el censo de suplentes para la semana
+                  destino.
                 </p>
               </div>
             ) : null}
@@ -392,6 +467,11 @@ export function ScheduleWeekToolbar({
           </div>
         </DialogContent>
       </Dialog>
+      {!open && feedback ? (
+        <div className="w-full lg:basis-full">
+          <FeedbackMessage message={feedback.text} tone={feedback.tone} />
+        </div>
+      ) : null}
     </div>
   );
 }

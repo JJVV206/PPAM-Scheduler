@@ -31,8 +31,14 @@ export async function prepareScheduleWeekAutomation(input: {
   scheduleWeekId: string;
   actorUserId: string;
   sendEmails?: boolean;
+  automationRunId?: string;
 }): Promise<PrepareScheduleWeekAutomationResult> {
   const sendEmails = input.sendEmails ?? true;
+  const automationMetadata = input.automationRunId
+    ? {
+        automationRunId: input.automationRunId
+      }
+    : undefined;
   const assignments = await db.assignment.findMany({
     where: {
       scheduleWeekId: input.scheduleWeekId,
@@ -71,7 +77,8 @@ export async function prepareScheduleWeekAutomation(input: {
       actorUserId: input.actorUserId,
       source: "week_preparation",
       metadata: {
-        scheduleWeekId: input.scheduleWeekId
+        scheduleWeekId: input.scheduleWeekId,
+        ...automationMetadata
       }
     });
     createdCount += creation.createdCount;
@@ -83,7 +90,8 @@ export async function prepareScheduleWeekAutomation(input: {
 
     const delivery = await sendPendingPrimaryInvitationsForAssignment({
       assignmentId: assignment.id,
-      actorUserId: input.actorUserId
+      actorUserId: input.actorUserId,
+      automationRunId: input.automationRunId
     });
     sentCount += delivery.sentCount;
     failedCount += delivery.failedCount;
@@ -91,11 +99,13 @@ export async function prepareScheduleWeekAutomation(input: {
 
   const census = await openReplacementCensusForWeek({
     scheduleWeekId: input.scheduleWeekId,
-    actorUserId: input.actorUserId
+    actorUserId: input.actorUserId,
+    metadata: automationMetadata
   });
   const censusDelivery = sendEmails
     ? await sendPendingReplacementCensusInvitations({
-        censusId: census.census.id
+        censusId: census.census.id,
+        automationRunId: input.automationRunId
       })
     : {
         sentCount: 0,

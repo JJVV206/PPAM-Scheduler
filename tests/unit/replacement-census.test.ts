@@ -156,7 +156,9 @@ describe("replacement census preparation", () => {
       { volunteerId: "volunteer-2" }
     ]);
     mocks.tx.replacementCensusResponse.create.mockResolvedValue({
-      id: "response-1"
+      id: "response-1",
+      token: "response-token-1",
+      expiresAt: closesAt
     });
 
     const result = await openReplacementCensusForWeek({
@@ -195,7 +197,12 @@ describe("replacement census preparation", () => {
         data: expect.objectContaining({
           userId: "user-1",
           censusId: "census-1",
-          type: "CENSUS_PENDING"
+          type: "CENSUS_PENDING",
+          metadata: expect.objectContaining({
+            censusResponseId: "response-1",
+            responseToken: "response-token-1",
+            closesAt: closesAt.toISOString()
+          })
         })
       })
     );

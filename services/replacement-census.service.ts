@@ -1,8 +1,9 @@
 import { randomBytes } from "node:crypto";
 
-import { addDays, addHours, startOfWeek } from "date-fns";
+import { addDays, addHours, startOfDay, startOfWeek } from "date-fns";
 import { Prisma } from "@prisma/client";
 import type {
+  AppNotificationPriority,
   DayOfWeek,
   ReplacementCensusResponseStatus,
   TimeSlot
@@ -94,6 +95,31 @@ function isUniqueTokenConflict(error: unknown) {
 
 function compactMetadata(metadata: Record<string, unknown>) {
   return compactJsonMetadata(metadata);
+}
+
+function compactCensusNotificationMetadata(
+  metadata: Record<string, unknown> & { responseToken?: string }
+) {
+  const compacted = { ...compactMetadata(metadata) };
+
+  if (typeof metadata.responseToken === "string") {
+    compacted.responseToken = metadata.responseToken;
+  }
+
+  return compacted;
+}
+
+function mergeCensusNotificationMetadata(
+  current: Prisma.JsonValue | null,
+  next: Record<string, unknown> & { responseToken?: string }
+) {
+  const merged = { ...mergeMetadata(current, next) };
+
+  if (typeof next.responseToken === "string") {
+    merged.responseToken = next.responseToken;
+  }
+
+  return merged;
 }
 
 function mergeMetadata(
@@ -203,24 +229,55 @@ function toAvailabilityCreateRows(input: {
 }
 
 async function createCensusPendingAppNotificationOnce(input: {
-  client: Prisma.TransactionClient;
+  client: ReplacementCensusClient;
   userId: string;
   censusId: string;
+  censusResponseId: string;
+  responseToken: string;
   weekLabel: string;
+  closesAt: Date;
+  priority?: AppNotificationPriority;
   metadata?: Record<string, unknown>;
 }) {
   const existing = await input.client.appNotification.findFirst({
     where: {
       userId: input.userId,
       censusId: input.censusId,
-      type: "CENSUS_PENDING"
+      type: "CENSUS_PENDING",
+      readAt: null
     },
     select: {
-      id: true
+      id: true,
+      metadata: true
     }
   });
+  const metadata = compactCensusNotificationMetadata({
+    source: "replacement_census",
+    ...(input.metadata ?? {}),
+    censusId: input.censusId,
+    censusResponseId: input.censusResponseId,
+    responseToken: input.responseToken,
+    weekLabel: input.weekLabel,
+    closesAt: input.closesAt.toISOString()
+  });
+  const data = {
+    priority: input.priority ?? "NORMAL",
+    title: "Censo semanal pendiente",
+    body: `Indica tu disponibilidad como suplente para ${input.weekLabel}.`,
+    metadata
+  };
 
   if (existing) {
+    await input.client.appNotification.update({
+      where: {
+        id: existing.id
+      },
+      data: {
+        ...data,
+        metadata: mergeCensusNotificationMetadata(existing.metadata, metadata)
+      }
+    });
+
     return null;
   }
 
@@ -229,15 +286,24 @@ async function createCensusPendingAppNotificationOnce(input: {
       userId: input.userId,
       censusId: input.censusId,
       type: "CENSUS_PENDING",
-      priority: "NORMAL",
-      title: "Censo semanal pendiente",
-      body: `Indica tu disponibilidad como suplente para ${input.weekLabel}.`,
-      metadata: {
-        ...(input.metadata ?? {}),
-        source: "replacement_census",
-        weekLabel: input.weekLabel
-      }
+      ...data
     }
+  });
+}
+
+export async function refreshCensusPendingAppNotification(input: {
+  userId: string;
+  censusId: string;
+  censusResponseId: string;
+  responseToken: string;
+  weekLabel: string;
+  closesAt: Date;
+  priority?: AppNotificationPriority;
+  metadata?: Record<string, unknown>;
+}) {
+  return createCensusPendingAppNotificationOnce({
+    client: db,
+    ...input
   });
 }
 
@@ -377,7 +443,7 @@ export async function openReplacementCensusForWeek(input: {
         continue;
       }
 
-      await createResponseWithUniqueToken({
+      const response = await createResponseWithUniqueToken({
         client: tx,
         censusId: openedCensus.id,
         volunteerId: replacement.id,
@@ -393,7 +459,10 @@ export async function openReplacementCensusForWeek(input: {
         client: tx,
         userId: replacement.userId,
         censusId: openedCensus.id,
+        censusResponseId: response.id,
+        responseToken: response.token,
         weekLabel,
+        closesAt: response.expiresAt,
         metadata: input.metadata
       });
       createdResponseCount += 1;
@@ -427,6 +496,201 @@ export async function openReplacementCensusForWeek(input: {
       skippedResponseCount: existingResponses.length
     };
   });
+}
+
+export async function getPendingReplacementCensusForVolunteer(
+  volunteerProfileId: string
+) {
+  const now = new Date();
+  const response = await db.replacementCensusResponse.findFirst({
+    where: {
+      volunteerId: volunteerProfileId,
+      respondedAt: null,
+      status: {
+        in: [...ACTIVE_REPLACEMENT_CENSUS_RESPONSE_STATUSES]
+      },
+      expiresAt: {
+        gt: now
+      },
+      census: {
+        status: "OPEN"
+      }
+    },
+    include: {
+      census: {
+        include: {
+          scheduleWeek: true
+        }
+      }
+    },
+    orderBy: {
+      expiresAt: "asc"
+    }
+  });
+
+  if (!response) {
+    return null;
+  }
+
+  return {
+    responseId: response.id,
+    censusId: response.censusId,
+    token: response.token,
+    weekStart: response.census.scheduleWeek.startDate,
+    weekEnd: response.census.scheduleWeek.endDate,
+    closesAt: response.expiresAt,
+    status: response.status as "PENDING" | "SENT"
+  };
+}
+
+export async function syncReplacementVolunteerWithOpenCensuses(input: {
+  volunteerProfileId: string;
+  actorUserId?: string;
+  automationRunId?: string;
+  sendEmails?: boolean;
+}) {
+  const now = new Date();
+  const volunteer = await db.volunteerProfile.findUnique({
+    where: {
+      id: input.volunteerProfileId
+    },
+    select: {
+      id: true,
+      userId: true,
+      active: true,
+      canServeAsReplacement: true,
+      user: {
+        select: {
+          active: true
+        }
+      }
+    }
+  });
+
+  if (
+    !volunteer?.active ||
+    !volunteer.canServeAsReplacement ||
+    !volunteer.user.active
+  ) {
+    return {
+      processedCensusCount: 0,
+      createdResponseCount: 0,
+      sentCount: 0,
+      failedCount: 0
+    };
+  }
+
+  const createdResponses = await db.$transaction(async (tx) => {
+    const censuses = await tx.replacementCensus.findMany({
+      where: {
+        status: "OPEN",
+        closesAt: {
+          gt: now
+        },
+        scheduleWeek: {
+          endDate: {
+            gte: startOfDay(now)
+          }
+        },
+        responses: {
+          none: {
+            volunteerId: volunteer.id
+          }
+        }
+      },
+      include: {
+        scheduleWeek: true
+      },
+      orderBy: {
+        closesAt: "asc"
+      }
+    });
+    const created: Array<{ censusId: string; responseId: string }> = [];
+
+    for (const census of censuses) {
+      const weekLabel = buildWeekLabel({
+        startDate: census.scheduleWeek.startDate,
+        endDate: census.scheduleWeek.endDate
+      });
+      const response = await createResponseWithUniqueToken({
+        client: tx,
+        censusId: census.id,
+        volunteerId: volunteer.id,
+        expiresAt: census.closesAt,
+        metadata: compactMetadata({
+          source: "replacement_profile_sync",
+          scheduleWeekId: census.scheduleWeekId,
+          actorUserId: input.actorUserId,
+          automationRunId: input.automationRunId,
+          createdAutomatically: true
+        })
+      });
+
+      await createCensusPendingAppNotificationOnce({
+        client: tx,
+        userId: volunteer.userId,
+        censusId: census.id,
+        censusResponseId: response.id,
+        responseToken: response.token,
+        weekLabel,
+        closesAt: response.expiresAt,
+        metadata: {
+          source: "replacement_profile_sync",
+          scheduleWeekId: census.scheduleWeekId,
+          actorUserId: input.actorUserId,
+          automationRunId: input.automationRunId
+        }
+      });
+      await recordAutomationAuditLog({
+        client: tx,
+        eventType: "CENSUS_CREATED",
+        status: "SUCCESS",
+        scheduleWeekId: census.scheduleWeekId,
+        censusId: census.id,
+        censusResponseId: response.id,
+        actorUserId: input.actorUserId,
+        automationRunId: input.automationRunId,
+        metadata: {
+          source: "replacement_profile_sync",
+          volunteerProfileId: volunteer.id,
+          createdResponseCount: 1
+        }
+      });
+      created.push({
+        censusId: census.id,
+        responseId: response.id
+      });
+    }
+
+    return created;
+  });
+
+  let sentCount = 0;
+  let failedCount = 0;
+
+  if (input.sendEmails !== false) {
+    const censusIds = [
+      ...new Set(createdResponses.map((item) => item.censusId))
+    ];
+
+    for (const censusId of censusIds) {
+      const delivery = await sendPendingReplacementCensusInvitations({
+        censusId,
+        automationRunId: input.automationRunId
+      });
+      sentCount += delivery.sentCount;
+      failedCount += delivery.failedCount;
+    }
+  }
+
+  return {
+    processedCensusCount: new Set(
+      createdResponses.map((response) => response.censusId)
+    ).size,
+    createdResponseCount: createdResponses.length,
+    sentCount,
+    failedCount
+  };
 }
 
 async function markCensusResponseFailed(input: {

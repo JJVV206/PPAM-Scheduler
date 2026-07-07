@@ -73,6 +73,7 @@ export type VolunteerDashboardModel = {
   replacementHistory: AssignmentDetailDto[];
   visibleHistory: AssignmentDetailDto[];
   visibleOpenSlots: OpenSlotDto[];
+  pendingReplacementCensus: VolunteerDashboardData["pendingReplacementCensus"];
   focusAssignment?: AssignmentDetailDto;
   focusOpenSlot?: OpenSlotDto;
 };
@@ -343,6 +344,7 @@ export function getVolunteerDashboardModel(
     replacementHistory: history.replacement,
     visibleHistory,
     visibleOpenSlots,
+    pendingReplacementCensus: dashboard.pendingReplacementCensus,
     focusAssignment,
     focusOpenSlot
   };

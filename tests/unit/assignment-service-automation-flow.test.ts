@@ -759,7 +759,7 @@ describe("assignment automation orchestration", () => {
       ]
     });
 
-    await duplicateScheduleWeek({
+    const result = await duplicateScheduleWeek({
       sourceWeekId: "source-week",
       targetWeekStart: new Date(2026, 6, 20),
       actorUserId: "admin-1"
@@ -770,8 +770,19 @@ describe("assignment automation orchestration", () => {
     ).toHaveBeenCalledTimes(2);
     expect(
       mocks.sendPendingPrimaryInvitationsForAssignment
-    ).toHaveBeenCalledTimes(2);
-    expect(mocks.prepareScheduleWeekAutomation).not.toHaveBeenCalled();
+    ).not.toHaveBeenCalled();
+    expect(mocks.prepareScheduleWeekAutomation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scheduleWeekId: "target-week",
+        actorUserId: "admin-1",
+        sendEmails: true
+      })
+    );
+    expect(result.replacementCensus).toMatchObject({
+      censusId: "census-1",
+      replacementCount: 4,
+      sentCount: 4
+    });
     expect(
       mocks.createPendingPrimaryInvitationsForAssignment
     ).toHaveBeenNthCalledWith(
@@ -960,11 +971,11 @@ describe("assignment automation orchestration", () => {
       createdCount: 1,
       assignmentCount: 1
     });
-    expect(
-      mocks.sendPendingPrimaryInvitationsForAssignment
-    ).toHaveBeenCalledWith(
+    expect(mocks.prepareScheduleWeekAutomation).toHaveBeenCalledWith(
       expect.objectContaining({
-        assignmentId: "assignment-1",
+        scheduleWeekId: "target-week",
+        actorUserId: "admin-1",
+        sendEmails: true,
         automationRunId: "automation-run-1"
       })
     );

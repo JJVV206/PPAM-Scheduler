@@ -21,6 +21,10 @@ import {
   deriveVolunteerServiceType,
   hasVolunteerServiceCapacity
 } from "@/lib/volunteer-service-type";
+import {
+  getPendingReplacementCensusForVolunteer,
+  syncReplacementVolunteerWithOpenCensuses
+} from "@/services/replacement-census.service";
 
 const ACTIVE_INVITATION_STATUSES = ["PENDING", "SENT"] as const;
 const TERMINAL_ASSIGNMENT_STATUSES = ["CANCELLED", "COMPLETED"] as const;
@@ -135,19 +139,24 @@ export async function getVolunteer(volunteerId: string) {
   };
 }
 
-export async function createVolunteer(input: {
-  name: string;
-  email: string;
-  phone: string;
-  role: "VOLUNTEER" | "ADMIN";
-  notes?: string;
-  transportationNotes?: string;
-  preferredAreas: string[];
-  active: boolean;
-  canServeAsPrimary: boolean;
-  canServeAsReplacement: boolean;
-  passwordHash: string;
-}) {
+export async function createVolunteer(
+  input: {
+    name: string;
+    email: string;
+    phone: string;
+    role: "VOLUNTEER" | "ADMIN";
+    notes?: string;
+    transportationNotes?: string;
+    preferredAreas: string[];
+    active: boolean;
+    canServeAsPrimary: boolean;
+    canServeAsReplacement: boolean;
+    passwordHash: string;
+  },
+  options?: {
+    actorUserId?: string;
+  }
+) {
   const normalizedEmail = input.email.toLowerCase();
   const normalizedPhone = input.phone.trim();
   const existingUser = await db.user.findUnique({
@@ -200,6 +209,18 @@ export async function createVolunteer(input: {
     }
   });
 
+  if (
+    user.volunteerProfile &&
+    input.active &&
+    input.role === "VOLUNTEER" &&
+    input.canServeAsReplacement
+  ) {
+    await syncReplacementVolunteerWithOpenCensuses({
+      volunteerProfileId: user.volunteerProfile.id,
+      actorUserId: options?.actorUserId
+    });
+  }
+
   return user;
 }
 
@@ -216,6 +237,9 @@ export async function updateVolunteer(
     temporaryUnavailable?: boolean;
     canServeAsPrimary?: boolean;
     canServeAsReplacement?: boolean;
+  },
+  options?: {
+    actorUserId?: string;
   }
 ) {
   const volunteer = await db.volunteerProfile.findUniqueOrThrow({
@@ -254,8 +278,12 @@ export async function updateVolunteer(
     canServeAsPrimary: nextCanServeAsPrimary,
     canServeAsReplacement: nextCanServeAsReplacement
   });
+  const becameActiveReplacement =
+    nextActive &&
+    nextCanServeAsReplacement &&
+    (!volunteer.active || !volunteer.canServeAsReplacement);
 
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: volunteer.userId },
       data: {
@@ -286,6 +314,15 @@ export async function updateVolunteer(
       include: { user: true }
     });
   });
+
+  if (becameActiveReplacement) {
+    await syncReplacementVolunteerWithOpenCensuses({
+      volunteerProfileId: volunteerId,
+      actorUserId: options?.actorUserId
+    });
+  }
+
+  return result;
 }
 
 export async function deactivateVolunteer(
@@ -440,6 +477,9 @@ export async function getVolunteerDashboardData(
     userId: volunteer.userId,
     assignmentIds: assignments.map((assignment) => assignment.id)
   });
+  const pendingReplacementCensus = volunteer.canServeAsReplacement
+    ? await getPendingReplacementCensusForVolunteer(volunteerProfileId)
+    : null;
 
   return {
     volunteer,
@@ -461,6 +501,7 @@ export async function getVolunteerDashboardData(
           )
         )
       : [],
+    pendingReplacementCensus,
     weeklyAvailabilitySummary: volunteer.availability.reduce<
       VolunteerDashboardData["weeklyAvailabilitySummary"]
     >((accumulator, item) => {

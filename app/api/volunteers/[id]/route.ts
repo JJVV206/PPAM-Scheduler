@@ -33,7 +33,9 @@ export async function PATCH(
     if ("error" in auth) return auth.error;
     const { id } = await params;
     const body = updateVolunteerSchema.parse(await request.json());
-    const result = await updateVolunteer(id, body);
+    const result = await updateVolunteer(id, body, {
+      actorUserId: auth.session.user.id
+    });
     revalidateVolunteerViews(id);
     return ok(result);
   } catch (error) {
