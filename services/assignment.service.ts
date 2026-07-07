@@ -14,6 +14,7 @@ import {
   ResponseStatus,
   TimeSlot
 } from "@prisma/client";
+import type { ScheduleWeek } from "@prisma/client";
 
 import { db } from "@/lib/db/prisma";
 import {
@@ -111,6 +112,16 @@ const assignmentInclude = {
 const SAME_DAY_REPEAT_WARNING = "Integrante repetido este día";
 const MIN_ASSIGNMENT_VOLUNTEERS = 2;
 const BASE_ASSIGNMENT_SLOT_NUMBERS = [1, 2] as const;
+
+type DuplicateScheduleWeekOnExisting = "throw" | "skip";
+type DuplicateScheduleWeekSource = "week_duplicate" | "auto_week_rollover";
+
+export type DuplicateScheduleWeekResult = {
+  week: ScheduleWeek;
+  created: boolean;
+  assignmentCount: number;
+  skippedReason?: "existing_week";
+};
 
 type SameDayRepeatAssignment = {
   id: string;
@@ -388,12 +399,20 @@ async function mapAssignmentDetailWithSameDayWarnings(
   return mapAssignmentDetail(assignment, { sameDayRepeatAssignmentIds });
 }
 
-function normalizeWeekStart(date: Date) {
+export function normalizeScheduleWeekStart(date: Date) {
   return startOfWeek(date, { weekStartsOn: 1 });
 }
 
+function getScheduleWeekRange(date: Date) {
+  const startDate = normalizeScheduleWeekStart(date);
+  return {
+    startDate,
+    endDate: addDays(startDate, 6)
+  };
+}
+
 async function assertWeekDoesNotExist(startDate: Date) {
-  const endDate = addDays(startDate, 6);
+  const { endDate } = getScheduleWeekRange(startDate);
   const existingWeek = await db.scheduleWeek.findUnique({
     where: {
       startDate_endDate: {
@@ -409,6 +428,80 @@ async function assertWeekDoesNotExist(startDate: Date) {
       409
     );
   }
+}
+
+export async function getNextAvailableScheduleWeekStart(input?: {
+  fromDate?: Date;
+  maxWeeksToCheck?: number;
+}) {
+  let candidate = normalizeScheduleWeekStart(input?.fromDate ?? new Date());
+  const maxWeeksToCheck = input?.maxWeeksToCheck ?? 104;
+
+  for (let index = 0; index < maxWeeksToCheck; index += 1) {
+    const { startDate, endDate } = getScheduleWeekRange(candidate);
+    const existingWeek = await db.scheduleWeek.findUnique({
+      where: {
+        startDate_endDate: {
+          startDate,
+          endDate
+        }
+      },
+      select: {
+        id: true
+      }
+    });
+
+    if (!existingWeek) {
+      return startDate;
+    }
+
+    candidate = addDays(startDate, 7);
+  }
+
+  throw new AppError("No fue posible encontrar una semana disponible.", 409);
+}
+
+export async function getRecommendedSourceWeekForTarget(input: {
+  targetWeekStart: Date;
+  requireAssignments?: boolean;
+}) {
+  const targetWeekStart = normalizeScheduleWeekStart(input.targetWeekStart);
+
+  return db.scheduleWeek.findFirst({
+    where: {
+      startDate: {
+        lt: targetWeekStart
+      },
+      assignments: input.requireAssignments
+        ? {
+            some: {
+              status: {
+                not: "CANCELLED"
+              }
+            }
+          }
+        : undefined
+    },
+    orderBy: {
+      startDate: "desc"
+    }
+  });
+}
+
+export async function getScheduleWeekPreparationContext(input?: {
+  selectedWeekStart?: Date;
+}) {
+  const recommendedTargetWeekStart = await getNextAvailableScheduleWeekStart({
+    fromDate: input?.selectedWeekStart ?? new Date()
+  });
+  const recommendedSourceWeek = await getRecommendedSourceWeekForTarget({
+    targetWeekStart: recommendedTargetWeekStart
+  });
+
+  return {
+    recommendedTargetWeekStart,
+    recommendedSourceWeekId: recommendedSourceWeek?.id ?? null
+  };
 }
 
 async function assertPointSupportsSlot(input: {
@@ -1290,7 +1383,7 @@ export async function createScheduleWeek(input: {
   targetWeekStart: Date;
   actorUserId: string;
 }) {
-  const weekStart = normalizeWeekStart(input.targetWeekStart);
+  const weekStart = normalizeScheduleWeekStart(input.targetWeekStart);
   await assertWeekDoesNotExist(weekStart);
 
   const week = await db.scheduleWeek.create({
@@ -1325,70 +1418,323 @@ export async function duplicateScheduleWeek(input: {
   sourceWeekId: string;
   targetWeekStart: Date;
   actorUserId: string;
-}) {
-  const weekStart = normalizeWeekStart(input.targetWeekStart);
-  await assertWeekDoesNotExist(weekStart);
+  onExisting?: DuplicateScheduleWeekOnExisting;
+  sendInvitations?: boolean;
+  source?: DuplicateScheduleWeekSource;
+  automationRunId?: string;
+}): Promise<DuplicateScheduleWeekResult> {
+  const onExisting = input.onExisting ?? "throw";
+  const sendInvitations = input.sendInvitations ?? true;
+  const duplicateSource = input.source ?? "week_duplicate";
+  const { startDate: weekStart, endDate: weekEnd } = getScheduleWeekRange(
+    input.targetWeekStart
+  );
 
   const sourceWeek = await db.scheduleWeek.findUniqueOrThrow({
     where: { id: input.sourceWeekId },
     include: {
       assignments: {
+        where: {
+          status: {
+            not: "CANCELLED"
+          }
+        },
         include: {
-          volunteers: true,
-          responses: true
-        }
+          volunteers: true
+        },
+        orderBy: [
+          {
+            date: "asc"
+          },
+          {
+            timeSlot: "asc"
+          },
+          {
+            pairNumber: "asc"
+          }
+        ]
       }
     }
   });
+  const fixedPoint = await getSingletonPreachingPoint();
+  const titularVolunteerIds = getUniqueIds(
+    sourceWeek.assignments.flatMap((assignment) =>
+      assignment.volunteers
+        .filter((volunteer) => !volunteer.isReplacement)
+        .map((volunteer) => volunteer.volunteerId)
+    )
+  );
 
-  const targetWeek = await db.scheduleWeek.create({
-    data: {
-      startDate: weekStart,
-      endDate: addDays(weekStart, 6),
-      label: formatDateRange(weekStart, addDays(weekStart, 6)),
-      createdById: input.actorUserId
-    }
-  });
-
-  await recordAutomationAuditLog({
-    eventType: "WEEK_CREATED",
-    scheduleWeekId: targetWeek.id,
-    actorUserId: input.actorUserId,
-    metadata: {
-      source: "week_duplicate",
-      sourceWeekId: sourceWeek.id,
-      startDate: targetWeek.startDate,
-      endDate: targetWeek.endDate
-    }
-  });
+  await assertVolunteersCanServeAsPrimary(titularVolunteerIds);
 
   for (const assignment of sourceWeek.assignments) {
-    const newDate = addDays(
-      weekStart,
-      differenceInCalendarDays(assignment.date, sourceWeek.startDate)
-    );
-    await createWeeklyAssignment({
-      scheduleWeekId: targetWeek.id,
-      date: newDate,
+    await assertPointSupportsSlot({
+      preachingPointId: fixedPoint.id,
       dayOfWeek: assignment.dayOfWeek,
       timeSlot: assignment.timeSlot,
-      preachingPointId: assignment.preachingPointId,
-      pairNumber: assignment.pairNumber,
-      notes: assignment.notes ?? undefined,
-      volunteers: assignment.volunteers.map((volunteer) => ({
-        volunteerId: volunteer.volunteerId,
-        slotNumber: volunteer.slotNumber
-      })),
-      actorUserId: input.actorUserId
+      allowAllSlots: fixedPoint.name === FIXED_PREACHING_POINT_NAME
     });
   }
 
-  await prepareScheduleWeekAutomation({
-    scheduleWeekId: targetWeek.id,
-    actorUserId: input.actorUserId
+  const duplication = await db.$transaction(async (tx) => {
+    const existingWeek = await tx.scheduleWeek.findUnique({
+      where: {
+        startDate_endDate: {
+          startDate: weekStart,
+          endDate: weekEnd
+        }
+      }
+    });
+
+    if (existingWeek) {
+      if (onExisting === "skip") {
+        return {
+          week: existingWeek,
+          created: false,
+          assignmentCount: 0,
+          createdAssignmentIds: [],
+          skippedReason: "existing_week" as const
+        };
+      }
+
+      throw new AppError(
+        `Ya existe una semana creada para el ${weekStart.toLocaleDateString("es-MX")}.`,
+        409
+      );
+    }
+
+    const targetWeek = await tx.scheduleWeek.create({
+      data: {
+        startDate: weekStart,
+        endDate: weekEnd,
+        label: formatDateRange(weekStart, weekEnd),
+        createdById: input.actorUserId
+      }
+    });
+    const createdAssignmentIds: string[] = [];
+
+    await recordAutomationAuditLog({
+      client: tx,
+      eventType: "WEEK_CREATED",
+      scheduleWeekId: targetWeek.id,
+      actorUserId: input.actorUserId,
+      automationRunId: input.automationRunId,
+      metadata: {
+        source: duplicateSource,
+        sourceWeekId: sourceWeek.id,
+        targetWeekId: targetWeek.id,
+        startDate: targetWeek.startDate,
+        endDate: targetWeek.endDate
+      }
+    });
+
+    for (const assignment of sourceWeek.assignments) {
+      const newDate = addDays(
+        weekStart,
+        differenceInCalendarDays(assignment.date, sourceWeek.startDate)
+      );
+      const titularVolunteers = assignment.volunteers
+        .filter((volunteer) => !volunteer.isReplacement)
+        .sort((left, right) => left.slotNumber - right.slotNumber);
+      const uniqueAssignmentVolunteerIds = getUniqueIds(
+        titularVolunteers.map((volunteer) => volunteer.volunteerId)
+      );
+      const created = await tx.assignment.create({
+        data: {
+          scheduleWeekId: targetWeek.id,
+          date: newDate,
+          dayOfWeek: assignment.dayOfWeek,
+          timeSlot: assignment.timeSlot,
+          preachingPointId: fixedPoint.id,
+          pairNumber: assignment.pairNumber,
+          notes: assignment.notes,
+          status: "SCHEDULED"
+        }
+      });
+
+      createdAssignmentIds.push(created.id);
+
+      if (titularVolunteers.length) {
+        await tx.assignmentVolunteer.createMany({
+          data: titularVolunteers.map((volunteer) => ({
+            assignmentId: created.id,
+            volunteerId: volunteer.volunteerId,
+            slotNumber: volunteer.slotNumber
+          }))
+        });
+
+        await syncResponses({
+          tx,
+          assignmentId: created.id,
+          volunteerIds: uniqueAssignmentVolunteerIds
+        });
+
+        await createPendingPrimaryInvitationsForAssignment({
+          tx,
+          assignmentId: created.id,
+          volunteerIds: uniqueAssignmentVolunteerIds,
+          actorUserId: input.actorUserId,
+          source: "week_duplicate",
+          metadata: {
+            source: duplicateSource,
+            sourceAssignmentId: assignment.id,
+            sourceWeekId: sourceWeek.id,
+            targetWeekId: targetWeek.id,
+            automationRunId: input.automationRunId
+          }
+        });
+      }
+
+      await recordAssignmentAuditActivity({
+        client: tx,
+        assignmentId: created.id,
+        actorUserId: input.actorUserId,
+        event: "ASSIGNED",
+        metadata: {
+          volunteers: uniqueAssignmentVolunteerIds,
+          source: duplicateSource,
+          sourceAssignmentId: assignment.id,
+          sourceWeekId: sourceWeek.id,
+          targetWeekId: targetWeek.id,
+          automationRunId: input.automationRunId
+        }
+      });
+
+      await recalculateAssignmentStatus(created.id, tx);
+    }
+
+    return {
+      week: targetWeek,
+      created: true,
+      assignmentCount: createdAssignmentIds.length,
+      createdAssignmentIds
+    };
   });
 
-  return targetWeek;
+  if (sendInvitations && duplication.created) {
+    for (const assignmentId of duplication.createdAssignmentIds) {
+      await sendPendingPrimaryInvitationsForAssignment({
+        assignmentId,
+        actorUserId: input.actorUserId,
+        automationRunId: input.automationRunId
+      });
+    }
+  }
+
+  return {
+    week: duplication.week,
+    created: duplication.created,
+    assignmentCount: duplication.assignmentCount,
+    skippedReason:
+      "skippedReason" in duplication ? duplication.skippedReason : undefined
+  };
+}
+
+export type AutoPrepareUpcomingScheduleWeeksResult = {
+  status: "completed" | "skipped";
+  processedCount: number;
+  skippedCount: number;
+  createdCount: number;
+  existingCount: number;
+  assignmentCount: number;
+  detail?: string;
+};
+
+export async function autoPrepareUpcomingScheduleWeeks(input?: {
+  now?: Date;
+  actorUserId?: string;
+  automationRunId?: string;
+}): Promise<AutoPrepareUpcomingScheduleWeeksResult> {
+  const settings = await getAppSettings();
+
+  if (!settings.autoPrepareNextWeekEnabled) {
+    return {
+      status: "skipped",
+      processedCount: 0,
+      skippedCount: 0,
+      createdCount: 0,
+      existingCount: 0,
+      assignmentCount: 0,
+      detail: "Auto-preparación semanal desactivada."
+    };
+  }
+
+  const now = input?.now ?? new Date();
+  const currentWeekStart = normalizeScheduleWeekStart(now);
+  const weeksAhead = settings.autoPrepareWeeksAhead;
+  let createdCount = 0;
+  let existingCount = 0;
+  let skippedCount = 0;
+  let assignmentCount = 0;
+
+  for (let index = 1; index <= weeksAhead; index += 1) {
+    const targetWeekStart = addDays(currentWeekStart, index * 7);
+    const { startDate, endDate } = getScheduleWeekRange(targetWeekStart);
+    const existingWeek = await db.scheduleWeek.findUnique({
+      where: {
+        startDate_endDate: {
+          startDate,
+          endDate
+        }
+      },
+      select: {
+        id: true
+      }
+    });
+
+    if (existingWeek) {
+      existingCount += 1;
+      continue;
+    }
+
+    const sourceWeek = await getRecommendedSourceWeekForTarget({
+      targetWeekStart,
+      requireAssignments: true
+    });
+
+    if (!sourceWeek) {
+      skippedCount += 1;
+      await recordAutomationAuditLog({
+        eventType: "WEEK_CREATED",
+        status: "SKIPPED",
+        actorUserId: input?.actorUserId,
+        automationRunId: input?.automationRunId,
+        metadata: {
+          source: "auto_week_rollover",
+          reason: "missing_source_week",
+          targetWeekStart: startDate,
+          targetWeekEnd: endDate
+        }
+      });
+      continue;
+    }
+
+    const result = await duplicateScheduleWeek({
+      sourceWeekId: sourceWeek.id,
+      targetWeekStart,
+      actorUserId: input?.actorUserId ?? sourceWeek.createdById,
+      onExisting: "skip",
+      sendInvitations: true,
+      source: "auto_week_rollover",
+      automationRunId: input?.automationRunId
+    });
+
+    if (result.created) {
+      createdCount += 1;
+      assignmentCount += result.assignmentCount;
+    } else {
+      existingCount += 1;
+    }
+  }
+
+  return {
+    status: "completed",
+    processedCount: weeksAhead,
+    skippedCount,
+    createdCount,
+    existingCount,
+    assignmentCount
+  };
 }
 
 async function assertVolunteerCanRespondToAssignment(input: {

@@ -306,6 +306,8 @@ export type SettingsDto = {
   censusResponseTimeoutHours: number;
   censusReminderOffsetsHours: number[];
   urgentThresholdHours: number;
+  autoPrepareNextWeekEnabled: boolean;
+  autoPrepareWeeksAhead: number;
   adminAlertEmail: string;
   notificationChannels: NotificationChannel[];
 };

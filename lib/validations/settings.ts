@@ -3,6 +3,7 @@ import { z } from "zod";
 import { NOTIFICATION_CHANNELS } from "@/lib/constants/domain";
 
 const dayValueSchema = z.number().int().min(1).max(30);
+const weekAheadValueSchema = z.number().int().min(1).max(8);
 const hourValueSchema = z.number().int().min(1).max(24 * 30);
 const reminderOffsetsSchema = z.array(hourValueSchema).min(1);
 
@@ -40,6 +41,8 @@ export const updateSettingsSchema = z
     censusResponseTimeoutHours: hourValueSchema,
     censusReminderOffsetsHours: reminderOffsetsSchema,
     urgentThresholdHours: hourValueSchema,
+    autoPrepareNextWeekEnabled: z.boolean(),
+    autoPrepareWeeksAhead: weekAheadValueSchema,
     adminAlertEmail: z.string().trim().email(),
     notificationChannels: z.array(z.enum(NOTIFICATION_CHANNELS)).min(1)
   })

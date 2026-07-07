@@ -37,6 +37,14 @@ const mocks = vi.hoisted(() => {
       findFirst: vi.fn(),
       updateMany: vi.fn()
     },
+    automationAuditLog: {
+      create: vi.fn()
+    },
+    scheduleWeek: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
+      findUnique: vi.fn()
+    },
     volunteerProfile: {
       findUnique: vi.fn(),
       update: vi.fn()
@@ -68,6 +76,7 @@ const mocks = vi.hoisted(() => {
     },
     scheduleWeek: {
       create: vi.fn(),
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn()
     },
@@ -123,6 +132,7 @@ vi.mock("@/services/assignment-invitation.service", () => ({
 
 import {
   assignReplacementVolunteer,
+  autoPrepareUpcomingScheduleWeeks,
   confirmAssignment,
   createWeeklyAssignment,
   declineAssignment,
@@ -264,6 +274,17 @@ function setupAssignmentDefaults() {
   });
   mocks.tx.assignment.aggregate.mockResolvedValue({
     _max: { pairNumber: null }
+  });
+  mocks.tx.scheduleWeek.findUnique.mockResolvedValue(null);
+  mocks.tx.scheduleWeek.create.mockResolvedValue({
+    id: "target-week",
+    startDate: new Date(2026, 6, 20),
+    endDate: new Date(2026, 6, 26),
+    label: "Del 20 al 26 de julio de 2026",
+    createdById: "admin-1"
+  });
+  mocks.tx.automationAuditLog.create.mockResolvedValue({
+    id: "audit-log-1"
   });
   mocks.tx.assignment.create.mockImplementation(async ({ data }) => {
     createdCount += 1;
@@ -750,10 +771,7 @@ describe("assignment automation orchestration", () => {
     expect(
       mocks.sendPendingPrimaryInvitationsForAssignment
     ).toHaveBeenCalledTimes(2);
-    expect(mocks.prepareScheduleWeekAutomation).toHaveBeenCalledWith({
-      scheduleWeekId: "target-week",
-      actorUserId: "admin-1"
-    });
+    expect(mocks.prepareScheduleWeekAutomation).not.toHaveBeenCalled();
     expect(
       mocks.createPendingPrimaryInvitationsForAssignment
     ).toHaveBeenNthCalledWith(
@@ -761,9 +779,210 @@ describe("assignment automation orchestration", () => {
       expect.objectContaining({
         assignmentId: "assignment-2",
         volunteerIds: ["volunteer-3", "volunteer-4"],
-        source: "assignment_created"
+        source: "week_duplicate"
       })
     );
+  });
+
+  it("duplicates only titular volunteers and leaves replacement slots out of the cloned week", async () => {
+    mocks.db.scheduleWeek.findUniqueOrThrow.mockResolvedValue({
+      id: "source-week",
+      startDate: new Date(2026, 6, 13),
+      assignments: [
+        {
+          id: "source-assignment-1",
+          date: new Date(2026, 6, 13),
+          dayOfWeek: "MONDAY",
+          timeSlot: "SLOT_11_13",
+          preachingPointId: fixedPoint.id,
+          pairNumber: 1,
+          notes: "Notas",
+          volunteers: [
+            { volunteerId: "volunteer-1", slotNumber: 1, isReplacement: false },
+            { volunteerId: "volunteer-2", slotNumber: 2, isReplacement: false },
+            {
+              volunteerId: "replacement-1",
+              slotNumber: 3,
+              isReplacement: true
+            }
+          ]
+        }
+      ]
+    });
+
+    await duplicateScheduleWeek({
+      sourceWeekId: "source-week",
+      targetWeekStart: new Date(2026, 6, 20),
+      actorUserId: "admin-1"
+    });
+
+    expect(mocks.tx.assignmentVolunteer.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          assignmentId: "assignment-1",
+          volunteerId: "volunteer-1",
+          slotNumber: 1
+        },
+        {
+          assignmentId: "assignment-1",
+          volunteerId: "volunteer-2",
+          slotNumber: 2
+        }
+      ]
+    });
+    expect(
+      mocks.createPendingPrimaryInvitationsForAssignment
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assignmentId: "assignment-1",
+        volunteerIds: ["volunteer-1", "volunteer-2"],
+        source: "week_duplicate"
+      })
+    );
+  });
+
+  it("does not duplicate or resend when the target week already exists in idempotent mode", async () => {
+    mocks.tx.scheduleWeek.findUnique.mockResolvedValue({
+      id: "existing-week",
+      startDate: new Date(2026, 6, 20),
+      endDate: new Date(2026, 6, 26),
+      label: "Del 20 al 26 de julio de 2026",
+      createdById: "admin-1"
+    });
+    mocks.db.scheduleWeek.findUniqueOrThrow.mockResolvedValue({
+      id: "source-week",
+      startDate: new Date(2026, 6, 13),
+      assignments: [
+        {
+          id: "source-assignment-1",
+          date: new Date(2026, 6, 13),
+          dayOfWeek: "MONDAY",
+          timeSlot: "SLOT_11_13",
+          preachingPointId: fixedPoint.id,
+          pairNumber: 1,
+          notes: null,
+          volunteers: [
+            { volunteerId: "volunteer-1", slotNumber: 1, isReplacement: false },
+            { volunteerId: "volunteer-2", slotNumber: 2, isReplacement: false }
+          ]
+        }
+      ]
+    });
+
+    const result = await duplicateScheduleWeek({
+      sourceWeekId: "source-week",
+      targetWeekStart: new Date(2026, 6, 20),
+      actorUserId: "admin-1",
+      onExisting: "skip"
+    });
+
+    expect(result).toMatchObject({
+      created: false,
+      assignmentCount: 0,
+      skippedReason: "existing_week"
+    });
+    expect(mocks.tx.assignment.create).not.toHaveBeenCalled();
+    expect(
+      mocks.sendPendingPrimaryInvitationsForAssignment
+    ).not.toHaveBeenCalled();
+  });
+
+  it("requests non-cancelled assignments when cloning a source week", async () => {
+    mocks.db.scheduleWeek.findUniqueOrThrow.mockResolvedValue({
+      id: "source-week",
+      startDate: new Date(2026, 6, 13),
+      assignments: []
+    });
+
+    await duplicateScheduleWeek({
+      sourceWeekId: "source-week",
+      targetWeekStart: new Date(2026, 6, 20),
+      actorUserId: "admin-1"
+    });
+
+    expect(mocks.db.scheduleWeek.findUniqueOrThrow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          assignments: expect.objectContaining({
+            where: {
+              status: {
+                not: "CANCELLED"
+              }
+            }
+          })
+        })
+      })
+    );
+  });
+
+  it("auto-prepares the next missing week from the closest source week and sends cloned invitations", async () => {
+    mocks.getAppSettings.mockResolvedValue({
+      confirmationLeadDays: 7,
+      autoPrepareNextWeekEnabled: true,
+      autoPrepareWeeksAhead: 1
+    });
+    mocks.db.scheduleWeek.findUnique.mockResolvedValue(null);
+    mocks.db.scheduleWeek.findFirst.mockResolvedValue({
+      id: "source-week",
+      startDate: new Date(2026, 6, 13),
+      endDate: new Date(2026, 6, 19),
+      label: "Del 13 al 19 de julio de 2026",
+      createdById: "admin-1"
+    });
+    mocks.db.scheduleWeek.findUniqueOrThrow.mockResolvedValue({
+      id: "source-week",
+      startDate: new Date(2026, 6, 13),
+      assignments: [
+        {
+          id: "source-assignment-1",
+          date: new Date(2026, 6, 13),
+          dayOfWeek: "MONDAY",
+          timeSlot: "SLOT_11_13",
+          preachingPointId: fixedPoint.id,
+          pairNumber: 1,
+          notes: null,
+          volunteers: [
+            { volunteerId: "volunteer-1", slotNumber: 1, isReplacement: false },
+            { volunteerId: "volunteer-2", slotNumber: 2, isReplacement: false }
+          ]
+        }
+      ]
+    });
+
+    const result = await autoPrepareUpcomingScheduleWeeks({
+      now: new Date(2026, 6, 13, 12),
+      automationRunId: "automation-run-1"
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      processedCount: 1,
+      createdCount: 1,
+      assignmentCount: 1
+    });
+    expect(
+      mocks.sendPendingPrimaryInvitationsForAssignment
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assignmentId: "assignment-1",
+        automationRunId: "automation-run-1"
+      })
+    );
+  });
+
+  it("skips auto-preparation when the setting is disabled", async () => {
+    mocks.getAppSettings.mockResolvedValue({
+      confirmationLeadDays: 7,
+      autoPrepareNextWeekEnabled: false,
+      autoPrepareWeeksAhead: 1
+    });
+
+    const result = await autoPrepareUpcomingScheduleWeeks({
+      now: new Date(2026, 6, 13, 12)
+    });
+
+    expect(result.status).toBe("skipped");
+    expect(mocks.db.scheduleWeek.findUnique).not.toHaveBeenCalled();
   });
 
   it("invalidates prior titular invitations and sends new ones when admins change titular volunteers", async () => {

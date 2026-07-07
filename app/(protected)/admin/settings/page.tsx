@@ -217,6 +217,14 @@ export default async function AdminSettingsPage() {
                   .join(", ")}
               />
               <ConfigRow
+                label="Auto-preparar semanas"
+                value={settings.autoPrepareNextWeekEnabled ? "Sí" : "No"}
+              />
+              <ConfigRow
+                label="Semanas futuras listas"
+                value={settings.autoPrepareWeeksAhead}
+              />
+              <ConfigRow
                 label="Email admin"
                 value={automationSettings.adminAlertEmail}
               />

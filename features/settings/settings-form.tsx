@@ -12,12 +12,14 @@ import { FeedbackMessage } from "@/components/ui/feedback-message";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { updateSettingsSchema } from "@/lib/validations/settings";
 import type { SettingsDto } from "@/types/domain";
 
@@ -28,7 +30,8 @@ type NumberSettingName =
   | "primaryResponseTimeoutHours"
   | "replacementResponseTimeoutHours"
   | "censusResponseTimeoutHours"
-  | "urgentThresholdHours";
+  | "urgentThresholdHours"
+  | "autoPrepareWeeksAhead";
 type NumberListSettingName =
   | "reminderTimingDays"
   | "primaryReminderOffsetsHours"
@@ -202,6 +205,42 @@ export function SettingsForm({ initialValues }: SettingsFormProps) {
                 <NumberSettingField
                   label="Recordatorio final (horas)"
                   name="finalReminderHours"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">
+                Preparación semanal
+              </h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="autoPrepareNextWeekEnabled"
+                  render={({ field }) => (
+                    <FormItem className="rounded-lg border border-border/70 bg-background/35 p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <FormLabel>Auto-preparar próximas semanas</FormLabel>
+                          <FormDescription>
+                            El cron clonará semanas faltantes y enviará
+                            designaciones nuevas.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <NumberSettingField
+                  label="Semanas futuras listas"
+                  name="autoPrepareWeeksAhead"
                 />
               </div>
             </div>

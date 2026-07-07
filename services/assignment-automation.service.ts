@@ -60,6 +60,7 @@ import {
   getAssignmentAutomationSettings,
   type AssignmentAutomationSettings
 } from "@/services/setting.service";
+import type { AutoPrepareUpcomingScheduleWeeksResult } from "@/services/assignment.service";
 import { getAppBaseUrl } from "@/lib/env/config";
 import { recordAssignmentAuditActivity } from "@/services/assignment-audit.service";
 import {
@@ -186,6 +187,7 @@ export type AssignmentAutomationRunResult = {
   failedStepCount: number;
   summarySaved: boolean;
   summaryError?: string;
+  autoPrepareUpcomingScheduleWeeks: AutoPrepareUpcomingScheduleWeeksResult;
   sendPendingPrimaryInvitations: SendPendingPrimaryInvitationsResult;
   sendPrimaryResponseReminders: SendDueAssignmentRemindersResult;
   expireTimedOutPrimaryInvitations: ExpireTimedOutInvitationsResult;
@@ -2891,6 +2893,26 @@ export async function processAssignmentAutomationRun(
   const now = input?.now ?? startedAt;
   const automationRunId = input?.automationRunId ?? randomUUID();
 
+  const autoPrepareUpcomingScheduleWeeksResult = await runAutomationStep(
+    async () => {
+      const { autoPrepareUpcomingScheduleWeeks } = await import(
+        "@/services/assignment.service"
+      );
+
+      return autoPrepareUpcomingScheduleWeeks({
+        now,
+        actorUserId: input?.actorUserId,
+        automationRunId
+      });
+    },
+    {
+      processedCount: 0,
+      skippedCount: 0,
+      createdCount: 0,
+      existingCount: 0,
+      assignmentCount: 0
+    }
+  );
   const sendPendingPrimaryInvitationsResult = await runAutomationStep(
     () => sendPendingPrimaryInvitations({ automationRunId }),
     {
@@ -3044,6 +3066,7 @@ export async function processAssignmentAutomationRun(
     }
   );
   const stepResults: AssignmentAutomationStepResult[] = [
+    autoPrepareUpcomingScheduleWeeksResult,
     sendPendingPrimaryInvitationsResult,
     sendPrimaryResponseRemindersResult,
     expireTimedOutPrimaryInvitationsResult,
@@ -3071,6 +3094,7 @@ export async function processAssignmentAutomationRun(
     durationMs: finishedAt.getTime() - startedAt.getTime(),
     failedStepCount,
     summarySaved: true,
+    autoPrepareUpcomingScheduleWeeks: autoPrepareUpcomingScheduleWeeksResult,
     sendPendingPrimaryInvitations: sendPendingPrimaryInvitationsResult,
     sendPrimaryResponseReminders: sendPrimaryResponseRemindersResult,
     expireTimedOutPrimaryInvitations: expireTimedOutPrimaryInvitationsResult,
