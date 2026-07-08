@@ -1,4 +1,5 @@
 import { startOfDay } from "date-fns";
+import type { Prisma } from "@prisma/client";
 
 import { db } from "@/lib/db/prisma";
 import type {
@@ -30,6 +31,26 @@ const ACTIVE_INVITATION_STATUSES = ["PENDING", "SENT"] as const;
 const TERMINAL_ASSIGNMENT_STATUSES = ["CANCELLED", "COMPLETED"] as const;
 const VOLUNTEER_DELETED_RESPONSE_NOTE =
   "Voluntario eliminado por administrador.";
+const VOLUNTEER_SUSPENDED_RESPONSE_NOTE =
+  "Cuenta de voluntario suspendida por administrador.";
+
+type VolunteerOperationalSuspensionReason =
+  | "volunteer_deleted"
+  | "account_suspended";
+
+type VolunteerOperationalSuspensionInput = {
+  client: Prisma.TransactionClient;
+  volunteerId: string;
+  volunteerUserId: string;
+  actorUserId?: string;
+  reason: VolunteerOperationalSuspensionReason;
+};
+
+export type VolunteerOperationalSuspensionResult = {
+  success: true;
+  affectedAssignmentCount: number;
+  expiredInvitationCount: number;
+};
 
 function mapVolunteer(record: {
   id: string;
@@ -89,6 +110,140 @@ function assertActiveVolunteerHasCapacity(input: {
     "Un perfil voluntario activo debe tener al menos una capacidad operativa.",
     400
   );
+}
+
+export async function suspendVolunteerOperationalAccess({
+  actorUserId,
+  client,
+  reason,
+  volunteerId,
+  volunteerUserId
+}: VolunteerOperationalSuspensionInput): Promise<VolunteerOperationalSuspensionResult> {
+  const now = new Date();
+  const activeFromToday = startOfDay(now);
+  const expiredBy =
+    reason === "account_suspended"
+      ? "ADMIN_ACCOUNT_SUSPENSION"
+      : "ADMIN_VOLUNTEER_DELETION";
+  const responseNote =
+    reason === "account_suspended"
+      ? VOLUNTEER_SUSPENDED_RESPONSE_NOTE
+      : VOLUNTEER_DELETED_RESPONSE_NOTE;
+
+  await client.volunteerProfile.update({
+    where: { id: volunteerId },
+    data: {
+      active: false,
+      temporaryUnavailable: true,
+      canServeAsPrimary: false,
+      canServeAsReplacement: false
+    }
+  });
+
+  const activeInvitations = await client.assignmentInvitation.findMany({
+    where: {
+      volunteerId,
+      status: {
+        in: [...ACTIVE_INVITATION_STATUSES]
+      }
+    },
+    select: {
+      id: true,
+      metadata: true
+    }
+  });
+
+  for (const invitation of activeInvitations) {
+    await client.assignmentInvitation.update({
+      where: { id: invitation.id },
+      data: {
+        status: "EXPIRED",
+        metadata: mergeJsonMetadata(invitation.metadata, {
+          expiredBy,
+          expiredAt: now.toISOString(),
+          actorUserId
+        })
+      }
+    });
+  }
+
+  const affectedAssignments = await client.assignment.findMany({
+    where: {
+      date: {
+        gte: activeFromToday
+      },
+      status: {
+        notIn: [...TERMINAL_ASSIGNMENT_STATUSES]
+      },
+      volunteers: {
+        some: {
+          volunteerId
+        }
+      }
+    },
+    include: {
+      volunteers: {
+        where: {
+          volunteerId
+        }
+      }
+    }
+  });
+
+  for (const assignment of affectedAssignments) {
+    const assignedSlot = assignment.volunteers[0];
+    const dedupeKey = `${reason}:${assignment.id}:${volunteerId}`;
+
+    await client.assignmentResponse.upsert({
+      where: {
+        assignmentId_volunteerId: {
+          assignmentId: assignment.id,
+          volunteerId
+        }
+      },
+      update: {
+        responseStatus: "DECLINED",
+        note: responseNote,
+        respondedAt: now
+      },
+      create: {
+        assignmentId: assignment.id,
+        volunteerId,
+        responseStatus: "DECLINED",
+        note: responseNote,
+        respondedAt: now
+      }
+    });
+
+    if (assignment.status !== "NEEDS_REPLACEMENT") {
+      await client.assignment.update({
+        where: { id: assignment.id },
+        data: { status: "NEEDS_REPLACEMENT" }
+      });
+    }
+
+    await recordAssignmentAuditActivity({
+      client,
+      assignmentId: assignment.id,
+      actorUserId,
+      event: "REPLACEMENT_REQUIRED",
+      dedupeKey,
+      metadata: {
+        reason,
+        volunteerProfileId: volunteerId,
+        volunteerUserId,
+        slotNumber: assignedSlot?.slotNumber,
+        previousStatus: assignment.status,
+        markedAt: now
+      }
+    });
+  }
+
+  return {
+    success: true,
+    affectedAssignmentCount: affectedAssignments.length,
+    expiredInvitationCount: activeInvitations.length
+  };
 }
 
 export async function getVolunteers(input?: { activeOnly?: boolean }) {
@@ -253,6 +408,13 @@ export async function updateVolunteer(
     }
   });
 
+  if (input.active !== undefined) {
+    throw new AppError(
+      "Usa la gestión de acceso de cuenta para suspender o reactivar voluntarios.",
+      409
+    );
+  }
+
   if (input.email) {
     const normalizedEmail = input.email.toLowerCase();
     const existingUser = await db.user.findUnique({
@@ -333,19 +495,8 @@ export async function deactivateVolunteer(
     where: { id: volunteerId },
     include: { user: true }
   });
-  const now = new Date();
-  const activeFromToday = startOfDay(now);
 
   return db.$transaction(async (tx) => {
-    await tx.volunteerProfile.update({
-      where: { id: volunteerId },
-      data: {
-        active: false,
-        temporaryUnavailable: true,
-        canServeAsPrimary: false,
-        canServeAsReplacement: false
-      }
-    });
     await tx.user.update({
       where: { id: volunteer.userId },
       data: {
@@ -354,110 +505,13 @@ export async function deactivateVolunteer(
       }
     });
 
-    const activeInvitations = await tx.assignmentInvitation.findMany({
-      where: {
-        volunteerId,
-        status: {
-          in: [...ACTIVE_INVITATION_STATUSES]
-        }
-      },
-      select: {
-        id: true,
-        metadata: true
-      }
+    return suspendVolunteerOperationalAccess({
+      client: tx,
+      volunteerId,
+      volunteerUserId: volunteer.userId,
+      actorUserId: input?.actorUserId,
+      reason: "volunteer_deleted"
     });
-
-    for (const invitation of activeInvitations) {
-      await tx.assignmentInvitation.update({
-        where: { id: invitation.id },
-        data: {
-          status: "EXPIRED",
-          metadata: mergeJsonMetadata(invitation.metadata, {
-            expiredBy: "ADMIN_VOLUNTEER_DELETION",
-            expiredAt: now.toISOString(),
-            actorUserId: input?.actorUserId
-          })
-        }
-      });
-    }
-
-    const affectedAssignments = await tx.assignment.findMany({
-      where: {
-        date: {
-          gte: activeFromToday
-        },
-        status: {
-          notIn: [...TERMINAL_ASSIGNMENT_STATUSES]
-        },
-        volunteers: {
-          some: {
-            volunteerId
-          }
-        }
-      },
-      include: {
-        volunteers: {
-          where: {
-            volunteerId
-          }
-        }
-      }
-    });
-
-    for (const assignment of affectedAssignments) {
-      const assignedSlot = assignment.volunteers[0];
-      const dedupeKey = `volunteer-deleted:${assignment.id}:${volunteerId}`;
-
-      await tx.assignmentResponse.upsert({
-        where: {
-          assignmentId_volunteerId: {
-            assignmentId: assignment.id,
-            volunteerId
-          }
-        },
-        update: {
-          responseStatus: "DECLINED",
-          note: VOLUNTEER_DELETED_RESPONSE_NOTE,
-          respondedAt: now
-        },
-        create: {
-          assignmentId: assignment.id,
-          volunteerId,
-          responseStatus: "DECLINED",
-          note: VOLUNTEER_DELETED_RESPONSE_NOTE,
-          respondedAt: now
-        }
-      });
-
-      if (assignment.status !== "NEEDS_REPLACEMENT") {
-        await tx.assignment.update({
-          where: { id: assignment.id },
-          data: { status: "NEEDS_REPLACEMENT" }
-        });
-      }
-
-      await recordAssignmentAuditActivity({
-        client: tx,
-        assignmentId: assignment.id,
-        actorUserId: input?.actorUserId,
-        event: "REPLACEMENT_REQUIRED",
-        dedupeKey,
-        metadata: {
-          reason: "volunteer_deleted",
-          volunteerProfileId: volunteerId,
-          volunteerUserId: volunteer.userId,
-          slotNumber: assignedSlot?.slotNumber,
-          previousStatus: assignment.status,
-          markedAt: now
-        }
-      });
-    }
-
-    return {
-      success: true,
-      affectedAssignmentCount: affectedAssignments.length,
-      expiredInvitationCount: activeInvitations.length
-    };
   });
 }
 

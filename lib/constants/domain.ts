@@ -7,6 +7,12 @@ export const USER_ACCESS_STATUSES = [
   "REJECTED",
   "SUSPENDED"
 ] as const;
+export const USER_ACCOUNT_AUDIT_ACTIONS = [
+  "SUSPEND",
+  "REACTIVATE",
+  "ANONYMIZE",
+  "NAME_CHANGE"
+] as const;
 export const DAYS_OF_WEEK = [
   "MONDAY",
   "TUESDAY",

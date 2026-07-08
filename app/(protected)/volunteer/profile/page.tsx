@@ -1,4 +1,5 @@
 import { VolunteerSelfProfileCard } from "@/components/volunteer/volunteer-self-profile-card";
+import { AccountNameForm } from "@/features/account/account-name-form";
 import { getServerAuthSession } from "@/lib/auth/auth";
 import { getVolunteer } from "@/services/volunteer.service";
 
@@ -19,6 +20,7 @@ export default async function VolunteerProfilePage() {
           Revisa tu contacto, preferencias y disponibilidad general.
         </p>
       </div>
+      <AccountNameForm initialName={session.user.name ?? volunteer.name} />
       <VolunteerSelfProfileCard volunteer={volunteer} />
     </div>
   );

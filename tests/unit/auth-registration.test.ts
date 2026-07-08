@@ -143,4 +143,99 @@ describe("auth registration", () => {
     expect(mocks.hashPassword).not.toHaveBeenCalled();
     expect(mocks.db.$transaction).not.toHaveBeenCalled();
   });
+
+  it("returns the existing pending request without creating another account", async () => {
+    mocks.db.user.findUnique.mockResolvedValue({
+      id: "existing-user",
+      name: "Julia Rivera",
+      email: "julia@example.org",
+      phone: "5551234567",
+      role: "VOLUNTEER",
+      active: false,
+      accessStatus: "PENDING_APPROVAL",
+      volunteerProfile: {
+        id: "volunteer-1"
+      }
+    });
+
+    const account = await registerAccount({
+      name: "Julia Rivera",
+      email: "julia@example.org",
+      phone: "5551234567",
+      password: "Password1"
+    });
+
+    expect(account).toMatchObject({
+      id: "existing-user",
+      accessStatus: "PENDING_APPROVAL",
+      volunteerProfileId: "volunteer-1"
+    });
+    expect(mocks.hashPassword).not.toHaveBeenCalled();
+    expect(mocks.db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it.each(["SUSPENDED", "REJECTED"] as const)(
+    "tells users to contact an admin when the existing account is %s",
+    async (accessStatus) => {
+      mocks.db.user.findUnique.mockResolvedValue({
+        id: "existing-user",
+        name: "Julia Rivera",
+        email: "julia@example.org",
+        phone: "5551234567",
+        role: "VOLUNTEER",
+        active: false,
+        accessStatus,
+        volunteerProfile: {
+          id: "volunteer-1"
+        }
+      });
+
+      await expect(
+        registerAccount({
+          name: "Julia Rivera",
+          email: "julia@example.org",
+          phone: "5551234567",
+          password: "Password1"
+        })
+      ).rejects.toMatchObject({
+        statusCode: 409,
+        message:
+          "Ya existe una cuenta con este correo. Contacta a un administrador para reactivar o liberar la cuenta."
+      });
+
+      expect(mocks.hashPassword).not.toHaveBeenCalled();
+      expect(mocks.db.$transaction).not.toHaveBeenCalled();
+    }
+  );
+
+  it("points approved duplicates to login or password reset", async () => {
+    mocks.db.user.findUnique.mockResolvedValue({
+      id: "existing-user",
+      name: "Julia Rivera",
+      email: "julia@example.org",
+      phone: "5551234567",
+      role: "VOLUNTEER",
+      active: true,
+      accessStatus: "APPROVED",
+      volunteerProfile: {
+        id: "volunteer-1"
+      }
+    });
+
+    await expect(
+      registerAccount({
+        name: "Julia Rivera",
+        email: "julia@example.org",
+        phone: "5551234567",
+        password: "Password1"
+      })
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message:
+        "Ya existe una cuenta activa con este correo. Inicia sesión o restablece tu contraseña."
+    });
+
+    expect(mocks.hashPassword).not.toHaveBeenCalled();
+    expect(mocks.db.$transaction).not.toHaveBeenCalled();
+  });
 });

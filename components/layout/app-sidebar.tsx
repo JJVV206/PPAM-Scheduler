@@ -61,6 +61,7 @@ const adminItems: NavItem[] = [
   { href: "/admin/replacements", label: "Suplentes", icon: UserCheck },
   { href: "/admin/assignments", label: "Asignaciones", icon: ClipboardList },
   { href: "/admin/volunteers", label: "Voluntarios", icon: Users },
+  { href: "/admin/account", label: "Cuenta", icon: UserCircle2 },
   { href: "/admin/settings", label: "Configuración", icon: Settings }
 ];
 

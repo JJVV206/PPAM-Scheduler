@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { UserX } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -47,7 +47,7 @@ export function DeleteVolunteerButton({
     } | null;
 
     if (!response.ok) {
-      setError(result?.error ?? "No se pudo eliminar el voluntario.");
+      setError(result?.error ?? "No se pudo suspender el voluntario.");
       setSubmitting(false);
       return;
     }
@@ -78,17 +78,17 @@ export function DeleteVolunteerButton({
           disabled={disabled}
           aria-label={
             disabled
-              ? `${volunteerName} ya está eliminado`
-              : `Eliminar voluntario ${volunteerName}`
+              ? `${volunteerName} ya está suspendido`
+              : `Suspender voluntario ${volunteerName}`
           }
         >
-          <Trash2 className="h-4 w-4" />
-          {disabled ? "Eliminado" : "Eliminar"}
+          <UserX className="h-4 w-4" />
+          {disabled ? "Suspendido" : "Suspender"}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-xl">
         <DialogHeader className="pr-8">
-          <DialogTitle>Eliminar voluntario</DialogTitle>
+          <DialogTitle>Suspender voluntario</DialogTitle>
           <DialogDescription>
             {volunteerName} quedará inactivo, no podrá iniciar sesión ni
             aparecerá como opción para nuevas asignaciones. Su historial se
@@ -118,7 +118,7 @@ export function DeleteVolunteerButton({
             onClick={handleDelete}
             disabled={submitting}
           >
-            {submitting ? "Eliminando..." : "Sí, eliminar"}
+            {submitting ? "Suspendiendo..." : "Sí, suspender"}
           </Button>
         </DialogFooter>
       </DialogContent>
