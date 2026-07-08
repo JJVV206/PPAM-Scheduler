@@ -261,6 +261,24 @@ export async function getUnreadAppNotificationCount(userId: string) {
   });
 }
 
+export async function getUnreadAdminAttentionNotificationReferencesForUser(input: {
+  userId: string;
+}) {
+  return db.appNotification.findMany({
+    where: {
+      userId: input.userId,
+      readAt: null,
+      type: {
+        in: ADMIN_ATTENTION_NOTIFICATION_TYPES
+      }
+    },
+    select: {
+      id: true,
+      assignmentId: true
+    }
+  });
+}
+
 const appNotificationInclude = {
   assignment: {
     select: {

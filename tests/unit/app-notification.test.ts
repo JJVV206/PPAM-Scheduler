@@ -24,6 +24,7 @@ import {
   createAppNotificationOnce,
   dismissAdminAttentionNotification,
   getUnreadAppNotificationCount,
+  getUnreadAdminAttentionNotificationReferencesForUser,
   markAppNotificationRead
 } from "@/services/app-notification.service";
 
@@ -149,6 +150,40 @@ describe("app notification service", () => {
       },
       data: {
         readAt
+      }
+    });
+  });
+
+  it("returns only unread admin attention notification references", async () => {
+    mocks.db.appNotification.findMany.mockResolvedValue([
+      { id: "attention-1", assignmentId: "assignment-1" },
+      { id: "replacement-1", assignmentId: null }
+    ]);
+
+    await expect(
+      getUnreadAdminAttentionNotificationReferencesForUser({
+        userId: "admin-1"
+      })
+    ).resolves.toEqual([
+      { id: "attention-1", assignmentId: "assignment-1" },
+      { id: "replacement-1", assignmentId: null }
+    ]);
+
+    expect(mocks.db.appNotification.findMany).toHaveBeenCalledWith({
+      where: {
+        userId: "admin-1",
+        readAt: null,
+        type: {
+          in: [
+            "ADMIN_ATTENTION_REQUIRED",
+            "EMAIL_FAILED",
+            "REPLACEMENT_NEEDED"
+          ]
+        }
+      },
+      select: {
+        id: true,
+        assignmentId: true
       }
     });
   });
