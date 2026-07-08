@@ -8,6 +8,7 @@ import type {
   NOTIFICATION_STATUSES,
   NOTIFICATION_TYPES,
   RESPONSE_STATUSES,
+  USER_ACCOUNT_AUDIT_ACTIONS,
   TIME_SLOTS,
   USER_ACCESS_STATUSES,
   USER_ROLES,
@@ -16,6 +17,8 @@ import type {
 
 export type UserRole = (typeof USER_ROLES)[number];
 export type UserAccessStatus = (typeof USER_ACCESS_STATUSES)[number];
+export type UserAccountAuditAction =
+  (typeof USER_ACCOUNT_AUDIT_ACTIONS)[number];
 export type DayOfWeek = (typeof DAYS_OF_WEEK)[number];
 export type TimeSlot = (typeof TIME_SLOTS)[number];
 export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number];

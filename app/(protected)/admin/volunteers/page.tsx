@@ -21,7 +21,7 @@ export default async function AdminVolunteersPage() {
       </DataTable>
       <DataTable
         title="Usuarios"
-        description="Consulta cuentas aprobadas, filtra por rol y delega acceso desde el perfil de cada usuario."
+        description="Consulta cuentas aprobadas y suspendidas, filtra por rol y gestiona acceso desde cada perfil."
         actions={<CreateVolunteerForm />}
       >
         <UserDirectoryManagement accounts={accounts} volunteers={volunteers} />

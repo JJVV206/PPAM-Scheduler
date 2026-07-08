@@ -2,10 +2,10 @@ import { requireRole } from "@/lib/auth/guards";
 import { revalidateVolunteerViews } from "@/lib/cache/revalidate-volunteer-views";
 import { updateVolunteerSchema } from "@/lib/validations/volunteer";
 import {
-  deactivateVolunteer,
   getVolunteer,
   updateVolunteer
 } from "@/services/volunteer.service";
+import { suspendUserAccount } from "@/services/user.service";
 import { handleRouteError, ok } from "@/lib/utils/api";
 
 type VolunteerRouteContext = {
@@ -48,7 +48,9 @@ export async function DELETE(_: Request, { params }: VolunteerRouteContext) {
     const auth = await requireRole(["ADMIN"]);
     if ("error" in auth) return auth.error;
     const { id } = await params;
-    const result = await deactivateVolunteer(id, {
+    const volunteer = await getVolunteer(id);
+    const result = await suspendUserAccount({
+      userId: volunteer.userId,
       actorUserId: auth.session.user.id
     });
     revalidateVolunteerViews(id);

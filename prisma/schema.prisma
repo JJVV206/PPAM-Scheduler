@@ -20,6 +20,13 @@ enum UserAccessStatus {
   SUSPENDED
 }
 
+enum UserAccountAuditAction {
+  SUSPEND
+  REACTIVATE
+  ANONYMIZE
+  NAME_CHANGE
+}
+
 enum DayOfWeek {
   MONDAY
   TUESDAY
@@ -148,33 +155,51 @@ enum AssignmentActivityType {
 }
 
 model User {
-  id                 String               @id @default(cuid())
-  name               String
-  email              String               @unique
-  passwordHash       String
-  role               UserRole
-  phone              String
-  active             Boolean              @default(true)
-  accessStatus       UserAccessStatus     @default(APPROVED)
-  accessReviewedAt   DateTime?
-  accessReviewedById String?
-  accessReviewNote   String?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  volunteerProfile   VolunteerProfile?
-  accounts           Account[]
-  sessions           Session[]
-  notifications      NotificationLog[]
-  appNotifications   AppNotification[]
-  activities         AssignmentActivity[]
-  createdWeeks       ScheduleWeek[]
-  createdCensuses    ReplacementCensus[]
-  passwordResets     PasswordResetToken[]
-  accessReviewedBy   User?                @relation("UserAccessReviews", fields: [accessReviewedById], references: [id], onDelete: SetNull)
-  accessReviews      User[]               @relation("UserAccessReviews")
+  id                  String                @id @default(cuid())
+  name                String
+  email               String                @unique
+  passwordHash        String
+  role                UserRole
+  phone               String
+  active              Boolean               @default(true)
+  accessStatus        UserAccessStatus      @default(APPROVED)
+  accessReviewedAt    DateTime?
+  accessReviewedById  String?
+  accessReviewNote    String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  volunteerProfile    VolunteerProfile?
+  accounts            Account[]
+  sessions            Session[]
+  notifications       NotificationLog[]
+  appNotifications    AppNotification[]
+  activities          AssignmentActivity[]
+  createdWeeks        ScheduleWeek[]
+  createdCensuses     ReplacementCensus[]
+  passwordResets      PasswordResetToken[]
+  accessReviewedBy    User?                 @relation("UserAccessReviews", fields: [accessReviewedById], references: [id], onDelete: SetNull)
+  accessReviews       User[]                @relation("UserAccessReviews")
+  accountAuditTargets UserAccountAuditLog[] @relation("UserAccountAuditTarget")
+  accountAuditActors  UserAccountAuditLog[] @relation("UserAccountAuditActor")
 
   @@index([accessStatus, role, createdAt])
   @@index([accessReviewedById])
+}
+
+model UserAccountAuditLog {
+  id           String                 @id @default(cuid())
+  targetUserId String?
+  actorUserId  String?
+  action       UserAccountAuditAction
+  note         String?
+  metadata     Json?
+  createdAt    DateTime               @default(now())
+  targetUser   User?                  @relation("UserAccountAuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  actorUser    User?                  @relation("UserAccountAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([targetUserId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
 }
 
 model VolunteerProfile {

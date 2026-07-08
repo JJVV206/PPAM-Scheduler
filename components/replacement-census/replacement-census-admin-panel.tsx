@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { addDays, format } from "date-fns";
-import { es } from "date-fns/locale";
+import { addDays } from "date-fns";
 import { ClipboardEdit, MailCheck, TimerReset, Users } from "lucide-react";
 
 import { ReplacementCensusForm } from "@/components/replacement-census/replacement-census-form";
@@ -21,8 +20,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
-  SelectTrigger,
-  SelectValue
+  SelectTrigger
 } from "@/components/ui/select";
 import {
   Table,
@@ -37,7 +35,7 @@ import {
   DAYS_OF_WEEK,
   TIME_SLOT_DEFINITIONS
 } from "@/lib/constants/domain";
-import { formatDisplayDate } from "@/lib/utils";
+import { formatDisplayDate, formatWeekRange } from "@/lib/utils";
 import type { DayOfWeek, TimeSlot } from "@/types/domain";
 
 type ReplacementCensusAdminPanelProps = {
@@ -101,6 +99,10 @@ function buildWeekDays(weekStart: string) {
     date: addDays(start, index).toISOString().slice(0, 10),
     dayOfWeek
   }));
+}
+
+function formatWeekStartLabel(weekStart: string) {
+  return formatWeekRange(`${weekStart}T12:00:00`);
 }
 
 function summarizeAvailability(
@@ -176,6 +178,19 @@ export function ReplacementCensusAdminPanel({
     (response) => response.id === editingResponseId
   );
   const weekDays = buildWeekDays(selectedWeekStart);
+  const hasAvailableWeeks = availableWeeks.length > 0;
+  const selectedWeekOption = availableWeeks.find(
+    (week) => week.startDate === selectedWeekStart
+  );
+  const selectedWeekLabel = selectedWeekOption
+    ? formatWeekStartLabel(selectedWeekOption.startDate)
+    : formatWeekStartLabel(selectedWeekStart);
+  const selectedWeekStatus = selectedWeekOption
+    ? "Semana preparada"
+    : hasAvailableWeeks
+      ? "Semana sin preparar"
+      : "Sin semanas preparadas";
+  const weekSelectLabelId = "replacement-census-week-select-label";
 
   return (
     <div className="space-y-4">
@@ -189,23 +204,37 @@ export function ReplacementCensusAdminPanel({
               Censo semanal y disponibilidad confirmada por fecha.
             </p>
           </div>
-          <div className="w-full lg:max-w-xs">
+          <div className="w-full lg:max-w-sm">
+            <label
+              id={weekSelectLabelId}
+              className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+            >
+              Semana del censo
+            </label>
             <Select
               value={selectedWeekStart}
+              disabled={!hasAvailableWeeks}
               onValueChange={(value) =>
                 router.push(`/admin/replacements?weekStart=${value}`)
               }
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona semana" />
+              <SelectTrigger
+                aria-labelledby={weekSelectLabelId}
+                className="h-auto min-h-11 py-2"
+              >
+                <span className="flex min-w-0 flex-col items-start text-left">
+                  <span className="w-full truncate font-medium">
+                    {selectedWeekLabel}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {selectedWeekStatus}
+                  </span>
+                </span>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="w-[var(--radix-select-trigger-width)]">
                 {availableWeeks.map((week) => (
                   <SelectItem key={week.id} value={week.startDate}>
-                    {week.label} ·{" "}
-                    {format(new Date(`${week.startDate}T12:00:00`), "d MMM", {
-                      locale: es
-                    })}
+                    {formatWeekStartLabel(week.startDate)}
                   </SelectItem>
                 ))}
               </SelectContent>

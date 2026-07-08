@@ -28,12 +28,49 @@ export async function registerAccount(input: {
       email: normalizedEmail
     },
     select: {
-      id: true
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+      active: true,
+      accessStatus: true,
+      volunteerProfile: {
+        select: {
+          id: true
+        }
+      }
     }
   });
 
   if (existingUser) {
-    throw new AppError("Ya existe una cuenta registrada con ese correo.", 409);
+    if (existingUser.accessStatus === "PENDING_APPROVAL") {
+      return {
+        id: existingUser.id,
+        name: existingUser.name,
+        email: existingUser.email,
+        phone: existingUser.phone,
+        role: existingUser.role,
+        active: existingUser.active,
+        accessStatus: existingUser.accessStatus,
+        volunteerProfileId: existingUser.volunteerProfile?.id ?? null
+      };
+    }
+
+    if (
+      existingUser.accessStatus === "SUSPENDED" ||
+      existingUser.accessStatus === "REJECTED"
+    ) {
+      throw new AppError(
+        "Ya existe una cuenta con este correo. Contacta a un administrador para reactivar o liberar la cuenta.",
+        409
+      );
+    }
+
+    throw new AppError(
+      "Ya existe una cuenta activa con este correo. Inicia sesión o restablece tu contraseña.",
+      409
+    );
   }
 
   const passwordHash = await hashPassword(input.password);
@@ -77,7 +114,10 @@ export async function registerAccount(input: {
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) {
-      throw new AppError("Ya existe una cuenta registrada con ese correo.", 409);
+      throw new AppError(
+        "Ya existe una cuenta registrada con ese correo.",
+        409
+      );
     }
 
     throw error;
