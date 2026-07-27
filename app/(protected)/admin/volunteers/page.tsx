@@ -6,25 +6,31 @@ import { getUserAccounts } from "@/services/user.service";
 import { getVolunteers } from "@/services/volunteer.service";
 
 export default async function AdminVolunteersPage() {
-  const [volunteers, accounts] = await Promise.all([
+  const [volunteers, pendingAccounts, directoryAccounts] = await Promise.all([
     getVolunteers({ activeOnly: true }),
-    getUserAccounts()
+    getUserAccounts({ accessStatuses: ["PENDING_APPROVAL"] }),
+    getUserAccounts({
+      accessStatuses: ["APPROVED", "SUSPENDED", "REJECTED"]
+    })
   ]);
 
   return (
     <div className="space-y-6">
       <DataTable
-        title="Solicitudes de admisión"
+        title="Solicitudes pendientes de admisión"
         description="Aprueba o rechaza cuentas de voluntario creadas desde el registro público."
       >
-        <UserAdmissionManagement accounts={accounts} />
+        <UserAdmissionManagement accounts={pendingAccounts} />
       </DataTable>
       <DataTable
         title="Usuarios"
-        description="Consulta cuentas aprobadas y suspendidas, filtra por rol y gestiona acceso desde cada perfil."
+        description="Consulta cuentas aprobadas, suspendidas y rechazadas, filtra por rol y gestiona acceso desde cada perfil."
         actions={<CreateVolunteerForm />}
       >
-        <UserDirectoryManagement accounts={accounts} volunteers={volunteers} />
+        <UserDirectoryManagement
+          accounts={directoryAccounts}
+          volunteers={volunteers}
+        />
       </DataTable>
     </div>
   );

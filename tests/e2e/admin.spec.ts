@@ -95,6 +95,43 @@ test.describe("admin workspace", () => {
     }
   });
 
+  test("keeps admissions pending-only and exposes rejected history @critical @write", async ({
+    e2eData,
+    page
+  }) => {
+    await page.goto("/admin/volunteers");
+
+    const admissionRegion = page.getByRole("region", {
+      name: /solicitudes pendientes de admisión/i
+    });
+    const usersRegion = page.getByRole("region", {
+      name: /directorio de usuarios/i
+    });
+    const pendingName = e2eData.admissions.pendingName;
+    const rejectedName = e2eData.admissions.rejectedName;
+
+    await expect(admissionRegion.getByText(pendingName)).toBeVisible();
+    await expect(admissionRegion.getByText(rejectedName)).toHaveCount(0);
+    await expect(usersRegion.getByText(rejectedName)).toHaveCount(0);
+
+    const pendingRow = admissionRegion
+      .getByRole("row")
+      .filter({ hasText: pendingName });
+    await pendingRow.getByRole("button", { name: "Rechazar" }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Rechazar" })
+      .click();
+
+    await expect(admissionRegion.getByText(pendingName)).toHaveCount(0);
+
+    await usersRegion.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "Rechazada" }).click();
+
+    await expect(usersRegion.getByText(pendingName)).toBeVisible();
+    await expect(usersRegion.getByText(rejectedName)).toBeVisible();
+  });
+
   test("opens a full assignment detail page from the assignments list @critical", async ({
     adminAssignmentsPage,
     page

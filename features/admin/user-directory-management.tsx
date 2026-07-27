@@ -42,7 +42,7 @@ import {
   VOLUNTEER_SERVICE_TYPE_LABELS,
   VOLUNTEER_SERVICE_TYPES
 } from "@/lib/constants/domain";
-import { cn } from "@/lib/utils";
+import { cn, formatDisplayDate } from "@/lib/utils";
 import type { UserAccountDto } from "@/services/user.service";
 import type {
   UserRole,
@@ -51,7 +51,7 @@ import type {
 } from "@/types/domain";
 
 type RoleFilter = "all" | UserRole;
-type AccessFilter = "all" | "APPROVED" | "SUSPENDED";
+type AccessFilter = "all" | "APPROVED" | "SUSPENDED" | "REJECTED";
 type ServiceTypeFilter = "all" | VolunteerServiceType;
 
 type UserDirectoryManagementProps = {
@@ -166,10 +166,21 @@ export function UserDirectoryManagement({
     () =>
       accounts.filter(
         (account) =>
-          ["APPROVED", "SUSPENDED"].includes(account.accessStatus) &&
-          !isAnonymizedAccount(account)
+          ["APPROVED", "SUSPENDED", "REJECTED"].includes(
+            account.accessStatus
+          ) && !isAnonymizedAccount(account)
       ),
     [accounts]
+  );
+
+  const accountsForCurrentStatus = useMemo(
+    () =>
+      managedAccounts.filter((account) =>
+        accessFilter === "all"
+          ? account.accessStatus !== "REJECTED"
+          : account.accessStatus === accessFilter
+      ),
+    [accessFilter, managedAccounts]
   );
 
   const activeAdminCount = useMemo(
@@ -183,7 +194,7 @@ export function UserDirectoryManagement({
   const filteredAccounts = useMemo(() => {
     const normalizedSearch = normalize(search.trim());
 
-    return managedAccounts.filter((account) => {
+    return accountsForCurrentStatus.filter((account) => {
       const volunteer = volunteersByUserId.get(account.id);
       const searchableText = normalize(
         [
@@ -210,11 +221,13 @@ export function UserDirectoryManagement({
         serviceTypeFilter === "all" ||
         volunteer?.serviceType === serviceTypeFilter;
 
-      return matchesSearch && matchesRole && matchesAccess && matchesServiceType;
+      return (
+        matchesSearch && matchesRole && matchesAccess && matchesServiceType
+      );
     });
   }, [
     accessFilter,
-    managedAccounts,
+    accountsForCurrentStatus,
     roleFilter,
     search,
     serviceTypeFilter,
@@ -541,7 +554,11 @@ export function UserDirectoryManagement({
   }
 
   return (
-    <div className="space-y-4">
+    <div
+      role="region"
+      aria-label="Directorio de usuarios"
+      className="space-y-4"
+    >
       <FilterBar>
         <SearchInput
           value={search}
@@ -570,12 +587,15 @@ export function UserDirectoryManagement({
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
+            <SelectItem value="all">Estados operativos</SelectItem>
             <SelectItem value="APPROVED">
               {USER_ACCESS_STATUS_LABELS.APPROVED}
             </SelectItem>
             <SelectItem value="SUSPENDED">
               {USER_ACCESS_STATUS_LABELS.SUSPENDED}
+            </SelectItem>
+            <SelectItem value="REJECTED">
+              {USER_ACCESS_STATUS_LABELS.REJECTED}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -599,7 +619,7 @@ export function UserDirectoryManagement({
         </Select>
         <div className="flex items-center justify-between gap-2 md:ml-auto">
           <p className="whitespace-nowrap text-sm text-muted-foreground">
-            {filteredAccounts.length} de {managedAccounts.length}
+            {filteredAccounts.length} de {accountsForCurrentStatus.length}
           </p>
           <Button
             type="button"
@@ -681,9 +701,11 @@ export function UserDirectoryManagement({
             </div>
           ) : (
             <div className="flex min-h-48 items-center justify-center px-4 py-8 text-center text-sm text-muted-foreground">
-              {managedAccounts.length
+              {accountsForCurrentStatus.length
                 ? "No hay usuarios que coincidan con esos filtros."
-                : "No hay usuarios aprobados o suspendidos para mostrar."}
+                : accessFilter === "REJECTED"
+                  ? "No hay solicitudes rechazadas para mostrar."
+                  : "No hay usuarios aprobados o suspendidos para mostrar."}
             </div>
           )}
         </div>
@@ -701,7 +723,7 @@ export function UserDirectoryManagement({
               <DialogHeader className="pr-8">
                 <DialogTitle>{selectedAccount.name}</DialogTitle>
                 <DialogDescription>
-                  Perfil de usuario aprobado y datos operativos de la cuenta.
+                  Perfil de usuario y datos operativos de la cuenta.
                 </DialogDescription>
               </DialogHeader>
 
@@ -767,6 +789,23 @@ export function UserDirectoryManagement({
                       ? "Cuenta activa"
                       : "Cuenta inactiva"}
                   </p>
+                  {selectedAccount.accessReviewedAt ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Revisada el{" "}
+                      {formatDisplayDate(
+                        selectedAccount.accessReviewedAt,
+                        "d MMM yyyy"
+                      )}
+                      {selectedAccount.accessReviewedBy
+                        ? ` por ${selectedAccount.accessReviewedBy.name}`
+                        : ""}
+                    </p>
+                  ) : null}
+                  {selectedAccount.accessReviewNote ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Nota de revisión: {selectedAccount.accessReviewNote}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="rounded-lg border border-border/60 bg-background/25 p-3 sm:col-span-2">

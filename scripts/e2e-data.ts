@@ -4,6 +4,10 @@ import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
 
 const E2E_EMAIL_PREFIX = "e2e+ppam-";
 const E2E_EMAIL_DOMAIN = "@example.invalid";
+const E2E_PENDING_ADMISSION_EMAIL = `${E2E_EMAIL_PREFIX}pending-admission${E2E_EMAIL_DOMAIN}`;
+const E2E_REJECTED_ADMISSION_EMAIL = `${E2E_EMAIL_PREFIX}rejected-admission${E2E_EMAIL_DOMAIN}`;
+const E2E_PENDING_ADMISSION_NAME = "E2E Pending Admission";
+const E2E_REJECTED_ADMISSION_NAME = "E2E Rejected Admission";
 const E2E_WEEK_LABEL = "E2E QA Week";
 const E2E_WEEK_START = new Date("2026-07-20T00:00:00.000Z");
 const E2E_WEEK_END = addDays(E2E_WEEK_START, 6);
@@ -382,6 +386,78 @@ async function seed() {
       role: "VOLUNTEER"
     }
   });
+
+  const pendingAdmission = await db.user.upsert({
+    where: { email: E2E_PENDING_ADMISSION_EMAIL },
+    update: {
+      accessReviewedAt: null,
+      accessReviewedById: null,
+      accessReviewNote: null,
+      accessStatus: "PENDING_APPROVAL",
+      active: false,
+      name: E2E_PENDING_ADMISSION_NAME,
+      passwordHash: volunteerPasswordHash,
+      phone: "000-000-0003",
+      role: "VOLUNTEER"
+    },
+    create: {
+      accessStatus: "PENDING_APPROVAL",
+      active: false,
+      email: E2E_PENDING_ADMISSION_EMAIL,
+      name: E2E_PENDING_ADMISSION_NAME,
+      passwordHash: volunteerPasswordHash,
+      phone: "000-000-0003",
+      role: "VOLUNTEER"
+    }
+  });
+
+  const rejectedAdmission = await db.user.upsert({
+    where: { email: E2E_REJECTED_ADMISSION_EMAIL },
+    update: {
+      accessReviewedAt: new Date("2026-07-01T12:00:00.000Z"),
+      accessReviewedById: admin.id,
+      accessReviewNote: "E2E solicitud rechazada para historial.",
+      accessStatus: "REJECTED",
+      active: false,
+      name: E2E_REJECTED_ADMISSION_NAME,
+      passwordHash: volunteerPasswordHash,
+      phone: "000-000-0004",
+      role: "VOLUNTEER"
+    },
+    create: {
+      accessReviewedAt: new Date("2026-07-01T12:00:00.000Z"),
+      accessReviewedById: admin.id,
+      accessReviewNote: "E2E solicitud rechazada para historial.",
+      accessStatus: "REJECTED",
+      active: false,
+      email: E2E_REJECTED_ADMISSION_EMAIL,
+      name: E2E_REJECTED_ADMISSION_NAME,
+      passwordHash: volunteerPasswordHash,
+      phone: "000-000-0004",
+      role: "VOLUNTEER"
+    }
+  });
+
+  for (const admission of [pendingAdmission, rejectedAdmission]) {
+    await db.volunteerProfile.upsert({
+      where: { userId: admission.id },
+      update: {
+        active: false,
+        canServeAsPrimary: false,
+        canServeAsReplacement: false,
+        preferredAreas: [],
+        temporaryUnavailable: true
+      },
+      create: {
+        userId: admission.id,
+        active: false,
+        canServeAsPrimary: false,
+        canServeAsReplacement: false,
+        preferredAreas: [],
+        temporaryUnavailable: true
+      }
+    });
+  }
 
   const volunteerProfile = await db.volunteerProfile.upsert({
     where: { userId: volunteer.id },

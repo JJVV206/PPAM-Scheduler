@@ -161,8 +161,15 @@ async function recordUserAccountAudit(
   });
 }
 
-export async function getUserAccounts(): Promise<UserAccountDto[]> {
+export async function getUserAccounts(
+  input: {
+    accessStatuses?: UserAccessStatus[];
+  } = {}
+): Promise<UserAccountDto[]> {
   const users = await db.user.findMany({
+    where: input.accessStatuses?.length
+      ? { accessStatus: { in: input.accessStatuses } }
+      : undefined,
     select: USER_ACCOUNT_SELECT,
     orderBy: [{ accessStatus: "asc" }, { role: "asc" }, { name: "asc" }]
   });
@@ -280,11 +287,13 @@ export async function reviewUserAdmission(input: {
     const reviewNote = input.note?.trim() || null;
 
     if (input.decision === "APPROVE") {
-      if (user.accessStatus === "SUSPENDED") {
-        throw new AppError(
-          "Esta cuenta está suspendida. Reactívala desde la gestión del perfil.",
-          409
-        );
+      if (user.accessStatus !== "PENDING_APPROVAL") {
+        const message =
+          user.accessStatus === "SUSPENDED"
+            ? "Esta cuenta está suspendida. Reactívala desde la gestión del perfil."
+            : "Solo se pueden aprobar solicitudes pendientes.";
+
+        throw new AppError(message, 409);
       }
 
       await tx.user.update({
@@ -321,12 +330,18 @@ export async function reviewUserAdmission(input: {
         });
       }
     } else {
-      if (
-        user.accessStatus === "APPROVED" ||
-        user.accessStatus === "SUSPENDED"
-      ) {
+      if (user.accessStatus === "REJECTED") {
+        const reviewedUser = await tx.user.findUniqueOrThrow({
+          where: { id: user.id },
+          select: USER_ACCOUNT_SELECT
+        });
+
+        return mapUserAccount(reviewedUser);
+      }
+
+      if (user.accessStatus !== "PENDING_APPROVAL") {
         throw new AppError(
-          "Solo se pueden rechazar solicitudes pendientes o previamente rechazadas.",
+          "Solo se pueden rechazar solicitudes pendientes.",
           409
         );
       }

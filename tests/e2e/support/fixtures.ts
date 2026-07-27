@@ -18,3 +18,8 @@ export const e2eAssignmentNotes = {
   volunteerAuthConfirm: "E2E volunteer authenticated confirm flow",
   volunteerPending: "E2E volunteer pending flow"
 } as const;
+
+export const e2eAdmissionFixtures = {
+  pendingName: "E2E Pending Admission",
+  rejectedName: "E2E Rejected Admission"
+} as const;

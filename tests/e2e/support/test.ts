@@ -1,6 +1,10 @@
 import { test as base } from "@playwright/test";
 
-import { e2eAssignmentFixtures, e2eAssignmentNotes } from "./fixtures";
+import {
+  e2eAdmissionFixtures,
+  e2eAssignmentFixtures,
+  e2eAssignmentNotes
+} from "./fixtures";
 import {
   clearMailpitInbox,
   getMailpitMessageDetail,
@@ -13,6 +17,7 @@ import { VolunteerAssignmentsPage } from "./pages/volunteer-assignments-page";
 type E2eFixtures = {
   adminAssignmentsPage: AdminAssignmentsPage;
   e2eData: {
+    admissions: typeof e2eAdmissionFixtures;
     fixtures: typeof e2eAssignmentFixtures;
     notes: typeof e2eAssignmentNotes;
   };
@@ -31,6 +36,7 @@ export const test = base.extend<E2eFixtures>({
   },
   e2eData: async ({}, use) => {
     await use({
+      admissions: e2eAdmissionFixtures,
       fixtures: e2eAssignmentFixtures,
       notes: e2eAssignmentNotes
     });

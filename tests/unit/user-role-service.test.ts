@@ -55,6 +55,7 @@ vi.mock("@/services/replacement-census.service", () => ({
 
 import {
   anonymizeUserAccount,
+  getUserAccounts,
   reactivateUserAccount,
   reviewUserAdmission,
   suspendUserAccount,
@@ -103,6 +104,19 @@ beforeEach(() => {
   mocks.tx.userAccountAuditLog.create.mockResolvedValue({});
   mocks.tx.volunteerProfile.create.mockResolvedValue(activeVolunteerProfile);
   mocks.tx.volunteerProfile.update.mockResolvedValue(activeVolunteerProfile);
+  mocks.db.user.findMany.mockResolvedValue([]);
+});
+
+describe("user account queries", () => {
+  it("filters accounts by the requested access statuses", async () => {
+    await getUserAccounts({ accessStatuses: ["PENDING_APPROVAL"] });
+
+    expect(mocks.db.user.findMany).toHaveBeenCalledWith({
+      where: { accessStatus: { in: ["PENDING_APPROVAL"] } },
+      select: expect.any(Object),
+      orderBy: [{ accessStatus: "asc" }, { role: "asc" }, { name: "asc" }]
+    });
+  });
 });
 
 describe("user role service", () => {
@@ -344,6 +358,7 @@ describe("user admission service", () => {
       data: expect.objectContaining({
         active: false,
         accessStatus: "REJECTED",
+        accessReviewedAt: expect.any(Date),
         accessReviewedById: "admin-1",
         accessReviewNote: "No coincide con la lista interna."
       })
@@ -362,6 +377,85 @@ describe("user admission service", () => {
       accessStatus: "REJECTED"
     });
   });
+
+  it("keeps an already rejected account unchanged on repeated rejection", async () => {
+    const reviewedAt = new Date("2026-06-20T12:00:00.000Z");
+    mocks.tx.user.findUniqueOrThrow
+      .mockResolvedValueOnce({
+        ...baseUser,
+        active: false,
+        accessStatus: "REJECTED",
+        accessReviewedAt: reviewedAt,
+        accessReviewedById: "admin-1",
+        accessReviewNote: "Registro no confirmado.",
+        role: "VOLUNTEER",
+        volunteerProfile: { id: "volunteer-1" }
+      })
+      .mockResolvedValueOnce(
+        accountResult({
+          active: false,
+          accessStatus: "REJECTED",
+          accessReviewedAt: reviewedAt,
+          accessReviewedBy: {
+            id: "admin-1",
+            name: "Admin PPAM",
+            email: "admin@example.org"
+          },
+          accessReviewNote: "Registro no confirmado.",
+          volunteerProfile: {
+            id: "volunteer-1",
+            active: false,
+            temporaryUnavailable: true,
+            canServeAsPrimary: false,
+            canServeAsReplacement: false
+          }
+        })
+      );
+
+    const result = await reviewUserAdmission({
+      userId: "user-1",
+      actorUserId: "admin-2",
+      decision: "REJECT",
+      note: "Otra nota"
+    });
+
+    expect(mocks.tx.user.update).not.toHaveBeenCalled();
+    expect(mocks.tx.volunteerProfile.update).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      accessStatus: "REJECTED",
+      accessReviewedAt: reviewedAt,
+      accessReviewNote: "Registro no confirmado."
+    });
+  });
+
+  it.each([
+    ["APPROVE", "REJECTED"],
+    ["APPROVE", "APPROVED"],
+    ["REJECT", "APPROVED"],
+    ["REJECT", "SUSPENDED"]
+  ] as const)(
+    "blocks %s for an account with status %s",
+    async (decision, accessStatus) => {
+      mocks.tx.user.findUniqueOrThrow.mockResolvedValueOnce({
+        ...baseUser,
+        active: accessStatus === "APPROVED",
+        accessStatus,
+        role: "VOLUNTEER",
+        volunteerProfile: { id: "volunteer-1" }
+      });
+
+      await expect(
+        reviewUserAdmission({
+          userId: "user-1",
+          actorUserId: "admin-1",
+          decision
+        })
+      ).rejects.toMatchObject({ statusCode: 409 });
+
+      expect(mocks.tx.user.update).not.toHaveBeenCalled();
+      expect(mocks.tx.volunteerProfile.update).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe("user account lifecycle service", () => {

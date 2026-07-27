@@ -40,12 +40,17 @@ export function UserAdmissionManagement({
   accounts
 }: UserAdmissionManagementProps) {
   const router = useRouter();
+  const [dismissedAccountIds, setDismissedAccountIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const admissionAccounts = useMemo(
     () =>
-      accounts.filter((account) =>
-        ["PENDING_APPROVAL", "REJECTED"].includes(account.accessStatus)
+      accounts.filter(
+        (account) =>
+          account.accessStatus === "PENDING_APPROVAL" &&
+          !dismissedAccountIds.has(account.id)
       ),
-    [accounts]
+    [accounts, dismissedAccountIds]
   );
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [rejectingAccount, setRejectingAccount] =
@@ -62,39 +67,68 @@ export function UserAdmissionManagement({
     reviewNote?: string
   ) {
     setPendingUserId(account.id);
+    setDismissedAccountIds((current) => {
+      const next = new Set(current);
+      next.add(account.id);
+      return next;
+    });
     setFeedback(null);
 
-    const response = await fetch(`/api/admin/users/${account.id}/admission`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision, note: reviewNote })
-    });
-    const result = await response.json().catch(() => ({}));
+    try {
+      const response = await fetch(`/api/admin/users/${account.id}/admission`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision, note: reviewNote })
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
 
-    if (!response.ok) {
+      if (!response.ok) {
+        setDismissedAccountIds((current) => {
+          const next = new Set(current);
+          next.delete(account.id);
+          return next;
+        });
+        setFeedback({
+          tone: "error",
+          text: result.error ?? "No se pudo revisar la solicitud."
+        });
+        setPendingUserId(null);
+        return;
+      }
+
       setFeedback({
-        tone: "error",
-        text: result.error ?? "No se pudo revisar la solicitud."
+        tone: "success",
+        text:
+          decision === "APPROVE"
+            ? `Cuenta aprobada para ${account.name}.`
+            : `Solicitud rechazada para ${account.name}.`
       });
       setPendingUserId(null);
-      return;
+      setRejectingAccount(null);
+      setNote("");
+      router.refresh();
+    } catch {
+      setDismissedAccountIds((current) => {
+        const next = new Set(current);
+        next.delete(account.id);
+        return next;
+      });
+      setFeedback({
+        tone: "error",
+        text: "No se pudo conectar con el servidor. Intenta de nuevo."
+      });
+      setPendingUserId(null);
     }
-
-    setFeedback({
-      tone: "success",
-      text:
-        decision === "APPROVE"
-          ? `Cuenta aprobada para ${account.name}.`
-          : `Solicitud rechazada para ${account.name}.`
-    });
-    setPendingUserId(null);
-    setRejectingAccount(null);
-    setNote("");
-    router.refresh();
   }
 
   return (
-    <div className="space-y-4">
+    <div
+      role="region"
+      aria-label="Solicitudes pendientes de admisión"
+      className="space-y-4"
+    >
       <FeedbackMessage message={feedback?.text} tone={feedback?.tone} />
       <Table>
         <TableHeader>
@@ -126,7 +160,9 @@ export function UserAdmissionManagement({
                   </TableCell>
                   <TableCell>{account.phone}</TableCell>
                   <TableCell>
-                    <Badge variant={getAccessBadgeVariant(account.accessStatus)}>
+                    <Badge
+                      variant={getAccessBadgeVariant(account.accessStatus)}
+                    >
                       {USER_ACCESS_STATUS_LABELS[account.accessStatus]}
                     </Badge>
                   </TableCell>
@@ -137,9 +173,7 @@ export function UserAdmissionManagement({
                     <div className="flex flex-wrap gap-2">
                       <Button
                         size="sm"
-                        onClick={() =>
-                          void reviewAdmission(account, "APPROVE")
-                        }
+                        onClick={() => void reviewAdmission(account, "APPROVE")}
                         disabled={isPending}
                       >
                         Aprobar
@@ -203,7 +237,9 @@ export function UserAdmissionManagement({
             <Button
               type="button"
               variant="danger"
-              disabled={!rejectingAccount || pendingUserId === rejectingAccount.id}
+              disabled={
+                !rejectingAccount || pendingUserId === rejectingAccount.id
+              }
               onClick={() => {
                 if (!rejectingAccount) return;
                 void reviewAdmission(rejectingAccount, "REJECT", note);
