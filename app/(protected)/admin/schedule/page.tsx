@@ -10,7 +10,6 @@ import {
   getWeeklySchedule
 } from "@/services/assignment.service";
 import { getPreachingPoints } from "@/services/point.service";
-import { getVolunteers } from "@/services/volunteer.service";
 import { db } from "@/lib/db/prisma";
 import { formatDateRange } from "@/lib/utils";
 
@@ -39,10 +38,9 @@ export default async function AdminSchedulePage({
     schedule.endDate
   );
 
-  const [preachingPoints, volunteers, currentWeek, availableWeeks, preparation] =
+  const [preachingPoints, currentWeek, availableWeeks, preparation] =
     await Promise.all([
       getPreachingPoints(),
-      getVolunteers({ activeOnly: true }),
       db.scheduleWeek.findFirst({
         where: {
           startDate: schedule.startDate
@@ -106,7 +104,6 @@ export default async function AdminSchedulePage({
                   triggerSize="default"
                   weekStartDate={schedule.startDate.toISOString().slice(0, 10)}
                   preachingPoints={formattedPoints}
-                  volunteers={volunteers}
                 />
               </div>
             ) : null}

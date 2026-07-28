@@ -26,8 +26,7 @@ import {
 } from "@/lib/utils";
 import type {
   AssignmentDetailDto,
-  PreachingPointSummary,
-  VolunteerSummary
+  PreachingPointSummary
 } from "@/types/domain";
 
 const COLLAPSED_MONTHS_STORAGE_KEY = "ppam-assignments-collapsed-months";
@@ -37,7 +36,6 @@ const COLLAPSED_DAYS_STORAGE_KEY = "ppam-assignments-collapsed-days";
 type AssignmentGroupedListProps = {
   assignments: AssignmentDetailDto[];
   preachingPoints: PreachingPointSummary[];
-  volunteers: VolunteerSummary[];
 };
 
 type AssignmentDayGroup = {
@@ -212,8 +210,7 @@ function writeStoredSet(key: string, value: Set<string>) {
 
 export function AssignmentGroupedList({
   assignments,
-  preachingPoints,
-  volunteers
+  preachingPoints
 }: AssignmentGroupedListProps) {
   const weekGroups = useMemo(
     () => groupAssignmentsByWeek(assignments),
@@ -541,7 +538,6 @@ export function AssignmentGroupedList({
                                               assignment={assignment}
                                               triggerLabel="Vista rápida"
                                               preachingPoints={preachingPoints}
-                                              volunteers={volunteers}
                                             />
                                           </div>
                                         </TableCell>
@@ -602,7 +598,6 @@ export function AssignmentGroupedList({
                                           assignment={assignment}
                                           triggerLabel="Vista rápida"
                                           preachingPoints={preachingPoints}
-                                          volunteers={volunteers}
                                         />
                                       </div>
                                     </div>

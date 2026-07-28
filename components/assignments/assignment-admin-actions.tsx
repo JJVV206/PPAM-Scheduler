@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { FeedbackMessage } from "@/components/ui/feedback-message";
 import { TimeSlotOptionButton } from "@/components/assignments/time-slot-option-button";
 import { useAssignmentPreflightWarnings } from "@/components/assignments/use-assignment-preflight-warnings";
+import { useEligibleVolunteers } from "@/components/assignments/use-eligible-volunteers";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { DAY_LABELS, TIME_SLOTS } from "@/lib/constants/domain";
+import { getPpamDayOfWeek } from "@/lib/assignments/time";
 import { cn } from "@/lib/utils";
 import type {
   AssignmentDetailDto,
@@ -30,24 +32,13 @@ import type {
 type AssignmentAdminActionsProps = {
   assignment: AssignmentDetailDto;
   preachingPoints: PreachingPointSummary[];
-  volunteers: VolunteerSummary[];
   compact?: boolean;
   showDivider?: boolean;
   showHeading?: boolean;
 };
 
 function getDayOfWeekFromDate(value: string): DayOfWeek {
-  const date = new Date(`${value}T12:00:00`);
-  const sundayFirstOrder: DayOfWeek[] = [
-    "SUNDAY",
-    "MONDAY",
-    "TUESDAY",
-    "WEDNESDAY",
-    "THURSDAY",
-    "FRIDAY",
-    "SATURDAY"
-  ];
-  return sundayFirstOrder[date.getDay()];
+  return getPpamDayOfWeek(new Date(value + "T12:00:00.000Z"));
 }
 
 function toAssignmentIsoDate(value: string) {
@@ -69,7 +60,6 @@ function hasDuplicateVolunteerIds(volunteerIds: string[]) {
 export function AssignmentAdminActions({
   assignment,
   preachingPoints,
-  volunteers,
   compact = false,
   showDivider = true,
   showHeading = true
@@ -93,6 +83,9 @@ export function AssignmentAdminActions({
         Math.max(assignment.volunteers.length, MIN_VISIBLE_MEMBER_FIELDS)
       )
   );
+  const [knownVolunteers, setKnownVolunteers] = useState<VolunteerSummary[]>(
+    () => assignment.volunteers.map((item) => item.volunteer)
+  );
   const [notes, setNotes] = useState(assignment.notes ?? "");
   const [loading, setLoading] = useState<"save" | "resolve" | "cancel" | null>(
     null
@@ -101,28 +94,72 @@ export function AssignmentAdminActions({
     tone: "success" | "error";
     text: string;
   } | null>(null);
-  const volunteerOptions = useMemo(() => {
-    const options = new Map<string, VolunteerSummary>();
+  const selectedMemberVolunteerIds = useMemo(
+    () => normalizeSelectedVolunteerIds(memberVolunteerIds),
+    [memberVolunteerIds]
+  );
+  const eligibleVolunteersQuery = useEligibleVolunteers({
+    assignmentId: assignment.id,
+    date: assignmentDate,
+    timeSlot,
+    enabled: true
+  });
+  const eligibleVolunteers = useMemo(
+    () => eligibleVolunteersQuery.data?.volunteers ?? [],
+    [eligibleVolunteersQuery.data]
+  );
+  const eligibleVolunteerIds = useMemo(
+    () => new Set(eligibleVolunteers.map((volunteer) => volunteer.id)),
+    [eligibleVolunteers]
+  );
 
-    for (const volunteer of volunteers) {
-      if (volunteer.canServeAsPrimary) {
-        options.set(volunteer.id, volunteer);
+  useEffect(() => {
+    if (!eligibleVolunteersQuery.data?.volunteers.length) return;
+
+    setKnownVolunteers((current) => {
+      const next = new Map(
+        current.map((volunteer) => [volunteer.id, volunteer])
+      );
+      for (const volunteer of eligibleVolunteersQuery.data.volunteers) {
+        next.set(volunteer.id, volunteer);
       }
-    }
+      return [...next.values()];
+    });
+  }, [eligibleVolunteersQuery.data]);
 
-    for (const slot of assignment.volunteers) {
-      options.set(slot.volunteer.id, slot.volunteer);
+  const volunteerOptions = useMemo(() => {
+    const options = new Map(
+      eligibleVolunteers.map((volunteer) => [volunteer.id, volunteer])
+    );
+    const knownById = new Map(
+      knownVolunteers.map((volunteer) => [volunteer.id, volunteer])
+    );
+
+    for (const volunteerId of selectedMemberVolunteerIds) {
+      const knownVolunteer = knownById.get(volunteerId);
+      if (knownVolunteer) options.set(volunteerId, knownVolunteer);
     }
 
     return [...options.values()].sort((left, right) =>
       left.name.localeCompare(right.name, "es-MX")
     );
-  }, [assignment.volunteers, volunteers]);
-  const selectedMemberVolunteerIds = useMemo(
-    () => normalizeSelectedVolunteerIds(memberVolunteerIds),
-    [memberVolunteerIds]
-  );
+  }, [eligibleVolunteers, knownVolunteers, selectedMemberVolunteerIds]);
   const canAddMemberField = memberVolunteerIds.length < volunteerOptions.length;
+  const originalAssignmentDate = assignment.date.toISOString().slice(0, 10);
+  const originalVolunteerIds = useMemo(
+    () => new Set(assignment.volunteers.map((item) => item.volunteerId)),
+    [assignment.volunteers]
+  );
+  const assignmentSlotChanged =
+    assignmentDate !== originalAssignmentDate ||
+    timeSlot !== assignment.timeSlot;
+  const hasIneligibleSelection =
+    eligibleVolunteersQuery.isSuccess &&
+    selectedMemberVolunteerIds.some(
+      (volunteerId) =>
+        !eligibleVolunteerIds.has(volunteerId) &&
+        (assignmentSlotChanged || !originalVolunteerIds.has(volunteerId))
+    );
 
   const selectedDayOfWeek = useMemo(
     () => getDayOfWeekFromDate(assignmentDate),
@@ -191,7 +228,8 @@ export function AssignmentAdminActions({
 
     return volunteerOptions.filter(
       (volunteer) =>
-        volunteer.id === memberVolunteerIds[index] ||
+        (volunteer.id === memberVolunteerIds[index] ||
+          eligibleVolunteerIds.has(volunteer.id)) &&
         !selectedIds.has(volunteer.id)
     );
   }
@@ -210,6 +248,33 @@ export function AssignmentAdminActions({
     setFeedback(null);
     const selectedVolunteerIds =
       normalizeSelectedVolunteerIds(memberVolunteerIds);
+
+    if (eligibleVolunteersQuery.isFetching) {
+      setLoading(null);
+      setFeedback({
+        tone: "error",
+        text: "Espera a que termine la consulta de voluntarios disponibles."
+      });
+      return;
+    }
+
+    if (eligibleVolunteersQuery.isError) {
+      setLoading(null);
+      setFeedback({
+        tone: "error",
+        text: "No fue posible consultar los voluntarios disponibles. Inténtalo de nuevo."
+      });
+      return;
+    }
+
+    if (hasIneligibleSelection) {
+      setLoading(null);
+      setFeedback({
+        tone: "error",
+        text: "Quita los integrantes que ya no están disponibles para este horario."
+      });
+      return;
+    }
 
     if (hasDuplicateVolunteerIds(selectedVolunteerIds)) {
       setLoading(null);
@@ -350,7 +415,12 @@ export function AssignmentAdminActions({
 
       <div className="space-y-3">
         <div className="grid gap-2">
-          <label className="text-sm font-medium">Integrantes</label>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Integrantes</label>
+            <span className="text-xs text-muted-foreground">
+              {eligibleVolunteers.length} candidatos disponibles
+            </span>
+          </div>
           <Button
             type="button"
             size={compact ? "sm" : "default"}
@@ -392,6 +462,7 @@ export function AssignmentAdminActions({
                 </div>
                 <Select
                   value={volunteerId || UNASSIGNED_VOLUNTEER_VALUE}
+                  disabled={eligibleVolunteersQuery.isFetching}
                   onValueChange={(nextValue) =>
                     setMemberVolunteerId(
                       index,
@@ -409,6 +480,9 @@ export function AssignmentAdminActions({
                     {selectableVolunteers.map((volunteer) => (
                       <SelectItem key={volunteer.id} value={volunteer.id}>
                         {volunteer.name}
+                        {!eligibleVolunteerIds.has(volunteer.id)
+                          ? " (ya no disponible)"
+                          : ""}
                         {volunteer.active ? "" : " (inactivo)"}
                       </SelectItem>
                     ))}
@@ -418,6 +492,27 @@ export function AssignmentAdminActions({
             );
           })}
         </div>
+        {eligibleVolunteersQuery.isFetching ? (
+          <p className="text-xs text-muted-foreground">
+            Consultando voluntarios disponibles...
+          </p>
+        ) : null}
+        {eligibleVolunteersQuery.isSuccess && !eligibleVolunteers.length ? (
+          <p className="rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
+            No hay voluntarios disponibles para este horario.
+          </p>
+        ) : null}
+        {eligibleVolunteersQuery.isError ? (
+          <p className="rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-xs text-danger">
+            No fue posible consultar los voluntarios disponibles.
+          </p>
+        ) : null}
+        {hasIneligibleSelection ? (
+          <p className="rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
+            Hay un integrante seleccionado que no está disponible para el
+            horario actual. Quita esa selección o cambia el horario.
+          </p>
+        ) : null}
       </div>
 
       <div className="grid gap-2">
@@ -453,7 +548,9 @@ export function AssignmentAdminActions({
             loading !== null ||
             !assignmentDate ||
             !preachingPointId ||
-            hasDuplicateVolunteerIds(memberVolunteerIds)
+            hasDuplicateVolunteerIds(memberVolunteerIds) ||
+            eligibleVolunteersQuery.isFetching ||
+            hasIneligibleSelection
           }
         >
           {loading === "save" ? "Guardando..." : "Guardar cambios"}

@@ -28,14 +28,12 @@ import {
 import { formatDisplayDate } from "@/lib/utils";
 import type {
   AssignmentDetailDto,
-  PreachingPointSummary,
-  VolunteerSummary
+  PreachingPointSummary
 } from "@/types/domain";
 
 type AssignmentDetailContentProps = {
   assignment: AssignmentDetailDto;
   preachingPoints?: PreachingPointSummary[];
-  volunteers?: VolunteerSummary[];
   compact?: boolean;
 };
 
@@ -305,7 +303,6 @@ function InvitationList({
 export function AssignmentDetailContent({
   assignment,
   preachingPoints,
-  volunteers,
   compact = false
 }: AssignmentDetailContentProps) {
   const timelineEntries = assignment.timeline;
@@ -386,7 +383,7 @@ export function AssignmentDetailContent({
               </div>
               <InvitationList
                 assignment={assignment}
-                allowLinkCopy={Boolean(preachingPoints && volunteers)}
+                allowLinkCopy={Boolean(preachingPoints)}
               />
             </CardContent>
           </Card>
@@ -484,7 +481,7 @@ export function AssignmentDetailContent({
             </CardContent>
           </Card>
 
-          {preachingPoints && volunteers ? (
+          {preachingPoints ? (
             <Card className="bg-background/25">
               <CardContent className="space-y-4 p-5">
                 <div>
@@ -497,7 +494,6 @@ export function AssignmentDetailContent({
                 <AssignmentAdminActions
                   assignment={assignment}
                   preachingPoints={preachingPoints}
-                  volunteers={volunteers}
                   showDivider={false}
                   showHeading={false}
                 />
@@ -615,7 +611,7 @@ export function AssignmentDetailContent({
               <InvitationList
                 assignment={assignment}
                 compact
-                allowLinkCopy={Boolean(preachingPoints && volunteers)}
+                allowLinkCopy={Boolean(preachingPoints)}
               />
             </div>
           </details>
@@ -643,7 +639,7 @@ export function AssignmentDetailContent({
             />
           </div>
 
-          {preachingPoints && volunteers ? (
+          {preachingPoints ? (
             compact ? (
               <details className="rounded-lg border border-border/60 bg-background/35 p-4">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold">
@@ -657,7 +653,6 @@ export function AssignmentDetailContent({
                   <AssignmentAdminActions
                     assignment={assignment}
                     preachingPoints={preachingPoints}
-                    volunteers={volunteers}
                     compact
                     showDivider={false}
                     showHeading={false}
@@ -668,7 +663,6 @@ export function AssignmentDetailContent({
               <AssignmentAdminActions
                 assignment={assignment}
                 preachingPoints={preachingPoints}
-                volunteers={volunteers}
               />
             )
           ) : null}

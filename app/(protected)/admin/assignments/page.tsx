@@ -11,16 +11,14 @@ import {
   getWeeklySchedule
 } from "@/services/assignment.service";
 import { getPreachingPoints } from "@/services/point.service";
-import { getVolunteers } from "@/services/volunteer.service";
 
 export default async function AdminAssignmentsPage() {
   const schedule = await getWeeklySchedule();
 
-  const [assignments, preachingPoints, volunteers, currentWeek] =
+  const [assignments, preachingPoints, currentWeek] =
     await Promise.all([
       getAssignments(),
       getPreachingPoints(),
-      getVolunteers({ activeOnly: true }),
       db.scheduleWeek.findFirst({
         where: {
           startDate: schedule.startDate
@@ -52,7 +50,6 @@ export default async function AdminAssignmentsPage() {
             scheduleWeekId={currentWeek.id}
             weekStartDate={schedule.startDate.toISOString().slice(0, 10)}
             preachingPoints={mappedPreachingPoints}
-            volunteers={volunteers}
           />
         ) : (
           <Button asChild>
@@ -65,7 +62,6 @@ export default async function AdminAssignmentsPage() {
         <AssignmentGroupedList
           assignments={assignments}
           preachingPoints={mappedPreachingPoints}
-          volunteers={volunteers}
         />
       ) : (
         <EmptyState

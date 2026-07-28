@@ -62,6 +62,15 @@ export type VolunteerSummary = {
   serviceType: VolunteerServiceType;
 };
 
+export type EligibleVolunteersResponse = {
+  volunteers: VolunteerSummary[];
+  context: {
+    date: string;
+    dayOfWeek: DayOfWeek;
+    timeSlot: TimeSlot;
+  };
+};
+
 export type PreachingPointSummary = {
   id: string;
   name: string;

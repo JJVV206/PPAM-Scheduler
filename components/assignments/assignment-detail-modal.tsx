@@ -14,22 +14,19 @@ import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
 import { formatDisplayDate } from "@/lib/utils";
 import type {
   AssignmentDetailDto,
-  PreachingPointSummary,
-  VolunteerSummary
+  PreachingPointSummary
 } from "@/types/domain";
 
 type AssignmentDetailModalProps = {
   assignment: AssignmentDetailDto;
   triggerLabel?: string;
   preachingPoints?: PreachingPointSummary[];
-  volunteers?: VolunteerSummary[];
 };
 
 export function AssignmentDetailModal({
   assignment,
   triggerLabel = "Ver detalles",
-  preachingPoints,
-  volunteers
+  preachingPoints
 }: AssignmentDetailModalProps) {
   return (
     <Dialog>
@@ -49,7 +46,6 @@ export function AssignmentDetailModal({
         <AssignmentDetailContent
           assignment={assignment}
           preachingPoints={preachingPoints}
-          volunteers={volunteers}
           compact
         />
       </DialogContent>

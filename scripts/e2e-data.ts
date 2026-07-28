@@ -517,6 +517,12 @@ async function seed() {
       },
       {
         volunteerId: volunteerProfile.id,
+        dayOfWeek: "MONDAY",
+        timeSlot: "SLOT_11_13",
+        areaPreference: "E2E"
+      },
+      {
+        volunteerId: volunteerProfile.id,
         dayOfWeek: "SATURDAY",
         timeSlot: "SLOT_09_11",
         areaPreference: "E2E"

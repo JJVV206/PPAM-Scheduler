@@ -51,6 +51,11 @@ import {
 } from "@/services/schedule-week-preparation.service";
 import { formatDateRange, safePercentage } from "@/lib/utils";
 import { mergeJsonMetadata } from "@/lib/utils/safe-metadata";
+import {
+  assertPpamDayMatchesDate,
+  getPpamDateKey,
+  getPpamDayOfWeek
+} from "@/lib/assignments/time";
 import { determineAssignmentStatus } from "@/services/assignment-engine";
 import { getSingletonPreachingPoint } from "@/services/point.service";
 import {
@@ -69,6 +74,10 @@ import {
 } from "@/services/app-notification.service";
 import { recordAutomationAuditLog } from "@/services/automation-audit-log.service";
 import { deriveVolunteerServiceType } from "@/lib/volunteer-service-type";
+import {
+  assertVolunteersEligibleForSlot,
+  getEligiblePrimaryVolunteers
+} from "@/services/volunteer-eligibility.service";
 
 const assignmentInclude = {
   scheduleWeek: true,
@@ -555,6 +564,7 @@ async function assertPointSupportsSlot(input: {
 }
 
 async function assertNoVolunteerConflicts(input: {
+  client?: Prisma.TransactionClient;
   assignmentId?: string;
   date: Date;
   timeSlot: TimeSlot;
@@ -562,7 +572,8 @@ async function assertNoVolunteerConflicts(input: {
 }) {
   if (!input.volunteerIds.length) return;
 
-  const conflicts = await db.assignmentVolunteer.findMany({
+  const client = input.client ?? db;
+  const conflicts = await client.assignmentVolunteer.findMany({
     where: {
       volunteerId: { in: input.volunteerIds },
       assignment: {
@@ -682,44 +693,6 @@ export async function getSameDayVolunteerRepeatWarnings(input: {
     repeatedVolunteerIds: repeatedVolunteers.map((item) => item.volunteerId),
     repeatedVolunteers
   };
-}
-
-async function assertVolunteersCanServeAsPrimary(volunteerIds: string[]) {
-  const uniqueVolunteerIds = [...new Set(volunteerIds)];
-  if (!uniqueVolunteerIds.length) return;
-
-  const volunteers = await db.volunteerProfile.findMany({
-    where: {
-      id: { in: uniqueVolunteerIds }
-    },
-    select: {
-      id: true,
-      canServeAsPrimary: true,
-      user: {
-        select: {
-          name: true
-        }
-      }
-    }
-  });
-  const foundVolunteerIds = new Set(
-    volunteers.map((volunteer) => volunteer.id)
-  );
-  const invalidVolunteerNames = volunteers
-    .filter((volunteer) => !volunteer.canServeAsPrimary)
-    .map((volunteer) => volunteer.user.name);
-  const missingVolunteerIds = uniqueVolunteerIds.filter(
-    (volunteerId) => !foundVolunteerIds.has(volunteerId)
-  );
-
-  if (invalidVolunteerNames.length || missingVolunteerIds.length) {
-    throw new AppError(
-      invalidVolunteerNames.length
-        ? `No puedes asignar como titular a: ${invalidVolunteerNames.join(", ")}.`
-        : "Uno de los voluntarios seleccionados no existe.",
-      409
-    );
-  }
 }
 
 async function assertVolunteerCanServeAsReplacement(volunteerId: string) {
@@ -916,10 +889,20 @@ export async function createWeeklyAssignment(input: {
   actorUserId: string;
 }) {
   const fixedPoint = await getSingletonPreachingPoint();
+  const derivedDayOfWeek = getPpamDayOfWeek(input.date);
+
+  if (
+    !assertPpamDayMatchesDate({ date: input.date, dayOfWeek: input.dayOfWeek })
+  ) {
+    throw new AppError(
+      "El día de la asignación no coincide con la fecha seleccionada.",
+      400
+    );
+  }
 
   await assertPointSupportsSlot({
     preachingPointId: fixedPoint.id,
-    dayOfWeek: input.dayOfWeek,
+    dayOfWeek: derivedDayOfWeek,
     timeSlot: input.timeSlot,
     allowAllSlots: fixedPoint.name === FIXED_PREACHING_POINT_NAME
   });
@@ -927,12 +910,6 @@ export async function createWeeklyAssignment(input: {
   const uniqueVolunteerIds = [
     ...new Set(input.volunteers.map((volunteer) => volunteer.volunteerId))
   ];
-  await assertVolunteersCanServeAsPrimary(uniqueVolunteerIds);
-  await assertNoVolunteerConflicts({
-    date: input.date,
-    timeSlot: input.timeSlot,
-    volunteerIds: uniqueVolunteerIds
-  });
 
   const assignment = await db.$transaction(async (tx) => {
     const pairNumber =
@@ -944,11 +921,26 @@ export async function createWeeklyAssignment(input: {
         preachingPointId: fixedPoint.id
       }));
 
+    if (input.volunteers.length) {
+      await assertVolunteersEligibleForSlot({
+        client: tx,
+        date: input.date,
+        timeSlot: input.timeSlot,
+        volunteerIds: uniqueVolunteerIds
+      });
+      await assertNoVolunteerConflicts({
+        client: tx,
+        date: input.date,
+        timeSlot: input.timeSlot,
+        volunteerIds: uniqueVolunteerIds
+      });
+    }
+
     const created = await tx.assignment.create({
       data: {
         scheduleWeekId: input.scheduleWeekId,
         date: input.date,
-        dayOfWeek: input.dayOfWeek,
+        dayOfWeek: derivedDayOfWeek,
         timeSlot: input.timeSlot,
         preachingPointId: fixedPoint.id,
         pairNumber,
@@ -1033,7 +1025,7 @@ export async function updateAssignment(
   const fixedPoint = await getSingletonPreachingPoint();
 
   const nextDate = input.date ?? current.date;
-  const nextDayOfWeek = input.dayOfWeek ?? current.dayOfWeek;
+  const nextDayOfWeek = getPpamDayOfWeek(nextDate);
   const nextTimeSlot = input.timeSlot ?? current.timeSlot;
   const nextPreachingPointId = fixedPoint.id;
   const volunteerIds =
@@ -1050,13 +1042,23 @@ export async function updateAssignment(
     ? difference(nextVolunteerIds, currentVolunteerIds)
     : [];
   const movedToNewSlot =
-    !isSameDay(nextDate, current.date) ||
+    getPpamDateKey(nextDate) !== getPpamDateKey(current.date) ||
     nextTimeSlot !== current.timeSlot ||
     nextPreachingPointId !== current.preachingPointId;
   const statusChangedAt = input.status ? new Date() : undefined;
   const updatedFields = Object.entries(input)
     .filter(([field, value]) => field !== "actorUserId" && value !== undefined)
     .map(([field]) => field);
+
+  if (
+    input.dayOfWeek &&
+    !assertPpamDayMatchesDate({ date: nextDate, dayOfWeek: input.dayOfWeek })
+  ) {
+    throw new AppError(
+      "El día de la asignación no coincide con la fecha seleccionada.",
+      400
+    );
+  }
 
   await assertPointSupportsSlot({
     preachingPointId: nextPreachingPointId,
@@ -1065,18 +1067,26 @@ export async function updateAssignment(
     allowAllSlots: fixedPoint.name === FIXED_PREACHING_POINT_NAME
   });
 
-  await assertNoVolunteerConflicts({
-    assignmentId,
-    date: nextDate,
-    timeSlot: nextTimeSlot,
-    volunteerIds
-  });
-
-  if (input.volunteers) {
-    await assertVolunteersCanServeAsPrimary(nextVolunteerIds);
-  }
-
   const assignment = await db.$transaction(async (tx) => {
+    const volunteerIdsToValidate = movedToNewSlot
+      ? nextVolunteerIds
+      : addedVolunteerIds;
+
+    await assertVolunteersEligibleForSlot({
+      client: tx,
+      date: nextDate,
+      timeSlot: nextTimeSlot,
+      volunteerIds: volunteerIdsToValidate,
+      assignmentId
+    });
+    await assertNoVolunteerConflicts({
+      client: tx,
+      assignmentId,
+      date: nextDate,
+      timeSlot: nextTimeSlot,
+      volunteerIds
+    });
+
     const pairNumber = movedToNewSlot
       ? await getNextPairNumber({
           tx,
@@ -1090,7 +1100,7 @@ export async function updateAssignment(
       where: { id: assignmentId },
       data: {
         date: input.date,
-        dayOfWeek: input.dayOfWeek,
+        dayOfWeek: nextDayOfWeek,
         timeSlot: input.timeSlot,
         preachingPointId: nextPreachingPointId,
         pairNumber,
@@ -1476,16 +1486,6 @@ export async function duplicateScheduleWeek(input: {
     }
   });
   const fixedPoint = await getSingletonPreachingPoint();
-  const titularVolunteerIds = getUniqueIds(
-    sourceWeek.assignments.flatMap((assignment) =>
-      assignment.volunteers
-        .filter((volunteer) => !volunteer.isReplacement)
-        .map((volunteer) => volunteer.volunteerId)
-    )
-  );
-
-  await assertVolunteersCanServeAsPrimary(titularVolunteerIds);
-
   for (const assignment of sourceWeek.assignments) {
     await assertPointSupportsSlot({
       preachingPointId: fixedPoint.id,
@@ -1558,11 +1558,19 @@ export async function duplicateScheduleWeek(input: {
       const uniqueAssignmentVolunteerIds = getUniqueIds(
         titularVolunteers.map((volunteer) => volunteer.volunteerId)
       );
+
+      await assertVolunteersEligibleForSlot({
+        client: tx,
+        date: newDate,
+        timeSlot: assignment.timeSlot,
+        volunteerIds: uniqueAssignmentVolunteerIds
+      });
+
       const created = await tx.assignment.create({
         data: {
           scheduleWeekId: targetWeek.id,
           date: newDate,
-          dayOfWeek: assignment.dayOfWeek,
+          dayOfWeek: getPpamDayOfWeek(newDate),
           timeSlot: assignment.timeSlot,
           preachingPointId: fixedPoint.id,
           pairNumber: assignment.pairNumber,
@@ -2539,48 +2547,12 @@ export async function getAvailableVolunteersForSlot(input: {
   area?: string;
   excludeVolunteerIds?: string[];
 }) {
-  const volunteers = await db.volunteerProfile.findMany({
-    where: {
-      active: true,
-      canServeAsPrimary: true,
-      temporaryUnavailable: false,
-      user: { active: true, accessStatus: "APPROVED" },
-      id: {
-        notIn: input.excludeVolunteerIds ?? []
-      },
-      availability: {
-        some: {
-          dayOfWeek: input.dayOfWeek,
-          timeSlot: input.timeSlot,
-          available: true
-        }
-      },
-      assignments: {
-        none: {
-          assignment: {
-            date: input.date,
-            timeSlot: input.timeSlot,
-            status: {
-              notIn: ["CANCELLED"]
-            }
-          }
-        }
-      },
-      availabilityBlocks: {
-        none: {
-          startDate: { lte: input.date },
-          endDate: { gte: input.date }
-        }
-      }
-    },
-    include: {
-      user: true
-    },
-    orderBy: [{ reliabilityScore: "desc" }, { user: { name: "asc" } }],
-    take: 6
+  const mapped = await getEligiblePrimaryVolunteers({
+    date: input.date,
+    timeSlot: input.timeSlot,
+    volunteerIds: undefined,
+    excludeVolunteerIds: input.excludeVolunteerIds
   });
-
-  const mapped = volunteers.map(mapVolunteerSummary);
   if (!input.area) return mapped;
   const area = input.area;
 

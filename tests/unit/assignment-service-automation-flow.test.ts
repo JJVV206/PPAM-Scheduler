@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => {
       createMany: vi.fn(),
       delete: vi.fn(),
       deleteMany: vi.fn(),
+      findMany: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn()
     },
@@ -46,6 +47,7 @@ const mocks = vi.hoisted(() => {
       findUnique: vi.fn()
     },
     volunteerProfile: {
+      findMany: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn()
     }
@@ -252,6 +254,7 @@ function setupAssignmentDefaults() {
   mocks.getAppSettings.mockResolvedValue({ confirmationLeadDays: 7 });
   mocks.db.preachingPoint.findUniqueOrThrow.mockResolvedValue(fixedPoint);
   mocks.db.assignmentVolunteer.findMany.mockResolvedValue([]);
+  mocks.tx.assignmentVolunteer.findMany.mockResolvedValue([]);
   mocks.db.volunteerProfile.findMany.mockImplementation(
     async ({ where }: { where: { id?: { in?: string[] } } }) =>
       (where.id?.in ?? []).map((id) => ({
@@ -259,6 +262,31 @@ function setupAssignmentDefaults() {
         canServeAsPrimary: true,
         user: {
           name: `Voluntario ${id}`
+        }
+      }))
+  );
+  mocks.tx.volunteerProfile.findMany.mockImplementation(
+    async ({ where }: { where: { id?: { in?: string[] } } }) =>
+      (where.id?.in ?? []).map((id) => ({
+        id,
+        userId: `user-${id}`,
+        transportationNotes: null,
+        preferredAreas: [],
+        reliabilityScore: 80,
+        confirmationCount: 0,
+        declineCount: 0,
+        noResponseCount: 0,
+        active: true,
+        temporaryUnavailable: false,
+        canServeAsPrimary: true,
+        canServeAsReplacement: true,
+        user: {
+          id: `user-${id}`,
+          name: `Voluntario ${id}`,
+          email: `${id}@example.org`,
+          phone: "555-0100",
+          active: true,
+          accessStatus: "APPROVED"
         }
       }))
   );
@@ -426,10 +454,9 @@ describe("assignment automation orchestration", () => {
   });
 
   it("rejects primary assignments for volunteers without primary capacity", async () => {
-    mocks.db.volunteerProfile.findMany.mockResolvedValueOnce([
+    mocks.tx.volunteerProfile.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
       {
         id: "replacement-only",
-        canServeAsPrimary: false,
         user: {
           name: "Solo Suplente"
         }
@@ -566,7 +593,7 @@ describe("assignment automation orchestration", () => {
   });
 
   it("keeps exact same-day and same-time volunteer conflicts blocking", async () => {
-    mocks.db.assignmentVolunteer.findMany.mockResolvedValueOnce([
+    mocks.tx.assignmentVolunteer.findMany.mockResolvedValueOnce([
       {
         volunteer: {
           user: {
@@ -1078,6 +1105,60 @@ describe("assignment automation orchestration", () => {
       assignmentId: "assignment-1",
       actorUserId: "admin-1"
     });
+  });
+
+  it("rejects moving an assignment when an existing member lacks new-slot availability", async () => {
+    mocks.db.assignment.findUniqueOrThrow.mockResolvedValueOnce(
+      assignmentDetail({
+        date: new Date(2026, 6, 20),
+        volunteers: [assignmentSlot("volunteer-1", 1)]
+      })
+    );
+    mocks.tx.volunteerProfile.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "volunteer-1",
+          user: { name: "Julia Westbrook" }
+        }
+      ]);
+
+    await expect(
+      updateAssignment("assignment-1", {
+        date: new Date(2026, 6, 21),
+        dayOfWeek: "TUESDAY",
+        timeSlot: "SLOT_09_11",
+        volunteers: [{ volunteerId: "volunteer-1", slotNumber: 1 }],
+        actorUserId: "admin-1"
+      })
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(mocks.tx.assignment.update).not.toHaveBeenCalled();
+    expect(mocks.tx.assignmentVolunteer.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("allows an existing member to remain when only notes are edited", async () => {
+    mocks.db.assignment.findUniqueOrThrow.mockResolvedValueOnce(
+      assignmentDetail({
+        volunteers: [assignmentSlot("volunteer-1", 1)]
+      })
+    );
+    mocks.tx.assignment.update.mockResolvedValue({ id: "assignment-1" });
+    mocks.tx.assignment.findUniqueOrThrow.mockResolvedValue(
+      assignmentDetail({
+        notes: "Nota actualizada",
+        volunteers: [assignmentSlot("volunteer-1", 1)]
+      })
+    );
+
+    await expect(
+      updateAssignment("assignment-1", {
+        notes: "Nota actualizada",
+        actorUserId: "admin-1"
+      })
+    ).resolves.toBeDefined();
+
+    expect(mocks.tx.volunteerProfile.findMany).not.toHaveBeenCalled();
   });
 
   it("confirms a titular invitation and records a confirmed assignment response", async () => {

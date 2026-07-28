@@ -10,7 +10,6 @@ import { TIME_SLOT_DEFINITIONS } from "@/lib/constants/domain";
 import { formatDisplayDate } from "@/lib/utils";
 import { getAssignmentDetail } from "@/services/assignment.service";
 import { getPreachingPoints } from "@/services/point.service";
-import { getVolunteers } from "@/services/volunteer.service";
 
 type AdminAssignmentDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -21,10 +20,9 @@ export default async function AdminAssignmentDetailPage({
 }: AdminAssignmentDetailPageProps) {
   try {
     const { id } = await params;
-    const [assignment, preachingPoints, volunteers] = await Promise.all([
+    const [assignment, preachingPoints] = await Promise.all([
       getAssignmentDetail(id),
-      getPreachingPoints(),
-      getVolunteers({ activeOnly: true })
+      getPreachingPoints()
     ]);
 
     return (
@@ -70,7 +68,6 @@ export default async function AdminAssignmentDetailPage({
               timeSlot: slot.timeSlot
             }))
           }))}
-          volunteers={volunteers}
         />
       </div>
     );

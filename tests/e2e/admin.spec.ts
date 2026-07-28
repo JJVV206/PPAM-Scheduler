@@ -161,6 +161,75 @@ test.describe("admin workspace", () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test("restricts assignment candidates to volunteer availability @critical @write @email", async ({
+    page,
+    request
+  }) => {
+    await page.goto("/admin/schedule/2026-07-20/SLOT_11_13");
+    await page
+      .getByRole("button", { name: /agregar pareja a este horario/i })
+      .click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    const firstMemberSelect = dialog.getByRole("combobox").first();
+    await firstMemberSelect.click();
+    await expect(
+      page.getByRole("option", { name: "E2E Volunteer", exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("option", { name: "E2E Replacement", exact: true })
+    ).toHaveCount(0);
+    await page
+      .getByRole("option", { name: "E2E Volunteer", exact: true })
+      .click();
+
+    await dialog
+      .getByPlaceholder("Indicaciones opcionales para esta pareja")
+      .fill("E2E availability assignment");
+    await dialog.getByRole("button", { name: "Guardar pareja" }).click();
+    await expect(page.getByText(/Pareja \d+ creada/)).toBeVisible();
+
+    await page.goto("/admin/schedule/2026-07-20/SLOT_07_09");
+    await page
+      .getByRole("button", { name: /agregar pareja a este horario/i })
+      .click();
+    await expect(
+      page
+        .getByRole("dialog")
+        .getByText("No hay voluntarios disponibles para este horario.")
+    ).toBeVisible();
+
+    const assignmentsResponse = await request.get("/api/assignments");
+    const assignments = (await assignmentsResponse.json()) as Array<{
+      preachingPoint: { id: string };
+      scheduleWeekId: string;
+    }>;
+    const volunteersResponse = await request.get("/api/volunteers");
+    const volunteers = (await volunteersResponse.json()) as Array<{
+      id: string;
+      name: string;
+    }>;
+    const volunteer = volunteers.find((item) => item.name === "E2E Volunteer");
+    expect(volunteer).toBeTruthy();
+
+    const manipulatedResponse = await request.post("/api/assignments", {
+      data: {
+        scheduleWeekId: assignments[0].scheduleWeekId,
+        date: "2026-07-26T12:00:00.000Z",
+        dayOfWeek: "SUNDAY",
+        timeSlot: "SLOT_07_09",
+        preachingPointId: assignments[0].preachingPoint.id,
+        volunteers: [{ volunteerId: volunteer!.id, slotNumber: 1 }]
+      }
+    });
+    const manipulatedBody = await manipulatedResponse.json();
+
+    expect(manipulatedResponse.status()).toBe(409);
+    expect(manipulatedBody.error).toMatch(/disponibilidad/i);
+  });
+
   test("sends an assignment invitation email through Mailpit @critical @write @email", async ({
     adminAssignmentsPage,
     e2eData,

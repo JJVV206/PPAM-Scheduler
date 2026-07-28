@@ -42,8 +42,10 @@ import {
   TIME_SLOTS
 } from "@/lib/constants/domain";
 import { FIXED_PREACHING_POINT_NAME } from "@/lib/constants/preaching-point";
+import { getPpamDayOfWeek } from "@/lib/assignments/time";
 import { TimeSlotOptionButton } from "@/components/assignments/time-slot-option-button";
 import { useAssignmentPreflightWarnings } from "@/components/assignments/use-assignment-preflight-warnings";
+import { useEligibleVolunteers } from "@/components/assignments/use-eligible-volunteers";
 import { cn } from "@/lib/utils";
 import type {
   DayOfWeek,
@@ -75,18 +77,8 @@ type AssignmentFormProps = {
   triggerSize?: ButtonProps["size"];
   weekStartDate: string;
   preachingPoints: PreachingPointSummary[];
-  volunteers: VolunteerSummary[];
 };
 
-const DAY_ORDER: DayOfWeek[] = [
-  "SUNDAY",
-  "MONDAY",
-  "TUESDAY",
-  "WEDNESDAY",
-  "THURSDAY",
-  "FRIDAY",
-  "SATURDAY"
-];
 const SUCCESS_CLOSE_DELAY_MS = 900;
 const MIN_VISIBLE_MEMBER_FIELDS = 2;
 const UNASSIGNED_VOLUNTEER_VALUE = "__unassigned__";
@@ -100,8 +92,7 @@ function parseLocalDateOnly(value: string) {
 }
 
 function getDayOfWeekFromDate(value: string): DayOfWeek {
-  const date = parseLocalDateOnly(value);
-  return DAY_ORDER[date.getDay()];
+  return getPpamDayOfWeek(new Date(value + "T12:00:00.000Z"));
 }
 
 function toAssignmentIsoDate(value: string) {
@@ -129,8 +120,7 @@ export function AssignmentForm({
   triggerLabel = "Agregar pareja",
   triggerSize = "lg",
   weekStartDate,
-  preachingPoints,
-  volunteers
+  preachingPoints
 }: AssignmentFormProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -141,6 +131,9 @@ export function AssignmentForm({
   } | null>(null);
   const [memberVolunteerIds, setMemberVolunteerIds] = useState<string[]>(
     Array.from({ length: MIN_VISIBLE_MEMBER_FIELDS }, () => "")
+  );
+  const [knownVolunteers, setKnownVolunteers] = useState<VolunteerSummary[]>(
+    []
   );
   const closeTimeoutRef = useRef<number | null>(null);
 
@@ -199,16 +192,10 @@ export function AssignmentForm({
     return () => clearCloseTimeout();
   }, []);
 
-  const primaryVolunteerOptions = useMemo(
-    () => volunteers.filter((volunteer) => volunteer.canServeAsPrimary),
-    [volunteers]
-  );
   const selectedMemberVolunteerIds = useMemo(
     () => normalizeSelectedVolunteerIds(memberVolunteerIds),
     [memberVolunteerIds]
   );
-  const canAddMemberField =
-    memberVolunteerIds.length < primaryVolunteerOptions.length;
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
@@ -229,9 +216,7 @@ export function AssignmentForm({
 
   function addMemberField() {
     setMemberVolunteerIds((current) =>
-      current.length < primaryVolunteerOptions.length
-        ? [...current, ""]
-        : current
+      current.length < volunteerOptions.length ? [...current, ""] : current
     );
   }
 
@@ -254,9 +239,10 @@ export function AssignmentForm({
       })
     );
 
-    return primaryVolunteerOptions.filter(
+    return volunteerOptions.filter(
       (volunteer) =>
-        volunteer.id === memberVolunteerIds[index] ||
+        (volunteer.id === memberVolunteerIds[index] ||
+          eligibleVolunteerIds.has(volunteer.id)) &&
         !selectedIds.has(volunteer.id)
     );
   }
@@ -278,6 +264,55 @@ export function AssignmentForm({
       }),
     [selectedDate]
   );
+  const eligibleVolunteersQuery = useEligibleVolunteers({
+    date: selectedDate,
+    enabled: open,
+    timeSlot: selectedTimeSlot
+  });
+  const eligibleVolunteers = useMemo(
+    () => eligibleVolunteersQuery.data?.volunteers ?? [],
+    [eligibleVolunteersQuery.data]
+  );
+  const eligibleVolunteerIds = useMemo(
+    () => new Set(eligibleVolunteers.map((volunteer) => volunteer.id)),
+    [eligibleVolunteers]
+  );
+
+  useEffect(() => {
+    if (!eligibleVolunteersQuery.data?.volunteers.length) return;
+
+    setKnownVolunteers((current) => {
+      const next = new Map(
+        current.map((volunteer) => [volunteer.id, volunteer])
+      );
+      for (const volunteer of eligibleVolunteersQuery.data.volunteers) {
+        next.set(volunteer.id, volunteer);
+      }
+      return [...next.values()];
+    });
+  }, [eligibleVolunteersQuery.data]);
+
+  const volunteerOptions = useMemo(() => {
+    const options = new Map(
+      eligibleVolunteers.map((volunteer) => [volunteer.id, volunteer])
+    );
+    const knownById = new Map(
+      knownVolunteers.map((volunteer) => [volunteer.id, volunteer])
+    );
+
+    for (const volunteerId of selectedMemberVolunteerIds) {
+      const knownVolunteer = knownById.get(volunteerId);
+      if (knownVolunteer) options.set(volunteerId, knownVolunteer);
+    }
+
+    return [...options.values()];
+  }, [eligibleVolunteers, knownVolunteers, selectedMemberVolunteerIds]);
+  const canAddMemberField = memberVolunteerIds.length < volunteerOptions.length;
+  const hasIneligibleSelection =
+    eligibleVolunteersQuery.isSuccess &&
+    selectedMemberVolunteerIds.some(
+      (volunteerId) => !eligibleVolunteerIds.has(volunteerId)
+    );
 
   const compatiblePoints = useMemo(() => {
     const matches = preachingPoints.filter(
@@ -317,6 +352,33 @@ export function AssignmentForm({
     setFeedback(null);
     const selectedVolunteerIds =
       normalizeSelectedVolunteerIds(memberVolunteerIds);
+
+    if (eligibleVolunteersQuery.isFetching) {
+      setFeedback({
+        tone: "error",
+        text: "Espera a que termine la consulta de voluntarios disponibles."
+      });
+      setSubmitting(false);
+      return;
+    }
+
+    if (eligibleVolunteersQuery.isError) {
+      setFeedback({
+        tone: "error",
+        text: "No fue posible consultar los voluntarios disponibles. Inténtalo de nuevo."
+      });
+      setSubmitting(false);
+      return;
+    }
+
+    if (hasIneligibleSelection) {
+      setFeedback({
+        tone: "error",
+        text: "Quita los integrantes que ya no están disponibles para este horario."
+      });
+      setSubmitting(false);
+      return;
+    }
 
     if (hasDuplicateVolunteerIds(selectedVolunteerIds)) {
       setFeedback({
@@ -521,7 +583,12 @@ export function AssignmentForm({
 
             <div className="space-y-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <FormLabel>Integrantes</FormLabel>
+                <div className="flex items-center gap-2">
+                  <FormLabel>Integrantes</FormLabel>
+                  <span className="text-xs text-muted-foreground">
+                    {eligibleVolunteers.length} candidatos disponibles
+                  </span>
+                </div>
                 <Button
                   type="button"
                   size="sm"
@@ -564,6 +631,7 @@ export function AssignmentForm({
                       </div>
                       <Select
                         value={volunteerId || UNASSIGNED_VOLUNTEER_VALUE}
+                        disabled={eligibleVolunteersQuery.isFetching}
                         onValueChange={(nextValue) =>
                           setMemberVolunteerId(
                             index,
@@ -583,6 +651,9 @@ export function AssignmentForm({
                           {selectableVolunteers.map((volunteer) => (
                             <SelectItem key={volunteer.id} value={volunteer.id}>
                               {volunteer.name}
+                              {!eligibleVolunteerIds.has(volunteer.id)
+                                ? " (ya no disponible)"
+                                : ""}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -591,6 +662,28 @@ export function AssignmentForm({
                   );
                 })}
               </div>
+              {eligibleVolunteersQuery.isFetching ? (
+                <p className="text-xs text-muted-foreground">
+                  Consultando voluntarios disponibles...
+                </p>
+              ) : null}
+              {eligibleVolunteersQuery.isSuccess &&
+              !eligibleVolunteers.length ? (
+                <p className="rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
+                  No hay voluntarios disponibles para este horario.
+                </p>
+              ) : null}
+              {eligibleVolunteersQuery.isError ? (
+                <p className="rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-xs text-danger">
+                  No fue posible consultar los voluntarios disponibles.
+                </p>
+              ) : null}
+              {hasIneligibleSelection ? (
+                <p className="rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
+                  Hay un integrante seleccionado que no está disponible para el
+                  horario actual. Quita esa selección o cambia el horario.
+                </p>
+              ) : null}
             </div>
 
             <FormField
@@ -627,7 +720,15 @@ export function AssignmentForm({
               >
                 Cerrar
               </Button>
-              <Button type="submit" size="sm" disabled={submitting}>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={
+                  submitting ||
+                  eligibleVolunteersQuery.isFetching ||
+                  hasIneligibleSelection
+                }
+              >
                 {submitting ? "Guardando..." : "Guardar pareja"}
               </Button>
             </div>

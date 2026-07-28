@@ -12,7 +12,6 @@ import { db } from "@/lib/db/prisma";
 import { formatDisplayDate } from "@/lib/utils";
 import { getAssignmentsForScheduleSlot } from "@/services/assignment.service";
 import { getPreachingPoints } from "@/services/point.service";
-import { getVolunteers } from "@/services/volunteer.service";
 import type { TimeSlot } from "@/types/domain";
 
 type AdminScheduleSlotPageProps = {
@@ -38,14 +37,13 @@ export default async function AdminScheduleSlotPage({
     notFound();
   }
 
-  const [assignments, preachingPoints, volunteers, scheduleWeek] =
+  const [assignments, preachingPoints, scheduleWeek] =
     await Promise.all([
       getAssignmentsForScheduleSlot({
         date: slotDate,
         timeSlot
       }),
       getPreachingPoints(),
-      getVolunteers({ activeOnly: true }),
       db.scheduleWeek.findFirst({
         where: {
           startDate: { lte: slotDate },
@@ -122,7 +120,6 @@ export default async function AdminScheduleSlotPage({
                       .toISOString()
                       .slice(0, 10)}
                     preachingPoints={formattedPoints}
-                    volunteers={volunteers}
                   />
                 </div>
               ) : null}
@@ -220,7 +217,6 @@ export default async function AdminScheduleSlotPage({
                     assignment={assignment}
                     compact
                     preachingPoints={formattedPoints}
-                    volunteers={volunteers}
                   />
                 </section>
               ))}
